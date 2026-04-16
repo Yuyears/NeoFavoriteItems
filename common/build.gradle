@@ -1,0 +1,13 @@
+
+plugins {
+    id("dev.architectury.loom") version "1.7-SNAPSHOT"
+}
+
+dependencies {
+    minecraft("com.mojang:minecraft:${property("minecraft_version")}")
+    mappings(loom.layered {
+        officialMojangMappings()
+        parchment("org.parchmentmc.data:parchment-${property("minecraft_version")}:${property("parchment_mappings_version")}@zip")
+    })
+}
+

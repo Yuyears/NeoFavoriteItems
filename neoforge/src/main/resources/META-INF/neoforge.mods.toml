@@ -1,0 +1,12 @@
+
+modLoader="neoforge"
+loaderVersion="[2,)"
+license="MIT"
+
+[[mods]]
+modId="new_item_favorites"
+version="${version}"
+displayName="New Item Favorites"
+description='''
+A versatile item favorites/lock mod for Minecraft
+'''

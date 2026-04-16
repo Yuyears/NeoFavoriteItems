@@ -1,0 +1,27 @@
+
+{
+  "schemaVersion": 1,
+  "id": "new_item_favorites",
+  "version": "${version}",
+  "name": "New Item Favorites",
+  "description": "A versatile item favorites/lock mod for Minecraft",
+  "authors": [],
+  "contact": {},
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "mycraft.yuyears.newitemfavorites.fabric.NewItemFavoritesFabric"
+    ]
+  },
+  "mixins": [
+    "new_item_favorites.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": "&gt;=0.15.11",
+    "minecraft": "~1.21.1",
+    "java": "&gt;=21",
+    "fabric-api": "*"
+  },
+  "suggests": {}
+}

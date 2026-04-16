@@ -1,0 +1,8 @@
+
+{
+  "key.new_item_favorites.toggle_favorite": "Toggle Favorite Slot",
+  "key.new_item_favorites.bypass_lock": "Bypass Lock",
+  "category.new_item_favorites": "New Item Favorites",
+  "text.new_item_favorites.slot_marked": "Slot marked as favorite!",
+  "text.new_item_favorites.slot_unmarked": "Slot unmarked as favorite!"
+}

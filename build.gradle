@@ -1,0 +1,27 @@
+
+plugins {
+    id("java")
+    id("idea")
+    id("eclipse")
+}
+
+allprojects {
+    apply(plugin = "java")
+    apply(plugin = "idea")
+    apply(plugin = "eclipse")
+
+    repositories {
+        mavenCentral()
+    }
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    tasks.withType&lt;JavaCompile&gt; {
+        options.encoding = "UTF-8"
+        options.release.set(21)
+    }
+}
+

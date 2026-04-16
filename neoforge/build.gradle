@@ -1,0 +1,30 @@
+
+plugins {
+    id("dev.architectury.loom") version "1.7-SNAPSHOT"
+    id("architectury-plugin") version "3.4-SNAPSHOT"
+}
+
+architectury {
+    platformSetupLoomIde()
+    neoForge()
+}
+
+dependencies {
+    minecraft("com.mojang:minecraft:${property("minecraft_version")}")
+    mappings(loom.layered {
+        officialMojangMappings()
+        parchment("org.parchmentmc.data:parchment-${property("minecraft_version")}:${property("parchment_mappings_version")}@zip")
+    })
+
+    neoForge("net.neoforged:neoforge:${property("neoforge_version")}")
+
+    implementation(project(":common"))
+    shadow(project(":common"))
+}
+
+tasks.processResources {
+    inputs.property("version", project.version)
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand("version" to project.version)
+    }
+}
