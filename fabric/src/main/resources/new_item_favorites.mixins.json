@@ -5,7 +5,9 @@
   "package": "mycraft.yuyears.newitemfavorites.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [],
-  "client": [],
+  "client": [
+    "AbstractContainerScreenMixin"
+  ],
   "server": [],
   "injectors": {
     "defaultRequire": 1

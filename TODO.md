@@ -1,55 +1,55 @@
-# New Item Favorites Mod - TODO List
+# NeoFavoriteItems TODO
 
-## 项目状态跟踪
+最后更新：2026-04-20
 
-### 已完成的功能 ✅
+## 阶段 0：本地构建入口
 
-**核心功能**：
-1. ✅ 项目基础架构和多平台Gradle配置
-2. ✅ 核心数据模型和TOML配置系统
-3. ✅ 公共API层和平台无关的核心逻辑
-4. ✅ Fabric平台集成
-5. ✅ Forge平台集成
-6. ✅ NeoForge平台集成
-7. ✅ Overlay渲染系统
-8. ✅ 数据持久化系统
+状态：完成
 
-**资源和文档**：
-9. ✅ 语言文件和资源文件
-10. ✅ 项目文档
+- 已添加当前目录 `gradle.bat`，固定使用 `D:\Tools\Gradle\gradle-8.14.4`。
+- 已固定 Gradle 下载/缓存目录为 `D:\Tools\Gradle\GRADLE_Local_Repository`。
+- 直接运行 `.\gradle.bat` 时，默认提交 `common/fabric/forge/neoforge` 四端 `compileJava`，由 Gradle 自动调度执行。
+- 传入参数时保持透传，例如 `.\gradle.bat :fabric:compileJava`。
 
-### 待实现的功能 📋
+## 阶段 1：架构设计与 common 核心
 
-**高优先级**：
-12. ⏳ 实现物品栏操作拦截（Mixin）
-19. ⏳ 可配置收藏的物品栏是否阻止消耗品的使用、方块的放置、功能物品的使用、工具武器的使用
+状态：完成
 
-**中优先级**：
-11. ⏳ 创建纹理文件（lock.png, star.png, checkmark.png）
-13. ⏳ 实现音效系统
-14. ⏳ 服务端权威验证的完整实现
-15. ⏳ 编写单元测试和集成测试
+- 已新增 `ARCHITECTURE_DESIGN.md`，记录新模组分层、平台边界、槽位映射和服务端权威策略。
+- 已引入 `LogicalSlotIndex`、`SlotMappingService`、`InteractionGuardService` 等 common 层基础模型。
+- 已把 `FavoritesManager` 从裸 `int` 存储迁移到逻辑槽位模型，同时保留兼容入口。
+- 验证：`:common:compileJava` 已通过。
 
-**低优先级**：
-16. ⏳ 优化性能和内存使用
-17. ⏳ 添加更多Overlay样式选项
-18. ⏳ 实现物品栏排序功能
+## 阶段 2：Fabric 1.21.1 基础集成
 
-## 进度跟踪
+状态：完成
 
-- **最后更新**：2026-04-12
-- **已完成**：10/19 个任务
-- **进行中**：0 个任务
-- **待实现**：9 个任务
+- 已完成 Fabric 入口和 Overlay 渲染的 1.21.1 Mojmap/API 迁移。
+- Fabric 平台细节通过 helper/反射隔离，避免 common 层依赖 Minecraft client 类型。
+- 验证：`:fabric:compileJava` 已通过。
 
-## 建议的下一步计划
+## 阶段 3：Forge/NeoForge 1.21.1 基础集成
 
-1. **创建纹理文件**：准备Overlay渲染系统需要的纹理资源
-2. **实现物品栏操作拦截**：使用Mixin技术拦截各种物品栏操作
-3. **实现音效系统**：为用户操作提供反馈
-4. **完善服务端验证**：确保多人游戏中的安全性
+状态：完成
 
-## 任务更新记录
+- 已为 Forge/NeoForge 子项目添加 `loom.platform`，让 Architectury Loom 正确注册 loader 配置。
+- 已完成 Forge/NeoForge 入口、客户端 tick、Overlay 渲染和 1.21.1 Mojmap/API 迁移。
+- 平台私有字段访问集中在平台层 helper 中，common 层不承担映射兼容成本。
+- 验证：`:forge:compileJava` 与 `:neoforge:compileJava` 已通过。
 
-- **2026-04-12**：初始创建TODO列表，标记已完成的核心功能
-- **2026-04-12**：添加新任务 - 可配置收藏的物品栏是否阻止消耗品的使用、方块的放置、功能物品的使用、工具武器的使用
+## 阶段 4：交互拦截与服务端权威
+
+状态：进行中
+
+- 设计目标：平台层只负责捕获点击、拖拽、快捷移动、丢弃、热键等交互，决策统一交给 common 的 `InteractionGuardService`。
+- Fabric 已接入 `AbstractContainerScreen#slotClicked` 薄 mixin，并通过 `:fabric:compileJava`。
+- 下一步：复用同一决策模型到 Forge/NeoForge，继续补齐服务端权威验证点。
+- 需要覆盖的风险点：创造模式、旁路键、非玩家容器槽位、多人服务端验证和客户端提示一致性。
+
+## 阶段 5：资源、体验与测试
+
+状态：待开始
+
+- 补齐 `lock.png`、`star.png`、`checkmark.png` 或改为更稳定的程序化 Overlay。
+- 增加最小单元测试，优先覆盖槽位映射、序列化兼容和交互决策。
+- 最终验证目标：三平台 `compileJava` 通过，并尽量执行可用的资源处理/打包任务。

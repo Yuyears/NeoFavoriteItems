@@ -4,25 +4,27 @@ package mycraft.yuyears.newitemfavorites.neoforge;
 import mycraft.yuyears.newitemfavorites.ConfigManager;
 import mycraft.yuyears.newitemfavorites.FavoritesManager;
 import mycraft.yuyears.newitemfavorites.NewItemFavoritesMod;
+import mycraft.yuyears.newitemfavorites.domain.LogicalSlotIndex;
+import mycraft.yuyears.newitemfavorites.integration.SlotMappingService;
 import mycraft.yuyears.newitemfavorites.neoforge.render.NeoForgeOverlayRenderer;
 import mycraft.yuyears.newitemfavorites.persistence.DataPersistenceManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvent;
-import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.neoforged.fml.loading.FMLLoader;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.lwjgl.glfw.GLFW;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 @Mod(NewItemFavoritesMod.MOD_ID)
 public class NewItemFavoritesNeoForge {
@@ -31,10 +33,9 @@ public class NewItemFavoritesNeoForge {
     private static net.minecraft.client.KeyMapping bypassLockKey;
     private static boolean bypassKeyHeld = false;
 
-    public NewItemFavoritesNeoForge() {
+    public NewItemFavoritesNeoForge(IEventBus modBus) {
         NewItemFavoritesMod.getInstance().initialize();
-        
-        var modBus = FMLJavaModLoadingContext.get().getModEventBus();
+
         modBus.addListener(this::setup);
         modBus.addListener(this::clientSetup);
         modBus.addListener(this::registerKeyBindings);
@@ -101,41 +102,91 @@ public class NewItemFavoritesNeoForge {
     }
 
     @SubscribeEvent
-    public void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
-            var minecraft = Minecraft.getInstance();
-            if (minecraft.player == null) return;
+    public void onClientTick(ClientTickEvent.Post event) {
+        var minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) return;
             
-            bypassKeyHeld = bypassLockKey.isDown();
+        bypassKeyHeld = bypassLockKey.isDown();
             
-            // 当世界加载时，设置世界保存目录
-            if (minecraft.level != null && minecraft.getSingleplayerServer() != null) {
-                DataPersistenceManager.getInstance().setWorldSaveDirectory(
-                    minecraft.getSingleplayerServer().getWorldPath(minecraft.level.dimension())
-                );
-            }
+        // 当世界加载时，设置世界保存目录
+        if (minecraft.level != null && minecraft.getSingleplayerServer() != null) {
+            DataPersistenceManager.getInstance().setWorldSaveDirectory(
+                minecraft.getSingleplayerServer().getServerDirectory()
+            );
+        }
             
-            while (toggleFavoriteKey.consumeClick()) {
-                if (minecraft.screen != null &amp;&amp; minecraft.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen) {
-                    int hoveredSlot = getHoveredSlot(minecraft);
-                    if (hoveredSlot &gt;= 0) {
-                        FavoritesManager.getInstance().toggleSlotFavorite(hoveredSlot);
-                        boolean isFavorite = FavoritesManager.getInstance().isSlotFavorite(hoveredSlot);
-                        String message = isFavorite ? "Slot marked as favorite!" : "Slot unmarked as favorite!";
-                        minecraft.player.displayClientMessage(Component.literal(message), true);
-                    }
+        while (toggleFavoriteKey.consumeClick()) {
+            if (minecraft.screen != null && minecraft.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen) {
+                LogicalSlotIndex hoveredSlot = getHoveredSlot(minecraft);
+                if (hoveredSlot != null) {
+                    FavoritesManager.getInstance().toggleSlotFavorite(hoveredSlot);
+                    boolean isFavorite = FavoritesManager.getInstance().isSlotFavorite(hoveredSlot);
+                    String message = isFavorite ? "Slot marked as favorite!" : "Slot unmarked as favorite!";
+                    minecraft.player.displayClientMessage(Component.literal(message), true);
                 }
             }
         }
     }
 
-    private int getHoveredSlot(Minecraft minecraft) {
+    private LogicalSlotIndex getHoveredSlot(Minecraft minecraft) {
         var screen = minecraft.screen;
         if (screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen inventoryScreen) {
-            var slot = inventoryScreen.hoveredSlot;
-            return slot != null ? slot.index : -1;
+            var slot = getHoveredSlotReflectively(inventoryScreen);
+            if (slot != null && slot.container == minecraft.player.getInventory()) {
+                return SlotMappingService.fromPlayerInventoryIndex(getContainerSlotIndex(slot)).orElse(null);
+            }
         }
-        return -1;
+        return null;
+    }
+
+    private net.minecraft.world.inventory.Slot getHoveredSlotReflectively(Object screen) {
+        Class<?> type = screen.getClass();
+        while (type != null) {
+            try {
+                Field field = type.getDeclaredField("hoveredSlot");
+                field.setAccessible(true);
+                return (net.minecraft.world.inventory.Slot) field.get(screen);
+            } catch (NoSuchFieldException ignored) {
+                type = type.getSuperclass();
+            } catch (IllegalAccessException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private int getContainerSlotIndex(net.minecraft.world.inventory.Slot slot) {
+        Integer methodResult = invokeIntMethod(slot, "getContainerSlot");
+        if (methodResult != null) {
+            return methodResult;
+        }
+
+        Integer fieldResult = readIntField(slot, "slot");
+        if (fieldResult != null) {
+            return fieldResult;
+        }
+
+        fieldResult = readIntField(slot, "index");
+        return fieldResult == null ? -1 : fieldResult;
+    }
+
+    private Integer invokeIntMethod(Object target, String name) {
+        try {
+            Method method = target.getClass().getMethod(name);
+            return (Integer) method.invoke(target);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private Integer readIntField(Object target, String name) {
+        try {
+            Field field = target.getClass().getDeclaredField(name);
+            field.setAccessible(true);
+            return field.getInt(target);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
     }
 
     public static boolean isBypassKeyHeld() {

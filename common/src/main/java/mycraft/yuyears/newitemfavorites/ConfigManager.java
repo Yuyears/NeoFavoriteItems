@@ -156,12 +156,12 @@ public class ConfigManager {
     private void setConfigValue(String section, String key, String value) {
         try {
             switch (section) {
-                case "general" -&gt; setGeneralValue(key, value);
-                case "lockBehavior" -&gt; setLockBehaviorValue(key, value);
-                case "slotBehavior" -&gt; setSlotBehaviorValue(key, value);
-                case "overlay" -&gt; setOverlayValue(key, value);
-                case "feedback" -&gt; setFeedbackValue(key, value);
-                case "keybindings" -&gt; setKeybindingValue(key, value);
+                case "general" -> setGeneralValue(key, value);
+                case "lockBehavior" -> setLockBehaviorValue(key, value);
+                case "slotBehavior" -> setSlotBehaviorValue(key, value);
+                case "overlay" -> setOverlayValue(key, value);
+                case "feedback" -> setFeedbackValue(key, value);
+                case "keybindings" -> setKeybindingValue(key, value);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -170,21 +170,21 @@ public class ConfigManager {
 
     private void setGeneralValue(String key, String value) {
         switch (key) {
-            case "lockEmptySlots" -&gt; config.general.lockEmptySlots = Boolean.parseBoolean(value);
-            case "autoUnlockEmptySlots" -&gt; config.general.autoUnlockEmptySlots = Boolean.parseBoolean(value);
-            case "allowItemsIntoLockedEmptySlots" -&gt; config.general.allowItemsIntoLockedEmptySlots = Boolean.parseBoolean(value);
+            case "lockEmptySlots" -> config.general.lockEmptySlots = Boolean.parseBoolean(value);
+            case "autoUnlockEmptySlots" -> config.general.autoUnlockEmptySlots = Boolean.parseBoolean(value);
+            case "allowItemsIntoLockedEmptySlots" -> config.general.allowItemsIntoLockedEmptySlots = Boolean.parseBoolean(value);
         }
     }
 
     private void setLockBehaviorValue(String key, String value) {
         switch (key) {
-            case "preventClick" -&gt; config.lockBehavior.preventClick = Boolean.parseBoolean(value);
-            case "preventDrop" -&gt; config.lockBehavior.preventDrop = Boolean.parseBoolean(value);
-            case "preventQuickMove" -&gt; config.lockBehavior.preventQuickMove = Boolean.parseBoolean(value);
-            case "preventShiftClick" -&gt; config.lockBehavior.preventShiftClick = Boolean.parseBoolean(value);
-            case "preventDrag" -&gt; config.lockBehavior.preventDrag = Boolean.parseBoolean(value);
-            case "preventSwap" -&gt; config.lockBehavior.preventSwap = Boolean.parseBoolean(value);
-            case "allowBypassWithKey" -&gt; config.lockBehavior.allowBypassWithKey = Boolean.parseBoolean(value);
+            case "preventClick" -> config.lockBehavior.preventClick = Boolean.parseBoolean(value);
+            case "preventDrop" -> config.lockBehavior.preventDrop = Boolean.parseBoolean(value);
+            case "preventQuickMove" -> config.lockBehavior.preventQuickMove = Boolean.parseBoolean(value);
+            case "preventShiftClick" -> config.lockBehavior.preventShiftClick = Boolean.parseBoolean(value);
+            case "preventDrag" -> config.lockBehavior.preventDrag = Boolean.parseBoolean(value);
+            case "preventSwap" -> config.lockBehavior.preventSwap = Boolean.parseBoolean(value);
+            case "allowBypassWithKey" -> config.lockBehavior.allowBypassWithKey = Boolean.parseBoolean(value);
         }
     }
 
@@ -201,18 +201,18 @@ public class ConfigManager {
 
     private void setOverlayValue(String key, String value) {
         switch (key) {
-            case "lockedStyle" -&gt; config.overlay.lockedStyle = parseOverlayStyle(value);
-            case "unlockedStyle" -&gt; config.overlay.unlockedStyle = parseOverlayStyle(value);
-            case "holdingKeyLockedStyle" -&gt; config.overlay.holdingKeyLockedStyle = parseOverlayStyle(value);
-            case "holdingKeyUnlockedStyle" -&gt; config.overlay.holdingKeyUnlockedStyle = parseOverlayStyle(value);
-            case "overlayColor" -&gt; {
+            case "lockedStyle" -> config.overlay.lockedStyle = parseOverlayStyle(value);
+            case "unlockedStyle" -> config.overlay.unlockedStyle = parseOverlayStyle(value);
+            case "holdingKeyLockedStyle" -> config.overlay.holdingKeyLockedStyle = parseOverlayStyle(value);
+            case "holdingKeyUnlockedStyle" -> config.overlay.holdingKeyUnlockedStyle = parseOverlayStyle(value);
+            case "overlayColor" -> {
                 if (value.startsWith("0x")) {
                     config.overlay.overlayColor = (int) Long.parseLong(value.substring(2), 16);
                 } else {
                     config.overlay.overlayColor = Integer.parseInt(value);
                 }
             }
-            case "overlayOpacity" -&gt; config.overlay.overlayOpacity = Float.parseFloat(value);
+            case "overlayOpacity" -> config.overlay.overlayOpacity = Float.parseFloat(value);
         }
     }
 
@@ -227,18 +227,18 @@ public class ConfigManager {
 
     private void setFeedbackValue(String key, String value) {
         switch (key) {
-            case "showVisualFeedback" -&gt; config.feedback.showVisualFeedback = Boolean.parseBoolean(value);
-            case "playSoundFeedback" -&gt; config.feedback.playSoundFeedback = Boolean.parseBoolean(value);
-            case "feedbackSound" -&gt; config.feedback.feedbackSound = value.replace("\"", "");
-            case "feedbackVolume" -&gt; config.feedback.feedbackVolume = Float.parseFloat(value);
-            case "feedbackPitch" -&gt; config.feedback.feedbackPitch = Float.parseFloat(value);
+            case "showVisualFeedback" -> config.feedback.showVisualFeedback = Boolean.parseBoolean(value);
+            case "playSoundFeedback" -> config.feedback.playSoundFeedback = Boolean.parseBoolean(value);
+            case "feedbackSound" -> config.feedback.feedbackSound = value.replace("\"", "");
+            case "feedbackVolume" -> config.feedback.feedbackVolume = Float.parseFloat(value);
+            case "feedbackPitch" -> config.feedback.feedbackPitch = Float.parseFloat(value);
         }
     }
 
     private void setKeybindingValue(String key, String value) {
         switch (key) {
-            case "toggleFavoriteKey" -&gt; config.keybindings.toggleFavoriteKey = value.replace("\"", "");
-            case "bypassLockKey" -&gt; config.keybindings.bypassLockKey = value.replace("\"", "");
+            case "toggleFavoriteKey" -> config.keybindings.toggleFavoriteKey = value.replace("\"", "");
+            case "bypassLockKey" -> config.keybindings.bypassLockKey = value.replace("\"", "");
         }
     }
 

@@ -1,7 +1,6 @@
-
 plugins {
-    id("dev.architectury.loom") version "1.7-SNAPSHOT"
-    id("architectury-plugin") version "3.4-SNAPSHOT"
+    id("dev.architectury.loom")
+    id("architectury-plugin")
 }
 
 architectury {
@@ -13,13 +12,10 @@ dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
     mappings(loom.layered {
         officialMojangMappings()
-        parchment("org.parchmentmc.data:parchment-${property("minecraft_version")}:${property("parchment_mappings_version")}@zip")
     })
 
-    forge("net.minecraftforge:forge:${property("minecraft_version")}-${property("forge_version")}")
-
+    add("forge", "net.minecraftforge:forge:${property("minecraft_version")}-${property("forge_version")}")
     implementation(project(":common"))
-    shadow(project(":common"))
 }
 
 tasks.processResources {

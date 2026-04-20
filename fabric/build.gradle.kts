@@ -1,7 +1,6 @@
-
 plugins {
-    id("dev.architectury.loom") version "1.7-SNAPSHOT"
-    id("architectury-plugin") version "3.4-SNAPSHOT"
+    id("dev.architectury.loom")
+    id("architectury-plugin")
 }
 
 architectury {
@@ -9,22 +8,16 @@ architectury {
     fabric()
 }
 
-loom {
-    accessWidenerPath.set(file("src/main/resources/new_item_favorites.accesswidener"))
-}
-
 dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
     mappings(loom.layered {
         officialMojangMappings()
-        parchment("org.parchmentmc.data:parchment-${property("minecraft_version")}:${property("parchment_mappings_version")}@zip")
     })
 
     modImplementation("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
 
     implementation(project(":common"))
-    shadow(project(":common"))
 }
 
 tasks.processResources {
@@ -33,4 +26,3 @@ tasks.processResources {
         expand("version" to project.version)
     }
 }
-

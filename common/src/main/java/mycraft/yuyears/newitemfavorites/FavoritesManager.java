@@ -4,14 +4,19 @@ package mycraft.yuyears.newitemfavorites;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import mycraft.yuyears.newitemfavorites.application.InteractionGuardService;
+import mycraft.yuyears.newitemfavorites.domain.InteractionType;
+import mycraft.yuyears.newitemfavorites.domain.LogicalSlotIndex;
+import mycraft.yuyears.newitemfavorites.integration.SlotMappingService;
 
 public class FavoritesManager {
     private static FavoritesManager instance;
-    private final Set&lt;Integer&gt; favoriteSlots;
+    private final Set<LogicalSlotIndex> favoriteSlots;
     private UUID currentPlayerUUID;
 
     private FavoritesManager() {
-        this.favoriteSlots = new HashSet&lt;&gt;();
+        this.favoriteSlots = new HashSet<>();
     }
 
     public static FavoritesManager getInstance() {
@@ -34,18 +39,32 @@ public class FavoritesManager {
     }
 
     public boolean isSlotFavorite(int slot) {
+        return SlotMappingService.fromPlayerInventoryIndex(slot)
+            .map(favoriteSlots::contains)
+            .orElse(false);
+    }
+
+    public boolean isSlotFavorite(LogicalSlotIndex slot) {
         return favoriteSlots.contains(slot);
     }
 
     public void toggleSlotFavorite(int slot) {
+        SlotMappingService.fromPlayerInventoryIndex(slot).ifPresent(this::toggleSlotFavorite);
+    }
+
+    public void toggleSlotFavorite(LogicalSlotIndex slot) {
         if (favoriteSlots.contains(slot)) {
             favoriteSlots.remove(slot);
-        } else {
-            favoriteSlots.add(slot);
+            return;
         }
+        favoriteSlots.add(slot);
     }
 
     public void setSlotFavorite(int slot, boolean favorite) {
+        SlotMappingService.fromPlayerInventoryIndex(slot).ifPresent(logicalSlot -> setSlotFavorite(logicalSlot, favorite));
+    }
+
+    public void setSlotFavorite(LogicalSlotIndex slot, boolean favorite) {
         if (favorite) {
             favoriteSlots.add(slot);
         } else {
@@ -53,8 +72,14 @@ public class FavoritesManager {
         }
     }
 
-    public Set&lt;Integer&gt; getFavoriteSlots() {
-        return new HashSet&lt;&gt;(favoriteSlots);
+    public Set<Integer> getFavoriteSlots() {
+        return favoriteSlots.stream()
+            .map(LogicalSlotIndex::value)
+            .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    public Set<LogicalSlotIndex> getFavoriteLogicalSlots() {
+        return new HashSet<>(favoriteSlots);
     }
 
     public void clearFavorites() {
@@ -89,23 +114,15 @@ public class FavoritesManager {
     }
 
     public boolean shouldPreventInteraction(int slot, boolean isHoldingBypassKey) {
-        if (!isSlotFavorite(slot)) {
-            return false;
-        }
-
-        NewItemFavoritesConfig config = ConfigManager.getInstance().getConfig();
-        
-        if (isHoldingBypassKey &amp;&amp; config.lockBehavior.allowBypassWithKey) {
-            return false;
-        }
-
-        return true;
+        return InteractionGuardService.getInstance()
+            .evaluate(slot, InteractionType.CLICK, isHoldingBypassKey)
+            .denied();
     }
 
     public byte[] serialize() {
         StringBuilder sb = new StringBuilder();
-        for (int slot : favoriteSlots) {
-            sb.append(slot).append(",");
+        for (LogicalSlotIndex slot : favoriteSlots) {
+            sb.append(slot.value()).append(",");
         }
         return sb.toString().getBytes();
     }
@@ -118,7 +135,8 @@ public class FavoritesManager {
             for (String slotStr : slots) {
                 if (!slotStr.isEmpty()) {
                     try {
-                        favoriteSlots.add(Integer.parseInt(slotStr));
+                        SlotMappingService.fromPlayerInventoryIndex(Integer.parseInt(slotStr))
+                            .ifPresent(favoriteSlots::add);
                     } catch (NumberFormatException e) {
                     }
                 }
