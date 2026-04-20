@@ -1,7 +1,6 @@
-
 {
   "schemaVersion": 1,
-  "id": "new_item_favorites",
+  "id": "neo_favorite_items",
   "version": "${version}",
   "name": "New Item Favorites",
   "description": "A versatile item favorites/lock mod for Minecraft",
@@ -11,11 +10,14 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "mycraft.yuyears.newitemfavorites.fabric.NewItemFavoritesFabric"
+      "mycraft.yuyears.neofavoriteitems.fabric.NeoFavoriteItemsFabric"
+    ],
+    "client": [
+      "mycraft.yuyears.neofavoriteitems.fabric.NeoFavoriteItemsFabricClient"
     ]
   },
   "mixins": [
-    "new_item_favorites.mixins.json"
+    "neo_favorite_items.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.15.11",

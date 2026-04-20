@@ -8,6 +8,12 @@ architectury {
     fabric()
 }
 
+loom {
+    mixin {
+        useLegacyMixinAp.set(false)
+    }
+}
+
 dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
     mappings(loom.layered {
@@ -25,4 +31,7 @@ tasks.processResources {
     filesMatching("fabric.mod.json") {
         expand("version" to project.version)
     }
+    
+    // 包含 common 模块的资源文件
+    from(project(":common").sourceSets.main.get().resources.srcDirs)
 }

@@ -23,4 +23,7 @@ tasks.processResources {
     filesMatching("META-INF/mods.toml") {
         expand("version" to project.version)
     }
+    
+    // 包含 common 模块的资源文件
+    from(project(":common").sourceSets.main.get().resources.srcDirs)
 }

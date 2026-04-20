@@ -1,8 +1,0 @@
-
-{
-  "key.new_item_favorites.toggle_favorite": "切换收藏槽位",
-  "key.new_item_favorites.bypass_lock": "绕过锁定",
-  "category.new_item_favorites": "新物品收藏",
-  "text.new_item_favorites.slot_marked": "槽位已收藏！",
-  "text.new_item_favorites.slot_unmarked": "槽位已取消收藏！"
-}

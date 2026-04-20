@@ -31,4 +31,16 @@ allprojects {
         options.encoding = "UTF-8"
         options.release.set(21)
     }
+
+    tasks.withType<AbstractArchiveTask>().configureEach {
+        if (project.name in setOf("fabric", "forge", "neoforge")) {
+            archiveFileName.set("${rootProject.property("archives_base_name")}-${project.name}-${project.version}-${rootProject.property("build_number")}.jar")
+        }
+    }
+
+    if (name in setOf("fabric", "forge", "neoforge")) {
+        tasks.withType<Jar>().configureEach {
+            from(rootProject.project(":common").extensions.getByType<SourceSetContainer>()["main"].output)
+        }
+    }
 }

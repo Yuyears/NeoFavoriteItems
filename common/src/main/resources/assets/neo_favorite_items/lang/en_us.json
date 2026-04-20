@@ -1,0 +1,7 @@
+{
+  "key.neo_favorite_items.lock_operation": "Lock Operation Key",
+  "key.neo_favorite_items.bypass_lock": "Bypass Lock Key",
+  "category.neo_favorite_items": "Neo Favorite Items",
+  "text.neo_favorite_items.slot_marked": "Slot locked!",
+  "text.neo_favorite_items.slot_unmarked": "Slot unlocked!"
+}

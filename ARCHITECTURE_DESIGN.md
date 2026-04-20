@@ -66,6 +66,17 @@ The architecture should support three modes cleanly:
 - integrated singleplayer with full authority
 - dedicated server authority with client sync
 
+## Current Implementation Notes (2026-04-20)
+
+The current Fabric path now follows the intended architecture closely enough to act as the reference implementation for the remaining platform ports:
+
+- Common owns the logical slot model, slot mapping helpers, config parsing, overlay color helpers, and interaction decisions.
+- Fabric resolves player inventory slots through `FabricSlotResolver`, unwraps `CreativeModeInventoryScreen$SlotWrapper`, and uses Mojmap `Slot#getContainerSlot()` for the real player inventory index.
+- Fabric intercepts ordinary container clicks, creative inventory clicks, and GUI mouse clicks before native handling so lock-operation toggles do not pick up items.
+- Overlay PNGs are treated as luminance/shape masks; final colors are driven by config and support both `0xAARRGGBB` and `"luv(L, u, v, alpha)"` syntax.
+- Fabric GUI and hotbar HUD overlays render at an elevated z layer so they appear in front of item icons.
+- Remaining architecture work is mainly Forge/NeoForge parity, server authority/sync, and the more advanced bypass move-tracking policy.
+
 ## Target Layering
 
 The project should evolve toward five layers.
@@ -76,7 +87,7 @@ Pure business model and rules. No loader-specific code.
 
 Suggested package:
 
-- `mycraft.yuyears.newitemfavorites.domain`
+- `mycraft.yuyears.neofavoriteitems.domain`
 
 Suggested contents:
 
@@ -104,7 +115,7 @@ Use-case oriented services that coordinate domain rules.
 
 Suggested package:
 
-- `mycraft.yuyears.newitemfavorites.application`
+- `mycraft.yuyears.neofavoriteitems.application`
 
 Suggested services:
 
@@ -131,7 +142,7 @@ Persistence, config loading, network packet codecs, and adapters for environment
 
 Suggested package:
 
-- `mycraft.yuyears.newitemfavorites.infrastructure`
+- `mycraft.yuyears.neofavoriteitems.infrastructure`
 
 Suggested subpackages:
 
@@ -159,7 +170,7 @@ Minecraft-specific but loader-neutral logic where possible.
 
 Suggested package:
 
-- `mycraft.yuyears.newitemfavorites.integration`
+- `mycraft.yuyears.neofavoriteitems.integration`
 
 Responsibilities:
 
@@ -300,8 +311,8 @@ This makes rendering easier to share and easier to test.
 Suggested target structure inside `common`:
 
 ```text
-common/src/main/java/mycraft/yuyears/newitemfavorites/
-  NewItemFavoritesMod.java
+common/src/main/java/mycraft/yuyears/neofavoriteitems/
+  NeoFavoriteItemsMod.java
   domain/
     FavoriteState.java
     LogicalSlotIndex.java
@@ -322,7 +333,7 @@ common/src/main/java/mycraft/yuyears/newitemfavorites/
   infrastructure/
     config/
       ConfigManager.java
-      NewItemFavoritesConfig.java
+      NeoFavoriteItemsConfig.java
     persistence/
       FavoriteRepository.java
       DataPersistenceManager.java
@@ -335,7 +346,7 @@ common/src/main/java/mycraft/yuyears/newitemfavorites/
 Notes:
 
 - existing files can be migrated incrementally rather than moved all at once
-- `ConfigManager` and `NewItemFavoritesConfig` can remain where they are short-term, then move under `infrastructure.config`
+- `ConfigManager` and `NeoFavoriteItemsConfig` can remain where they are short-term, then move under `infrastructure.config`
 - `FavoritesManager` should eventually be replaced by a service-oriented state model
 
 ## Recommended Class Responsibilities
@@ -573,10 +584,8 @@ This architecture is successful when:
 
 ## Next Execution Step
 
-The next practical step after this document is:
+The next practical steps are:
 
-- implement `LogicalSlotIndex`
-- implement `SlotMappingService`
-- refactor the first Fabric path to use them
-
-That will establish the foundation that all later locking, sync, and overlay work can build on.
+1. Port the current Fabric interaction and overlay behavior to Forge and NeoForge.
+2. Add server-authoritative state sync while keeping client-only singleplayer behavior responsive.
+3. Complete bypass move tracking and focused tests for edge cases such as empty locked slots and creative inventory wrappers.

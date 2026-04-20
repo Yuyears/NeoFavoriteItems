@@ -1,0 +1,7 @@
+{
+  "key.neo_favorite_items.lock_operation": "收藏槽位",
+  "key.neo_favorite_items.bypass_lock": "绕过收藏",
+  "category.neo_favorite_items": "Neo 物品收藏",
+  "text.neo_favorite_items.slot_marked": "槽位已锁定！",
+  "text.neo_favorite_items.slot_unmarked": "槽位已解锁！"
+}

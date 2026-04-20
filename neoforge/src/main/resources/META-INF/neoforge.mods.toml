@@ -4,7 +4,7 @@ loaderVersion="[2,)"
 license="MIT"
 
 [[mods]]
-modId="new_item_favorites"
+modId="neo_favorite_items"
 version="${version}"
 displayName="New Item Favorites"
 description='''

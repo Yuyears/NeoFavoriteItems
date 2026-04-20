@@ -12,5 +12,5 @@ if not exist "%GRADLE_HOME%\bin\gradle.bat" (
 if "%~1"=="" (
     call "%GRADLE_HOME%\bin\gradle.bat" -g "%GRADLE_USER_HOME%" --configure-on-demand --no-daemon --no-build-cache :common:compileJava :fabric:compileJava :forge:compileJava :neoforge:compileJava
 ) else (
-    call "%GRADLE_HOME%\bin\gradle.bat" -g "%GRADLE_USER_HOME%" %*
+    call "%GRADLE_HOME%\bin\gradle.bat" -g "%GRADLE_USER_HOME%" --configure-on-demand --no-daemon --no-build-cache %*
 )
