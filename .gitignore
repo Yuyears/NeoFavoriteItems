@@ -29,5 +29,7 @@ replay_pid*
 .gradle-home-2/
 build/
 **/build/
+
+# IDEs
 .idea/
 .vscode/
