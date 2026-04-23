@@ -28,8 +28,13 @@ replay_pid*
 .gradle-home/
 .gradle-home-2/
 build/
+**/run/
 **/build/
 
 # IDEs
 .idea/
 .vscode/
+*.iml
+*.ipr
+*.iws
+
