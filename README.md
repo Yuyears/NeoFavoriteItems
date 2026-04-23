@@ -1,94 +1,111 @@
-
 # Neo Favorite Items
 
-## 项目概述
+`Neo Favorite Items` 是一个面向 Minecraft 1.21.1 的多平台物品栏收藏/锁定模组。玩家可以把自己的物品栏槽位标记为收藏槽位，并通过交互拦截、Overlay 提示和数据持久化减少误操作。
 
-这是一个为 Minecraft 1.21.1 设计的多平台物品栏收藏/锁定模组，Mod ID 为 `neo_favorite_items`，当前包名为 `mycraft.yuyears.neofavoriteitems`。项目支持 Fabric、Forge 和 NeoForge，当前 Fabric 主功能路径已基本完成。
+- Mod ID: `neo_favorite_items`
+- 包名: `mycraft.yuyears.neofavoriteitems`
+- 版本: `0.0.1-alpha-build1`
+- Java: 21
+- 构建系统: Gradle Kotlin DSL + Architectury Loom
+- 支持平台: Fabric、Forge、NeoForge
 
-## 核心功能
+## 功能概览
 
-### 1. 物品栏收藏系统
-- 按住游戏内按键绑定的锁定操作键（默认 `Left Alt`）时，左键点击玩家物品栏槽位切换收藏状态。
-- 普通容器、创造模式标签页快捷栏、创造模式物品栏页均按真实玩家物品栏索引处理。
-- 已收藏槽位在 GUI 与退出 GUI 后的快捷栏 HUD 中显示 overlay。
-- 支持 `border`、`classic`、`framework`、`highlight`、`brackets`、`lock`、`mark`、`tag`、`star` 九种明度/形状 PNG 材质。
-- Overlay PNG 会按实际图片尺寸采样并缩放到 16x16 槽位，16x16、32x32、64x64 等单图材质不需要额外配置尺寸。
+- 按住锁定操作键后点击玩家物品栏槽位，可切换收藏状态。
+- 默认按键:
+  - 锁定操作键: `Left Alt`
+  - 旁路键: `Left Control`
+- 收藏状态使用统一逻辑槽位索引:
+  - `0..8`: 快捷栏
+  - `9..35`: 主背包
+  - `36..39`: 护甲栏
+  - `40`: 副手
+- 已收藏槽位会在 GUI 和快捷栏 HUD 中显示 Overlay。
+- 支持 `border`、`classic`、`framework`、`highlight`、`brackets`、`lock`、`mark`、`tag`、`star` 九种 PNG 材质。
+- Overlay 颜色支持 `0xAARRGGBB` 和 `luv(L, u, v, alpha)` 两种写法。
+- 支持阻止点击、丢弃、快速移动、Shift 点击、拖拽、交换等行为。
+- 服务端安装时会走服务端权威状态与同步；客户端仍保留本地响应和本地持久化能力。
+- 配置文件和界面文本提供中英文资源。
 
-### 2. 锁定行为控制
-- 可配置阻止的操作：点击、丢弃、快速移动、Shift点击、拖拽、交换
-- 支持按住游戏内按键绑定的旁路键（默认 `Left Control`）临时绕过锁定限制
-- 可配置空槽位的锁定行为
+## 项目结构
 
-### 3. 数据持久化
-- **单人游戏**：数据保存在存档文件夹中
-- **多人游戏**：数据保存在服务器端，确保跨服务器的一致性
-- **仅客户端**：数据保存在游戏根目录的 `itemfavorites` 文件夹中
-
-### 4. 高度可配置
-- **配置文件**：`config/neo-favorite-items.toml`
-- **支持的配置项**：
-  - 锁定行为设置
-  - Overlay 样式、透明度和颜色
-  - 已锁、可收藏提示、可解锁提示是否显示在物品图标前方
-  - 音效和视觉反馈
-  - Debug 日志开关
-
-Overlay 颜色支持旧版 `0xAARRGGBB`，也支持 CIE L*u*v* 写法，例如：
-
-```toml
-lockedOverlayColor = "luv(86, 10, 80, 1.0)"
+```text
+.
+├─ common/       平台无关代码、配置、状态、持久化、渲染抽象和资源
+├─ fabric/       Fabric 入口、网络、Mixin、按键和渲染适配
+├─ forge/        Forge 入口、网络、Mixin、事件、按键和渲染适配
+├─ neoforge/     NeoForge 入口、网络、Mixin、事件、按键和渲染适配
+├─ gradle/       Gradle Wrapper
+├─ build.gradle.kts
+├─ settings.gradle.kts
+└─ gradle.properties
 ```
 
-按键在 Minecraft 控制设置中注册，不再写入模组配置文件。
+公共源码位于 `common/src/main/java/mycraft/yuyears/neofavoriteitems`，主要分为:
 
-## 安装方法
+- `domain`: `LogicalSlotIndex`、`InteractionType`、`InteractionDecision`
+- `application`: `InteractionGuardService`、`ServerFavoriteService`、`ClientFavoriteSyncService`
+- `integration`: `SlotMappingService`
+- `persistence`: `DataPersistenceManager`
+- `render`: `OverlayRenderer`
+- 根包: `ConfigManager`、`FavoritesManager`、`NeoFavoriteItemsConfig`、`DebugLogger`
 
-1. **Fabric**：将模组文件放入 `mods` 文件夹
-2. **Forge**：将模组文件放入 `mods` 文件夹
-3. **NeoForge**：将模组文件放入 `mods` 文件夹
+公共资源位于 `common/src/main/resources/assets/neo_favorite_items`，平台模块通过 `processResources` 合并这些资源。
 
-## 构建项目
+## 构建
 
-使用 Gradle 构建系统：
-
-```bash
+```powershell
 # 构建所有平台
-.\gradle.bat
+.\gradle.bat build
 
-# 单独构建 Fabric
+# 单独构建
 .\gradle.bat :fabric:build
-
-# 单独构建 Forge
 .\gradle.bat :forge:build
-
-# 单独构建 NeoForge
 .\gradle.bat :neoforge:build
+
+# 只编译 Java
+.\gradle.bat :common:compileJava :fabric:compileJava :forge:compileJava :neoforge:compileJava
 ```
 
-## 配置文件
+构建产物:
 
-首次运行游戏时，会自动生成配置文件 `config/neo-favorite-items.toml`，包含中英双语注释。
+- `fabric/build/libs/neo_favorite_items-fabric-0.0.1-alpha-build1.jar`
+- `forge/build/libs/neo_favorite_items-forge-0.0.1-alpha-build1.jar`
+- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.1-alpha-build1.jar`
 
-## 按键绑定
+## 开发运行
 
-- **锁定操作键**：`Left Alt`（在 Minecraft 控制设置中修改）
-- **旁路键**：`Left Control`（在 Minecraft 控制设置中修改）
+```powershell
+.\gradle.bat :fabric:runClient
+.\gradle.bat :forge:runClient
+.\gradle.bat :neoforge:runClient
+```
 
-## 开发说明
+## 配置
 
-### 项目结构
-- **common**：平台无关的核心代码
-- **fabric**：Fabric 平台实现
-- **forge**：Forge 平台实现
-- **neoforge**：NeoForge 平台实现
+首次运行后会生成:
 
-### 主要类
-- `NeoFavoriteItemsConfig`：配置数据模型
-- `ConfigManager`：配置管理器
-- `FavoritesManager`：收藏状态管理器
-- `DataPersistenceManager`：数据持久化管理器
-- `OverlayRenderer`：Overlay 渲染系统
+```text
+config/neo-favorite-items.toml
+```
+
+主要配置分组:
+
+- `general`: 空槽锁定、空槽自动解锁、是否允许物品进入锁定空槽
+- `lockBehavior`: 不同交互类型的拦截策略和旁路键行为
+- `slotBehavior`: 收藏状态随物品移动或固定在槽位
+- `overlay`: Overlay 样式、颜色、透明度和前景渲染开关
+- `feedback`: 文本、音效等反馈设置
+- `debug`: 诊断日志开关
+
+按键绑定通过 Minecraft 控制设置管理，不写入模组配置文件。
+
+## 文档
+
+- `ARCHITECTURE_DESIGN.md`: 当前架构、分层职责和关键运行流程
+- `TODO.md`: 仍需完成或验证的事项
+- `README.md`: 面向使用和开发入口的简要说明
 
 ## 许可证
 
-MIT 许可证
+MIT License
