@@ -117,9 +117,13 @@ Build outputs:
 
 构建产物：
 
-- `fabric/build/libs/neo_favorite_items-fabric-0.0.1-alpha-build1.jar`
-- `forge/build/libs/neo_favorite_items-forge-0.0.1-alpha-build1.jar`
-- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.1-alpha-build1.jar`
+- `fabric/build/libs/neo_favorite_items-fabric-0.0.1-alpha-<build_number>.jar`
+- `forge/build/libs/neo_favorite_items-forge-0.0.1-alpha-<build_number>.jar`
+- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.1-alpha-<build_number>.jar`
+
+`build_number` is stored in `gradle.properties` and automatically increments when running `build`, `assemble`, `jar`, or `remapJar` tasks. It does not increment for `compileJava`, `runClient`, `help`, or `--dry-run`. Use `-Pskip_build_number_increment=true` when a release rebuild must keep the current build number.
+
+`build_number` 保存在 `gradle.properties` 中，执行 `build`、`assemble`、`jar` 或 `remapJar` 任务时会自动递增。执行 `compileJava`、`runClient`、`help` 或 `--dry-run` 时不会递增。如果发布重构建需要保持当前构建号，可使用 `-Pskip_build_number_increment=true`。
 
 ## Development Runs
 

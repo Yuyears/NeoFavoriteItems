@@ -6,6 +6,44 @@ plugins {
     id("architectury-plugin") version "3.4.162" apply false
 }
 
+fun shouldIncrementBuildNumber(): Boolean {
+    if ((findProperty("skip_build_number_increment") as String?)?.toBoolean() == true) {
+        return false
+    }
+    if (gradle.startParameter.isDryRun) {
+        return false
+    }
+
+    return gradle.startParameter.taskNames
+        .map { it.substringAfterLast(':').lowercase() }
+        .any { taskName ->
+            taskName in setOf("build", "assemble", "jar", "remapjar")
+        }
+}
+
+fun incrementBuildNumberIfNeeded(): String {
+    val currentBuildNumber = property("build_number") as String
+    if (!shouldIncrementBuildNumber()) {
+        return currentBuildNumber
+    }
+
+    val propertiesFile = rootProject.file("gradle.properties")
+    val propertiesText = propertiesFile.readText()
+    val buildNumberRegex = Regex("""(?m)^build_number=(build)?(\d+)\s*$""")
+    val match = buildNumberRegex.find(propertiesText)
+        ?: error("Missing build_number entry in gradle.properties")
+
+    val prefix = match.groupValues[1].ifEmpty { "build" }
+    val nextNumber = match.groupValues[2].toInt() + 1
+    val nextBuildNumber = "$prefix$nextNumber"
+    propertiesFile.writeText(buildNumberRegex.replace(propertiesText, "build_number=$nextBuildNumber"))
+    logger.lifecycle("Incremented build_number: $currentBuildNumber -> $nextBuildNumber")
+    return nextBuildNumber
+}
+
+val resolvedBuildNumber = incrementBuildNumberIfNeeded()
+extra["build_number"] = resolvedBuildNumber
+
 allprojects {
     apply(plugin = "java")
     apply(plugin = "idea")
@@ -34,7 +72,7 @@ allprojects {
 
     tasks.withType<AbstractArchiveTask>().configureEach {
         if (project.name in setOf("fabric", "forge", "neoforge")) {
-            archiveFileName.set("${rootProject.property("archives_base_name")}-${project.name}-${project.version}-${rootProject.property("build_number")}.jar")
+            archiveFileName.set("${rootProject.property("archives_base_name")}-${project.name}-${project.version}-${resolvedBuildNumber}.jar")
         }
     }
 
