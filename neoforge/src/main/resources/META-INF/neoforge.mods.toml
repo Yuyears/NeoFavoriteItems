@@ -1,6 +1,6 @@
 
-modLoader="neoforge"
-loaderVersion="[2,)"
+modLoader="javafml"
+loaderVersion="[4,)"
 license="MIT"
 
 [[mods]]
@@ -10,3 +10,9 @@ displayName="New Item Favorites"
 description='''
 A versatile item favorites/lock mod for Minecraft
 '''
+
+[[mixins]]
+config="neo_favorite_items.neoforge.mixins.json"
+
+[[mixins]]
+config="neo_favorite_items.neoforge.compat.mixins.json"

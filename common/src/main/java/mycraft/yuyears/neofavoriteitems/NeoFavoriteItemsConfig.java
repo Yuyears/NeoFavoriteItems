@@ -50,6 +50,7 @@ public class NeoFavoriteItemsConfig {
         public float lockableHighlightOpacity = 0.55f;
         public int unlockableHighlightColor = 0xFFFFAA33;
         public float unlockableHighlightOpacity = 0.65f;
+        public float colorOverlayOpacity = 0.35f;
         public float bypassOverlayOpacityMultiplier = 0.35f;
         public boolean renderLockedOverlayInFront = true;
         public boolean renderLockableHighlightInFront = true;

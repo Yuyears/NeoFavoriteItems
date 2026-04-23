@@ -21,7 +21,8 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.Slot;
 
-import java.lang.reflect.Field;
+import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -208,7 +209,7 @@ public class FabricOverlayRenderer extends OverlayRenderer {
                 case MARK -> renderTextureOverlay(context, x, y, MARK_TEXTURE, color, opacity, multiplier);
                 case TAG -> renderTextureOverlay(context, x, y, TAG_TEXTURE, color, opacity, multiplier);
                 case STAR -> renderTextureOverlay(context, x, y, STAR_TEXTURE, color, opacity, multiplier);
-                case COLOR_OVERLAY -> renderColorOverlay(context, x, y, color, opacity, multiplier);
+                case COLOR_OVERLAY -> renderColorOverlay(context, x, y, color, getColorOverlayOpacity(), multiplier);
             }
         } finally {
             context.pose().popPose();
@@ -220,6 +221,8 @@ public class FabricOverlayRenderer extends OverlayRenderer {
     }
 
     private void renderTextureOverlay(GuiGraphics context, int x, int y, ResourceLocation texture, int color, float opacity, float multiplier) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         applyOverlayTint(color, opacity, multiplier);
         TextureSize size = getTextureSize(texture);
         context.blit(texture, x, y, 16, 16, 0.0f, 0.0f, size.width(), size.height(), size.width(), size.height());
@@ -245,7 +248,9 @@ public class FabricOverlayRenderer extends OverlayRenderer {
     }
 
     private void renderColorOverlay(GuiGraphics context, int x, int y, int color, float opacity, float multiplier) {
-        context.fill(x, y, x + 16, y + 16, getColorArgb(color, opacity, multiplier * 0.3f));
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        context.fill(x, y, x + 16, y + 16, getColorArgb(color, opacity, multiplier));
     }
 
     private void applyOverlayTint(int color, float opacity, float multiplier) {
@@ -262,29 +267,13 @@ public class FabricOverlayRenderer extends OverlayRenderer {
     }
 
     private int getScreenLeft(AbstractContainerScreen<?> screen) {
-        Integer value = readIntField(screen, "leftPos");
+        Integer value = ReflectionHelper.readIntField(screen, "leftPos");
         return value == null ? 0 : value;
     }
 
     private int getScreenTop(AbstractContainerScreen<?> screen) {
-        Integer value = readIntField(screen, "topPos");
+        Integer value = ReflectionHelper.readIntField(screen, "topPos");
         return value == null ? 0 : value;
-    }
-
-    private Integer readIntField(Object target, String name) {
-        Class<?> type = target.getClass();
-        while (type != null) {
-            try {
-                Field field = type.getDeclaredField(name);
-                field.setAccessible(true);
-                return field.getInt(target);
-            } catch (NoSuchFieldException ignored) {
-                type = type.getSuperclass();
-            } catch (IllegalAccessException ignored) {
-                return null;
-            }
-        }
-        return null;
     }
 
     private record TextureSize(int width, int height) {

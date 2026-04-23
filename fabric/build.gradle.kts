@@ -23,7 +23,10 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
 
-    implementation(project(":common"))
+}
+
+sourceSets.main {
+    java.srcDirs(project(":common").sourceSets.main.get().java.srcDirs)
 }
 
 tasks.processResources {

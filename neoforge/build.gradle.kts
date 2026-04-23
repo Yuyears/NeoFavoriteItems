@@ -8,6 +8,10 @@ architectury {
     neoForge()
 }
 
+configurations.configureEach {
+    exclude(group = "net.fabricmc", module = "fabric-log4j-util")
+}
+
 dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
     mappings(loom.layered {
@@ -15,7 +19,10 @@ dependencies {
     })
 
     add("neoForge", "net.neoforged:neoforge:${property("neoforge_version")}")
-    implementation(project(":common"))
+}
+
+sourceSets.main {
+    java.srcDirs(project(":common").sourceSets.main.get().java.srcDirs)
 }
 
 tasks.processResources {

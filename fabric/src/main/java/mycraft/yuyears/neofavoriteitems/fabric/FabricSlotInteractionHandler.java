@@ -29,6 +29,10 @@ public final class FabricSlotInteractionHandler {
             return true;
         }
 
+        if (FabricFavoriteNetworking.trySendToggle(inventoryIndex)) {
+            return true;
+        }
+
         FavoritesManager.getInstance().toggleSlotFavorite(logicalSlot.get());
         NeoFavoriteItemsFabricClient.showSlotToggleMessage(logicalSlot.get());
         DebugLogger.debug(

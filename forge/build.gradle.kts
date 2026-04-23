@@ -5,7 +5,12 @@ plugins {
 
 architectury {
     platformSetupLoomIde()
+    compileOnly()
     forge()
+}
+
+configurations.configureEach {
+    exclude(group = "net.fabricmc", module = "fabric-log4j-util")
 }
 
 dependencies {
@@ -15,7 +20,24 @@ dependencies {
     })
 
     add("forge", "net.minecraftforge:forge:${property("minecraft_version")}-${property("forge_version")}")
-    implementation(project(":common"))
+}
+
+loom {
+    runs {
+        named("client") {
+            vmArg("-Dearlydisplay.disable=true")
+            // 强制禁用早期显示窗口
+            property("fml.earlyprogresswindow", "false")
+        }
+        named("server") {
+            vmArg("-Dearlydisplay.disable=true")
+            property("fml.earlyprogresswindow", "false")
+        }
+    }
+}
+
+sourceSets.main {
+    java.srcDirs(project(":common").sourceSets.main.get().java.srcDirs)
 }
 
 tasks.processResources {

@@ -5,11 +5,13 @@ import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.FavoritesManager;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
+import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.fabric.mixin.KeyMappingAccessor;
 import mycraft.yuyears.neofavoriteitems.fabric.render.FabricOverlayRenderer;
 import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.ChatFormatting;
@@ -67,6 +69,7 @@ public class NeoFavoriteItemsFabricClient implements ClientModInitializer {
             DebugLogger.debug("Fabric key state changed: lockOperation={} bypass={}", lockHeld, bypassHeld);
             lastLoggedLockOperationKeyState = lockHeld;
             lastLoggedBypassLockKeyState = bypassHeld;
+            FabricFavoriteNetworking.sendBypassKeyState(bypassHeld);
         }
     }
 
@@ -90,11 +93,18 @@ public class NeoFavoriteItemsFabricClient implements ClientModInitializer {
         new FabricOverlayRenderer();
 
         registerKeybindings();
+        FabricFavoriteNetworking.registerClientReceivers();
+        ClientTickEvents.END_CLIENT_TICK.register(client1 -> {
+            if (client1.player != null) {
+                logKeyStatesIfChanged();
+            }
+        });
 
         ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client1, world) -> {
             if (world != null && client1.player != null) {
-                DataPersistenceManager.getInstance().loadData(client1.player.getUUID());
+                ClientFavoriteSyncService.resetSession();
                 FavoritesManager.getInstance().setPlayer(client1.player.getUUID());
+                DataPersistenceManager.getInstance().loadData(client1.player.getUUID());
             } else if (world == null && client1.player != null) {
                 DataPersistenceManager.getInstance().saveData(client1.player.getUUID());
                 FavoritesManager.getInstance().clearPlayer();

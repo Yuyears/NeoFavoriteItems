@@ -54,6 +54,10 @@ public abstract class OverlayRenderer {
         return configManager.getConfig().overlay.unlockableHighlightOpacity;
     }
 
+    protected float getColorOverlayOpacity() {
+        return configManager.getConfig().overlay.colorOverlayOpacity;
+    }
+
     protected float getBypassOverlayOpacityMultiplier() {
         return configManager.getConfig().overlay.bypassOverlayOpacityMultiplier;
     }
@@ -83,9 +87,7 @@ public abstract class OverlayRenderer {
     }
 
     protected float getColorAlpha(int color, float opacity, float multiplier) {
-        float configuredAlpha = (color & 0xFF000000) == 0
-            ? 1.0f
-            : ((color >>> 24) & 0xFF) / 255.0f;
+        float configuredAlpha = ((color >>> 24) & 0xFF) / 255.0f;
         return clamp01(configuredAlpha * opacity * multiplier);
     }
 

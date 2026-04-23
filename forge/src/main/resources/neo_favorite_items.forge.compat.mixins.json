@@ -1,0 +1,15 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "mycraft.yuyears.neofavoriteitems.forge.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "SophisticatedCoreInventoryHelperMixin",
+    "SophisticatedSorterCoreUtilsMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

@@ -3,7 +3,11 @@
   "minVersion": "0.8",
   "package": "mycraft.yuyears.neofavoriteitems.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [],
+  "mixins": [
+    "AbstractContainerMenuMixin",
+    "InventoryMixin",
+    "SlotMixin"
+  ],
   "client": [
     "AbstractContainerScreenMixin",
     "CreativeModeInventoryScreenMixin",

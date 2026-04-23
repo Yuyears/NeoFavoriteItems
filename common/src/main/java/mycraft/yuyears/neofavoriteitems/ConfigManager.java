@@ -16,13 +16,13 @@ public class ConfigManager {
         # 是否允许锁定空槽位
         # Parent option for keeping empty slots locked after they become empty
         # 是否允许空槽位保持收藏状态的父级配置
-        lockEmptySlots = false
+        lockEmptySlots = true
         
         # Whether to automatically unlock slots when they become empty
         # 当槽位变为空时是否自动解锁
         # If true, allowItemsIntoLockedEmptySlots below has no effect because locked empty slots are removed
         # 如果为 true，下方 allowItemsIntoLockedEmptySlots 不生效，因为空槽位会自动解除收藏
-        autoUnlockEmptySlots = true
+        autoUnlockEmptySlots = false
         
         # Whether to allow items to be placed into locked empty slots
         # 是否允许物品放入已锁定的空槽位
@@ -66,52 +66,62 @@ public class ConfigManager {
         # FOLLOW_ITEM：锁定状态跟随物品移动
         # STAY_AT_POSITION: The favorite status stays at the slot position
         # STAY_AT_POSITION：锁定状态固定在槽位位置
-        moveBehavior = "FOLLOW_ITEM"
+        moveBehavior = "STAY_AT_POSITION"
         
         [overlay]
         # Overlay style for locked slots
         # 已锁定槽位的覆盖层样式
         # Options: BORDER, CLASSIC, FRAMEWORK, HIGHLIGHT, BRACKETS, LOCK, MARK, TAG, STAR, COLOR_OVERLAY
         # 可选值：BORDER, CLASSIC, FRAMEWORK, HIGHLIGHT, BRACKETS, LOCK, MARK, TAG, STAR, COLOR_OVERLAY
-        lockedStyle = "LOCK"
+        lockedStyle = "MARK"
         
         # Overlay style for locked slots when holding bypass key
         # 按住旁路键时已锁定槽位的覆盖层样式
-        holdingKeyLockedStyle = "LOCK"
+        holdingKeyLockedStyle = "MARK"
 
         # Overlay style shown on lockable slots while holding the lock operation key
         # 按住锁定操作键时，可锁定槽位上显示的提示覆盖层样式
-        highlightStyle = "HIGHLIGHT"
+        highlightStyle = "BORDER"
 
         # Color for locked slot overlays when not holding the lock operation key
-        # Supports ARGB 0xAARRGGBB or quoted CIE L*u*v* value: "luv(L, u, v, alpha)"
+        # Supports "rgba(red, green, blue, alpha)", "rgb(red, green, blue)", "#RRGGBB", "#RRGGBBAA" or "luv(L, u, v, alpha)"
+        # Alpha accepts 0.0 - 1.0 or 0 - 255
         # 未按住锁定操作键时，已锁定槽位覆盖层颜色
-        # 支持 ARGB 0xAARRGGBB，或带引号的 CIE L*u*v* 值："luv(L, u, v, alpha)"
-        lockedOverlayColor = 0xFFFFD700
+        # 支持 "rgba(红, 绿, 蓝, 透明度)"、"rgb(红, 绿, 蓝)"、"#RRGGBB"、"#RRGGBBAA" 或 "luv(L, u, v, alpha)"
+        # 透明度支持 0.0 - 1.0 或 0 - 255
+        lockedOverlayColor = "rgba(255,65,60,250)"
 
         # Opacity for locked slot overlays when not holding the lock operation key (0.0 - 1.0)
         # 未按住锁定操作键时，已锁定槽位覆盖层透明度，范围 0.0 - 1.0
         lockedOverlayOpacity = 0.7
 
         # Color for lockable slot highlight overlays while holding the lock operation key
-        # Supports ARGB 0xAARRGGBB or quoted CIE L*u*v* value: "luv(L, u, v, alpha)"
+        # Supports "rgba(red, green, blue, alpha)", "rgb(red, green, blue)", "#RRGGBB", "#RRGGBBAA" or "luv(L, u, v, alpha)"
+        # Alpha accepts 0.0 - 1.0 or 0 - 255
         # 按住锁定操作键时，可收藏槽位提示覆盖层颜色
-        # 支持 ARGB 0xAARRGGBB，或带引号的 CIE L*u*v* 值："luv(L, u, v, alpha)"
-        lockableHighlightColor = 0xFF66CCFF
+        # 支持 "rgba(红, 绿, 蓝, 透明度)"、"rgb(红, 绿, 蓝)"、"#RRGGBB"、"#RRGGBBAA" 或 "luv(L, u, v, alpha)"
+        # 透明度支持 0.0 - 1.0 或 0 - 255
+        lockableHighlightColor = "rgba(35,230,0,200)"
 
         # Opacity for lockable slot highlight overlays while holding the lock operation key (0.0 - 1.0)
         # 按住锁定操作键时，可收藏槽位提示覆盖层透明度，范围 0.0 - 1.0
         lockableHighlightOpacity = 0.55
 
         # Color for unlockable slot highlight overlays while holding the lock operation key
-        # Supports ARGB 0xAARRGGBB or quoted CIE L*u*v* value: "luv(L, u, v, alpha)"
+        # Supports "rgba(red, green, blue, alpha)", "rgb(red, green, blue)", "#RRGGBB", "#RRGGBBAA" or "luv(L, u, v, alpha)"
+        # Alpha accepts 0.0 - 1.0 or 0 - 255
         # 按住锁定操作键时，可取消收藏槽位提示覆盖层颜色
-        # 支持 ARGB 0xAARRGGBB，或带引号的 CIE L*u*v* 值："luv(L, u, v, alpha)"
-        unlockableHighlightColor = 0xFFFFAA33
+        # 支持 "rgba(红, 绿, 蓝, 透明度)"、"rgb(红, 绿, 蓝)"、"#RRGGBB"、"#RRGGBBAA" 或 "luv(L, u, v, alpha)"
+        # 透明度支持 0.0 - 1.0 或 0 - 255
+        unlockableHighlightColor = "rgba(255, 195, 53, 180)"
 
         # Opacity for unlockable slot highlight overlays while holding the lock operation key (0.0 - 1.0)
         # 按住锁定操作键时，可取消收藏槽位提示覆盖层透明度，范围 0.0 - 1.0
         unlockableHighlightOpacity = 0.65
+
+        # Default opacity used by COLOR_OVERLAY pure-color style (0.0 - 1.0)
+        # COLOR_OVERLAY 纯色覆盖层默认透明度，范围 0.0 - 1.0
+        colorOverlayOpacity = 0.35
 
         # Opacity multiplier for locked overlays while holding the bypass key (0.0 - 1.0)
         # 按住旁路键时，已锁定覆盖层透明度乘数，范围 0.0 - 1.0
@@ -236,16 +246,19 @@ public class ConfigManager {
                 .append("# 0.0.1-alpha 新增的覆盖层颜色控制项").append(System.lineSeparator())
                 .append("# lockedOverlayColor / lockedOverlayOpacity apply to locked slots when not holding the lock operation key").append(System.lineSeparator())
                 .append("# lockedOverlayColor / lockedOverlayOpacity 用于未按住锁定操作键时的已锁定槽位").append(System.lineSeparator())
-                .append("lockedOverlayColor = 0xFFFFD700").append(System.lineSeparator())
+                .append("lockedOverlayColor = \"rgba(255, 215, 0, 1.0)\"").append(System.lineSeparator())
                 .append("lockedOverlayOpacity = 0.7").append(System.lineSeparator())
                 .append("# lockableHighlightColor applies to non-favorite player inventory slots with items while holding the lock operation key").append(System.lineSeparator())
                 .append("# lockableHighlightColor 用于按住锁定操作键时，带有物品且尚未收藏的玩家背包槽位").append(System.lineSeparator())
-                .append("lockableHighlightColor = 0xFF66CCFF").append(System.lineSeparator())
+                .append("lockableHighlightColor = \"rgba(102, 204, 255, 1.0)\"").append(System.lineSeparator())
                 .append("lockableHighlightOpacity = 0.55").append(System.lineSeparator())
                 .append("# unlockableHighlightColor applies to favorite slots while holding the lock operation key").append(System.lineSeparator())
                 .append("# unlockableHighlightColor 用于按住锁定操作键时，已收藏且可取消收藏的槽位").append(System.lineSeparator())
-                .append("unlockableHighlightColor = 0xFFFFAA33").append(System.lineSeparator())
+                .append("unlockableHighlightColor = \"rgba(255, 170, 51, 1.0)\"").append(System.lineSeparator())
                 .append("unlockableHighlightOpacity = 0.65").append(System.lineSeparator())
+                .append("# colorOverlayOpacity controls the base opacity of the COLOR_OVERLAY pure-color style").append(System.lineSeparator())
+                .append("# colorOverlayOpacity 控制 COLOR_OVERLAY 纯色覆盖层样式的基础透明度").append(System.lineSeparator())
+                .append("colorOverlayOpacity = 0.35").append(System.lineSeparator())
                 .append("# bypassOverlayOpacityMultiplier fades locked overlays while holding the bypass key").append(System.lineSeparator())
                 .append("# bypassOverlayOpacityMultiplier 用于按住旁路键时淡化已锁定槽位覆盖层").append(System.lineSeparator())
                 .append("bypassOverlayOpacityMultiplier = 0.35").append(System.lineSeparator())
@@ -266,6 +279,13 @@ public class ConfigManager {
                 .append("# Render unlockable highlight overlays in front of item icons").append(System.lineSeparator())
                 .append("# 是否将可取消收藏提示覆盖层渲染在物品图标前方").append(System.lineSeparator())
                 .append("renderUnlockableHighlightInFront = true").append(System.lineSeparator());
+        }
+        if (content.contains("[overlay]") && !content.contains("colorOverlayOpacity") && additions.indexOf("colorOverlayOpacity") < 0) {
+            additions.append(System.lineSeparator())
+                .append("[overlay]").append(System.lineSeparator())
+                .append("# Default opacity used by COLOR_OVERLAY pure-color style (0.0 - 1.0)").append(System.lineSeparator())
+                .append("# COLOR_OVERLAY 纯色覆盖层默认透明度，范围 0.0 - 1.0").append(System.lineSeparator())
+                .append("colorOverlayOpacity = 0.35").append(System.lineSeparator());
         }
 
         if (!additions.isEmpty()) {
@@ -333,6 +353,7 @@ public class ConfigManager {
             case "lockableHighlightOpacity" -> config.overlay.lockableHighlightOpacity = Float.parseFloat(value);
             case "unlockableHighlightColor" -> config.overlay.unlockableHighlightColor = parseColor(value);
             case "unlockableHighlightOpacity" -> config.overlay.unlockableHighlightOpacity = Float.parseFloat(value);
+            case "colorOverlayOpacity" -> config.overlay.colorOverlayOpacity = Float.parseFloat(value);
             case "bypassOverlayOpacityMultiplier" -> config.overlay.bypassOverlayOpacityMultiplier = Float.parseFloat(value);
             case "renderLockedOverlayInFront" -> config.overlay.renderLockedOverlayInFront = Boolean.parseBoolean(value);
             case "renderLockableHighlightInFront" -> config.overlay.renderLockableHighlightInFront = Boolean.parseBoolean(value);
@@ -342,13 +363,64 @@ public class ConfigManager {
 
     private int parseColor(String value) {
         String cleanValue = value.replace("\"", "").trim();
+        if (cleanValue.regionMatches(true, 0, "rgba(", 0, 5) && cleanValue.endsWith(")")) {
+            return parseRgbaColor(cleanValue);
+        }
+        if (cleanValue.regionMatches(true, 0, "rgb(", 0, 4) && cleanValue.endsWith(")")) {
+            return parseRgbColor(cleanValue);
+        }
         if (cleanValue.regionMatches(true, 0, "luv(", 0, 4) && cleanValue.endsWith(")")) {
             return parseLuvColor(cleanValue);
         }
-        if (cleanValue.startsWith("0x") || cleanValue.startsWith("0X")) {
-            return (int) Long.parseLong(cleanValue.substring(2), 16);
+        if (cleanValue.startsWith("#")) {
+            return parseHexColor(cleanValue.substring(1), false);
         }
-        return Integer.parseInt(cleanValue);
+        if (cleanValue.startsWith("0x") || cleanValue.startsWith("0X")) {
+            return parseHexColor(cleanValue.substring(2), true);
+        }
+        int parsed = Integer.parseInt(cleanValue);
+        return parsed <= 0x00FFFFFF ? 0xFF000000 | parsed : parsed;
+    }
+
+    private int parseRgbColor(String value) {
+        String[] parts = value.substring(4, value.length() - 1).split(",");
+        if (parts.length != 3) {
+            throw new IllegalArgumentException("RGB color must be rgb(red, green, blue): " + value);
+        }
+        return toArgb(1.0d, parseColorComponent(parts[0]), parseColorComponent(parts[1]), parseColorComponent(parts[2]));
+    }
+
+    private int parseRgbaColor(String value) {
+        String[] parts = value.substring(5, value.length() - 1).split(",");
+        if (parts.length != 4) {
+            throw new IllegalArgumentException("RGBA color must be rgba(red, green, blue, alpha): " + value);
+        }
+        return toArgb(
+            parseAlpha(parts[3]),
+            parseColorComponent(parts[0]),
+            parseColorComponent(parts[1]),
+            parseColorComponent(parts[2])
+        );
+    }
+
+    private int parseHexColor(String value, boolean legacyArgb) {
+        String hex = value.trim();
+        if (hex.length() == 6) {
+            int rgb = (int) Long.parseLong(hex, 16);
+            return 0xFF000000 | rgb;
+        }
+        if (hex.length() == 8) {
+            long parsed = Long.parseLong(hex, 16);
+            if (legacyArgb) {
+                return (int) parsed;
+            }
+            int red = (int) ((parsed >> 24) & 0xFF);
+            int green = (int) ((parsed >> 16) & 0xFF);
+            int blue = (int) ((parsed >> 8) & 0xFF);
+            int alpha = (int) (parsed & 0xFF);
+            return (alpha << 24) | (red << 16) | (green << 8) | blue;
+        }
+        throw new IllegalArgumentException("Hex color must be #RRGGBB or #RRGGBBAA: " + value);
     }
 
     private int parseLuvColor(String value) {
@@ -366,6 +438,14 @@ public class ConfigManager {
 
     private double parseDouble(String value) {
         return Double.parseDouble(value.trim());
+    }
+
+    private double parseColorComponent(String value) {
+        double component = parseDouble(value);
+        if (component > 1.0d) {
+            component /= 255.0d;
+        }
+        return clamp01(component);
     }
 
     private double parseAlpha(String value) {

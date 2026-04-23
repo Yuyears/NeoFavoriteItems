@@ -1,11 +1,16 @@
 
 package mycraft.yuyears.neofavoriteitems.neoforge;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import mycraft.yuyears.neofavoriteitems.ConfigManager;
+import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.FavoritesManager;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
+import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
+import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
+import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
 import mycraft.yuyears.neofavoriteitems.neoforge.render.NeoForgeOverlayRenderer;
 import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
 import net.minecraft.ChatFormatting;
@@ -25,18 +30,18 @@ import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import org.lwjgl.glfw.GLFW;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
+
 
 @Mod(NeoFavoriteItemsMod.MOD_ID)
 public class NeoFavoriteItemsNeoForge {
 
     private static net.minecraft.client.KeyMapping lockOperationKey;
     private static net.minecraft.client.KeyMapping bypassLockKey;
-    private static boolean lockOperationKeyHeld = false;
-    private static boolean bypassKeyHeld = false;
+    private static boolean lastLoggedLockOperationKeyState;
+    private static boolean lastLoggedBypassLockKeyState;
     private NeoForgeOverlayRenderer overlayRenderer;
 
     public NeoFavoriteItemsNeoForge(IEventBus modBus) {
@@ -46,6 +51,7 @@ public class NeoFavoriteItemsNeoForge {
         modBus.addListener(this::clientSetup);
         modBus.addListener(this::registerKeyBindings);
         modBus.addListener(this::registerGuiLayers);
+        modBus.addListener(this::registerPayloadHandlers);
         
         NeoForge.EVENT_BUS.register(this);
     }
@@ -87,6 +93,7 @@ public class NeoFavoriteItemsNeoForge {
         
         event.register(lockOperationKey);
         event.register(bypassLockKey);
+        DebugLogger.debug("Registered NeoForge keybindings: lockOperation default=LEFT_ALT, bypass default=LEFT_CONTROL");
     }
 
     private void registerGuiLayers(final RegisterGuiLayersEvent event) {
@@ -101,6 +108,10 @@ public class NeoFavoriteItemsNeoForge {
         );
     }
 
+    private void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
+        NeoForgeFavoriteNetworking.registerPackets(event.registrar(NeoFavoriteItemsMod.MOD_ID).versioned("1"));
+    }
+
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         NeoFavoriteItemsMod.getInstance().onServerInitialize();
@@ -109,14 +120,21 @@ public class NeoFavoriteItemsNeoForge {
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         // 加载玩家数据
-        DataPersistenceManager.getInstance().loadData(event.getEntity().getUUID());
         FavoritesManager.getInstance().setPlayer(event.getEntity().getUUID());
+        DataPersistenceManager.getInstance().loadData(event.getEntity().getUUID());
+        if (event.getEntity().level().isClientSide()) {
+            ClientFavoriteSyncService.resetSession();
+        } else if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            ServerFavoriteService.resetRevision(serverPlayer);
+            NeoForgeFavoriteNetworking.sendFullSync(serverPlayer);
+        }
     }
 
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         // 保存玩家数据
         DataPersistenceManager.getInstance().saveData(event.getEntity().getUUID());
+        ServerFavoriteService.clearPlayerState(event.getEntity());
         FavoritesManager.getInstance().clearPlayer();
     }
 
@@ -124,9 +142,8 @@ public class NeoFavoriteItemsNeoForge {
     public void onClientTick(ClientTickEvent.Post event) {
         var minecraft = Minecraft.getInstance();
         if (minecraft.player == null) return;
-            
-        lockOperationKeyHeld = lockOperationKey.isDown();
-        bypassKeyHeld = bypassLockKey.isDown();
+
+        logKeyStatesIfChanged();
             
         // 当世界加载时，设置世界保存目录
         if (minecraft.level != null && minecraft.getSingleplayerServer() != null) {
@@ -160,60 +177,72 @@ public class NeoFavoriteItemsNeoForge {
     }
 
     private net.minecraft.world.inventory.Slot getHoveredSlotReflectively(Object screen) {
-        Class<?> type = screen.getClass();
-        while (type != null) {
-            try {
-                Field field = type.getDeclaredField("hoveredSlot");
-                field.setAccessible(true);
-                return (net.minecraft.world.inventory.Slot) field.get(screen);
-            } catch (NoSuchFieldException ignored) {
-                type = type.getSuperclass();
-            } catch (IllegalAccessException ignored) {
-                return null;
-            }
-        }
-        return null;
+        return ReflectionHelper.readField(screen, "hoveredSlot", net.minecraft.world.inventory.Slot.class);
     }
 
     private int getContainerSlotIndex(net.minecraft.world.inventory.Slot slot) {
-        Integer methodResult = invokeIntMethod(slot, "getContainerSlot");
+        Integer methodResult = ReflectionHelper.invokeIntMethod(slot, "getContainerSlot");
         if (methodResult != null) {
             return methodResult;
         }
 
-        Integer fieldResult = readIntField(slot, "slot");
+        Integer fieldResult = ReflectionHelper.readIntField(slot, "slot");
         if (fieldResult != null) {
             return fieldResult;
         }
 
-        fieldResult = readIntField(slot, "index");
+        fieldResult = ReflectionHelper.readIntField(slot, "index");
         return fieldResult == null ? -1 : fieldResult;
     }
 
-    private Integer invokeIntMethod(Object target, String name) {
-        try {
-            Method method = target.getClass().getMethod(name);
-            return (Integer) method.invoke(target);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
-
-    private Integer readIntField(Object target, String name) {
-        try {
-            Field field = target.getClass().getDeclaredField(name);
-            field.setAccessible(true);
-            return field.getInt(target);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
-
     public static boolean isBypassKeyHeld() {
-        return bypassKeyHeld;
+        return isKeyHeld(bypassLockKey);
     }
 
     public static boolean isLockOperationKeyHeld() {
-        return lockOperationKeyHeld;
+        return isKeyHeld(lockOperationKey);
+    }
+
+    private static boolean isKeyHeld(net.minecraft.client.KeyMapping keyMapping) {
+        if (keyMapping == null) {
+            return false;
+        }
+
+        var minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.getWindow() == null) {
+            return false;
+        }
+
+        InputConstants.Key key = getBoundKey(keyMapping);
+        if (key == null || key == InputConstants.UNKNOWN) {
+            return false;
+        }
+        return InputConstants.isKeyDown(minecraft.getWindow().getWindow(), key.getValue());
+    }
+
+    private static InputConstants.Key getBoundKey(net.minecraft.client.KeyMapping keyMapping) {
+        // 优先尝试 getKey() 方法（1.20.5+）
+        InputConstants.Key key = ReflectionHelper.invokeMethod(
+            keyMapping, 
+            "getKey", 
+            InputConstants.Key.class
+        );
+        if (key != null) {
+            return key;
+        }
+
+        // 回退到 key 字段（旧版本）
+        return ReflectionHelper.readField(keyMapping, "key", InputConstants.Key.class);
+    }
+
+    private static void logKeyStatesIfChanged() {
+        boolean lockHeld = isLockOperationKeyHeld();
+        boolean bypassHeld = isBypassKeyHeld();
+        if (lockHeld != lastLoggedLockOperationKeyState || bypassHeld != lastLoggedBypassLockKeyState) {
+            DebugLogger.debug("NeoForge key state changed: lockOperation={} bypass={}", lockHeld, bypassHeld);
+            lastLoggedLockOperationKeyState = lockHeld;
+            lastLoggedBypassLockKeyState = bypassHeld;
+            NeoForgeFavoriteNetworking.sendBypassKeyState(bypassHeld);
+        }
     }
 }

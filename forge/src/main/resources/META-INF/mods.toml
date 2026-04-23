@@ -10,3 +10,9 @@ displayName="New Item Favorites"
 description='''
 A versatile item favorites/lock mod for Minecraft
 '''
+
+[[mixins]]
+config="neo_favorite_items.forge.mixins.json"
+
+[[mixins]]
+config="neo_favorite_items.forge.compat.mixins.json"

@@ -2,6 +2,8 @@
 package mycraft.yuyears.neofavoriteitems;
 
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -12,11 +14,13 @@ import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 
 public class FavoritesManager {
     private static FavoritesManager instance;
-    private final Set<LogicalSlotIndex> favoriteSlots;
+    private final Set<LogicalSlotIndex> clientFavoriteSlots;
+    private final Map<UUID, Set<LogicalSlotIndex>> favoriteSlotsByPlayer;
     private UUID currentPlayerUUID;
 
     private FavoritesManager() {
-        this.favoriteSlots = new HashSet<>();
+        this.clientFavoriteSlots = new HashSet<>();
+        this.favoriteSlotsByPlayer = new HashMap<>();
     }
 
     public static FavoritesManager getInstance() {
@@ -27,25 +31,25 @@ public class FavoritesManager {
     }
 
     public void setPlayer(UUID playerUUID) {
-        if (this.currentPlayerUUID == null || !this.currentPlayerUUID.equals(playerUUID)) {
-            this.currentPlayerUUID = playerUUID;
-            this.favoriteSlots.clear();
+        this.currentPlayerUUID = playerUUID;
+        if (playerUUID != null) {
+            this.favoriteSlotsByPlayer.computeIfAbsent(playerUUID, ignored -> new HashSet<>());
         }
     }
 
     public void clearPlayer() {
         this.currentPlayerUUID = null;
-        this.favoriteSlots.clear();
+        this.clientFavoriteSlots.clear();
     }
 
     public boolean isSlotFavorite(int slot) {
         return SlotMappingService.fromPlayerInventoryIndex(slot)
-            .map(favoriteSlots::contains)
+            .map(activeSlots()::contains)
             .orElse(false);
     }
 
     public boolean isSlotFavorite(LogicalSlotIndex slot) {
-        return favoriteSlots.contains(slot);
+        return activeSlots().contains(slot);
     }
 
     public void toggleSlotFavorite(int slot) {
@@ -53,6 +57,7 @@ public class FavoritesManager {
     }
 
     public void toggleSlotFavorite(LogicalSlotIndex slot) {
+        Set<LogicalSlotIndex> favoriteSlots = activeSlots();
         if (favoriteSlots.contains(slot)) {
             favoriteSlots.remove(slot);
             return;
@@ -65,6 +70,7 @@ public class FavoritesManager {
     }
 
     public void setSlotFavorite(LogicalSlotIndex slot, boolean favorite) {
+        Set<LogicalSlotIndex> favoriteSlots = activeSlots();
         if (favorite) {
             favoriteSlots.add(slot);
         } else {
@@ -73,17 +79,23 @@ public class FavoritesManager {
     }
 
     public Set<Integer> getFavoriteSlots() {
-        return favoriteSlots.stream()
+        return activeSlots().stream()
             .map(LogicalSlotIndex::value)
             .collect(Collectors.toCollection(HashSet::new));
     }
 
     public Set<LogicalSlotIndex> getFavoriteLogicalSlots() {
-        return new HashSet<>(favoriteSlots);
+        return new HashSet<>(activeSlots());
     }
 
     public void clearFavorites() {
+        activeSlots().clear();
+    }
+
+    public void setFavoriteSlots(Set<LogicalSlotIndex> slots) {
+        Set<LogicalSlotIndex> favoriteSlots = activeSlots();
         favoriteSlots.clear();
+        favoriteSlots.addAll(slots);
     }
 
     public void handleSlotSwap(int slot1, int slot2) {
@@ -121,13 +133,14 @@ public class FavoritesManager {
 
     public byte[] serialize() {
         StringBuilder sb = new StringBuilder();
-        for (LogicalSlotIndex slot : favoriteSlots) {
+        for (LogicalSlotIndex slot : activeSlots()) {
             sb.append(slot.value()).append(",");
         }
         return sb.toString().getBytes();
     }
 
     public void deserialize(byte[] data) {
+        Set<LogicalSlotIndex> favoriteSlots = activeSlots();
         favoriteSlots.clear();
         String str = new String(data);
         if (!str.isEmpty()) {
@@ -142,5 +155,12 @@ public class FavoritesManager {
                 }
             }
         }
+    }
+
+    private Set<LogicalSlotIndex> activeSlots() {
+        if (currentPlayerUUID == null) {
+            return clientFavoriteSlots;
+        }
+        return favoriteSlotsByPlayer.computeIfAbsent(currentPlayerUUID, ignored -> new HashSet<>());
     }
 }

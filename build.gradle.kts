@@ -38,9 +38,4 @@ allprojects {
         }
     }
 
-    if (name in setOf("fabric", "forge", "neoforge")) {
-        tasks.withType<Jar>().configureEach {
-            from(rootProject.project(":common").extensions.getByType<SourceSetContainer>()["main"].output)
-        }
-    }
 }
