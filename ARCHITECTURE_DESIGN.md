@@ -1,150 +1,270 @@
+# Neo Favorite Items Architecture Notes
+
 # Neo Favorite Items 架构说明
 
-最后更新: 2026-04-23
+Last updated: 2026-04-23
+
+最后更新：2026-04-23
+
+This document records the current project structure and implementation boundaries. It describes the repository as it exists now, not an older migration draft.
 
 本文档记录当前项目结构和实现边界。它描述的是当前仓库状态，而不是早期迁移草案。
 
+## Design Goals
+
 ## 设计目标
 
+- Keep favorite/lock rules in loader-neutral code whenever possible.
 - 让收藏/锁定规则尽量位于平台无关代码中。
+- Use a unified logical slot model instead of treating GUI slot ids as persistent identities.
 - 使用统一逻辑槽位模型，避免把 GUI 槽位 id 当作持久化身份。
+- Keep loader modules focused on registration, key bindings, networking, mixins/events, and render entrypoints.
 - 平台层只负责注册、按键、网络、Mixin/事件和渲染入口。
+- Keep the client responsive while using server-authoritative state and sync when the server has the mod installed.
 - 客户端保持响应速度，服务端安装时负责权威状态和同步。
+- Share common-layer services across Fabric, Forge, and NeoForge wherever practical.
 - Fabric、Forge、NeoForge 尽量共享 common 层服务。
+
+## Module Structure
 
 ## 模块结构
 
 ```text
 common/
   src/main/java/mycraft/yuyears/neofavoriteitems/
-    domain/        纯领域模型
-    application/   用例服务和同步服务
-    integration/   Minecraft 槽位到逻辑槽位的适配
-    persistence/   收藏数据读写
-    render/        Overlay 抽象和颜色工具
-    *.java         配置、状态、公共初始化和日志
+    domain/        Domain models
+                   纯领域模型
+    application/   Use-case and sync services
+                   用例服务和同步服务
+    integration/   Minecraft slot-to-logical-slot adapters
+                   Minecraft 槽位到逻辑槽位的适配
+    persistence/   Favorite data I/O
+                   收藏数据读写
+    render/        Overlay abstraction and color utilities
+                   Overlay 抽象和颜色工具
+    *.java         Config, state, common initialization, logging
+                   配置、状态、公共初始化和日志
   src/main/resources/assets/neo_favorite_items/
     lang/          en_us.json, zh_cn.json
-    textures/      Overlay PNG 材质
+    textures/      Overlay PNG textures
+                   Overlay PNG 材质
 
 fabric/
+  Fabric entrypoints, client entrypoint, network payloads, slot resolving, mixins, Fabric renderer
   Fabric 入口、客户端入口、网络 payload、槽位解析、Mixin、Fabric 渲染器
 
 forge/
+  Forge entrypoint, network payloads, mixins, Forge events/key bindings/renderer
   Forge 入口、网络 payload、Mixin、Forge 事件/按键/渲染器
 
 neoforge/
+  NeoForge entrypoint, network payloads, mixins, NeoForge events/key bindings/renderer
   NeoForge 入口、网络 payload、Mixin、NeoForge 事件/按键/渲染器
 ```
+
+## Layer Responsibilities
 
 ## 分层职责
 
 ### Domain
 
-位置: `common/.../domain`
+### Domain / 领域层
 
-- `LogicalSlotIndex`: 统一玩家物品栏槽位索引，范围 `0..40`
-- `InteractionType`: 点击、丢弃、快速移动、拖拽、交换等交互类型
-- `InteractionDecision`: 允许、旁路允许、拒绝及原因
+Location: `common/.../domain`
+
+位置：`common/.../domain`
+
+- `LogicalSlotIndex`: unified player inventory slot index in the `0..40` range
+- `LogicalSlotIndex`：统一玩家物品栏槽位索引，范围 `0..40`
+- `InteractionType`: click, drop, quick move, drag, swap, and related interaction types
+- `InteractionType`：点击、丢弃、快速移动、拖拽、交换等交互类型
+- `InteractionDecision`: allow, allow-with-bypass, deny, and denial reason
+- `InteractionDecision`：允许、旁路允许、拒绝及原因
+
+This layer does not depend on loader APIs.
 
 该层不依赖加载器 API。
 
 ### Application
 
-位置: `common/.../application`
+### Application / 应用层
 
-- `InteractionGuardService`: 根据收藏状态、配置、旁路键和槽位内容做拦截决策
-- `ServerFavoriteService`: 服务端收藏切换、校验、修订号、旁路状态和服务端交互保护
-- `ClientFavoriteSyncService`: 客户端全量/增量同步、过期修订过滤和同步缺口检测
+Location: `common/.../application`
+
+位置：`common/.../application`
+
+- `InteractionGuardService`: decides whether an interaction should be allowed based on favorite state, config, bypass key, and slot contents
+- `InteractionGuardService`：根据收藏状态、配置、旁路键和槽位内容做拦截决策
+- `ServerFavoriteService`: handles server-side toggles, validation, revisions, bypass state, and server interaction protection
+- `ServerFavoriteService`：处理服务端收藏切换、校验、修订号、旁路状态和服务端交互保护
+- `ClientFavoriteSyncService`: applies full and incremental syncs, rejects stale revisions, and detects revision gaps
+- `ClientFavoriteSyncService`：应用客户端全量/增量同步、过滤过期修订并检测同步缺口
 
 ### Integration
 
-位置: `common/.../integration`
+### Integration / 集成层
 
-- `SlotMappingService`: 在 Minecraft 玩家背包索引和 `LogicalSlotIndex` 之间转换。
+Location: `common/.../integration`
+
+位置：`common/.../integration`
+
+- `SlotMappingService`: converts between Minecraft player inventory indices and `LogicalSlotIndex`.
+- `SlotMappingService`：在 Minecraft 玩家背包索引和 `LogicalSlotIndex` 之间转换。
+- Current favorite/lock behavior only targets player inventory slots, not container-owned slots such as chests or furnaces.
 - 当前收藏/锁定只面向玩家物品栏槽位，不面向箱子、熔炉等容器自身槽位。
 
 ### Persistence
 
-位置: `common/.../persistence`
+### Persistence / 持久化层
 
-- `DataPersistenceManager`: 按玩家 UUID 保存和加载收藏数据。
+Location: `common/.../persistence`
+
+位置：`common/.../persistence`
+
+- `DataPersistenceManager`: saves and loads favorite data by player UUID.
+- `DataPersistenceManager`：按玩家 UUID 保存和加载收藏数据。
+- It supports client-local directories, singleplayer world directories, and server player-data scenarios.
 - 支持客户端本地目录、单人世界目录和服务端玩家数据场景。
 
 ### Render
 
-位置: `common/.../render`
+### Render / 渲染层
 
-- `OverlayRenderer`: 平台渲染器的公共基类和颜色/资源工具。
+Location: `common/.../render`
+
+位置：`common/.../render`
+
+- `OverlayRenderer`: common base class and color/resource utilities for platform renderers.
+- `OverlayRenderer`：平台渲染器的公共基类和颜色/资源工具。
+- Loader modules resolve common textures into loader-specific rendering calls.
 - 平台模块负责把公共材质解析为各自加载器可用的渲染调用。
+
+## Loader Responsibilities
 
 ## 平台职责
 
 ### Fabric
 
-- `NeoFavoriteItemsFabric`: 公共初始化、服务端生命周期、玩家加入/离开、服务端全量同步。
-- `NeoFavoriteItemsFabricClient`: 客户端配置、按键、Overlay、客户端同步接收、世界切换加载/保存。
-- `FabricFavoriteNetworking`: Toggle、Full Sync、Delta Sync、Bypass Key State payload。
+### Fabric
+
+- `NeoFavoriteItemsFabric`: common initialization, server lifecycle, player join/leave handling, and server full sync.
+- `NeoFavoriteItemsFabric`：公共初始化、服务端生命周期、玩家加入/离开、服务端全量同步。
+- `NeoFavoriteItemsFabricClient`: client config, key bindings, overlay, client sync receivers, world-change load/save.
+- `NeoFavoriteItemsFabricClient`：客户端配置、按键、Overlay、客户端同步接收、世界切换加载/保存。
+- `FabricFavoriteNetworking`: Toggle, Full Sync, Delta Sync, and Bypass Key State payloads.
+- `FabricFavoriteNetworking`：Toggle、Full Sync、Delta Sync、Bypass Key State payload。
+- Mixins cover normal containers, creative slots, inventory interactions, and player inventory mutation protection.
 - Mixin 覆盖普通容器、创造模式槽位、物品栏交互和玩家背包变更保护。
 
 ### Forge
 
-- `NeoFavoriteItemsForge`: Mod 入口、事件总线、按键、GUI Layer、玩家登录/登出、服务端同步。
-- `ForgeFavoriteNetworking`: Forge SimpleChannel 网络包注册与收发。
+### Forge
+
+- `NeoFavoriteItemsForge`: mod entrypoint, event bus wiring, key bindings, GUI layer, player login/logout, and server sync.
+- `NeoFavoriteItemsForge`：Mod 入口、事件总线、按键、GUI Layer、玩家登录/登出、服务端同步。
+- `ForgeFavoriteNetworking`: Forge SimpleChannel packet registration and send/receive handling.
+- `ForgeFavoriteNetworking`：Forge SimpleChannel 网络包注册与收发。
+- Mixins and Forge adapters reuse common decision services.
 - Mixin 和 Forge 适配类复用 common 决策服务。
 
 ### NeoForge
 
-- `NeoFavoriteItemsNeoForge`: Mod 入口、NeoForge 事件、按键、GUI Layer、payload handler、玩家登录/登出。
-- `NeoForgeFavoriteNetworking`: NeoForge payload 注册与收发。
+### NeoForge
+
+- `NeoFavoriteItemsNeoForge`: mod entrypoint, NeoForge events, key bindings, GUI layer, payload handler, and player login/logout.
+- `NeoFavoriteItemsNeoForge`：Mod 入口、NeoForge 事件、按键、GUI Layer、payload handler、玩家登录/登出。
+- `NeoForgeFavoriteNetworking`: NeoForge payload registration and send/receive handling.
+- `NeoForgeFavoriteNetworking`：NeoForge payload 注册与收发。
+- Mixins and NeoForge adapters reuse common decision services.
 - Mixin 和 NeoForge 适配类复用 common 决策服务。
+
+## Runtime Flows
 
 ## 核心流程
 
+### Toggle Favorite
+
 ### 切换收藏
 
-1. 客户端检测锁定操作键和目标玩家物品栏槽位。
-2. 平台槽位解析把目标转换为 `LogicalSlotIndex`。
-3. 有服务端支持时发送 Toggle 请求。
-4. `ServerFavoriteService` 校验空槽配置、更新收藏状态、保存数据并生成修订号。
-5. 服务端发送全量或增量同步。
-6. 客户端通过 `ClientFavoriteSyncService` 应用同步结果并刷新本地展示。
+1. The client detects the lock-operation key and the target player inventory slot.
+2. 客户端检测锁定操作键和目标玩家物品栏槽位。
+3. Platform slot resolving converts the target to `LogicalSlotIndex`.
+4. 平台槽位解析把目标转换为 `LogicalSlotIndex`。
+5. If server support is available, the client sends a Toggle request.
+6. 有服务端支持时发送 Toggle 请求。
+7. `ServerFavoriteService` validates empty-slot rules, updates favorite state, saves data, and creates a revision.
+8. `ServerFavoriteService` 校验空槽配置、更新收藏状态、保存数据并生成修订号。
+9. The server sends a full or incremental sync.
+10. 服务端发送全量或增量同步。
+11. The client applies the sync through `ClientFavoriteSyncService` and refreshes local presentation.
+12. 客户端通过 `ClientFavoriteSyncService` 应用同步结果并刷新本地展示。
+
+### Interaction Guard
 
 ### 交互拦截
 
-1. 平台 Mixin/事件捕获点击、快速移动、拖拽、丢弃、交换或外部移动。
-2. 只处理玩家自己的物品栏槽位。
-3. `InteractionGuardService` 根据配置和收藏状态返回决策。
-4. 平台层按决策取消交互或允许继续。
-5. 旁路键状态由客户端按键轮询同步到服务端。
+1. A platform mixin/event captures click, quick move, drag, drop, swap, or external movement.
+2. 平台 Mixin/事件捕获点击、快速移动、拖拽、丢弃、交换或外部移动。
+3. Only the player's own inventory slots are processed.
+4. 只处理玩家自己的物品栏槽位。
+5. `InteractionGuardService` returns a decision based on config and favorite state.
+6. `InteractionGuardService` 根据配置和收藏状态返回决策。
+7. The platform layer cancels or allows the interaction according to that decision.
+8. 平台层按决策取消交互或允许继续。
+9. Bypass-key state is polled on the client and synced to the server.
+10. 旁路键状态由客户端按键轮询同步到服务端。
+
+### Overlay Rendering
 
 ### Overlay 渲染
 
-1. 平台渲染器枚举 GUI 槽位或快捷栏槽位。
-2. 槽位映射到 `LogicalSlotIndex`。
-3. 根据收藏状态、锁定操作键、旁路键和配置选择 Overlay 样式。
-4. PNG 材质按实际尺寸采样并缩放到 16x16 槽位。
-5. 根据配置决定绘制在物品图标前方或后方。
+1. The platform renderer enumerates GUI slots or hotbar slots.
+2. 平台渲染器枚举 GUI 槽位或快捷栏槽位。
+3. Slots are mapped to `LogicalSlotIndex`.
+4. 槽位映射到 `LogicalSlotIndex`。
+5. Overlay style is selected from favorite state, lock-operation key state, bypass-key state, and config.
+6. 根据收藏状态、锁定操作键、旁路键和配置选择 Overlay 样式。
+7. PNG textures are sampled at their actual dimensions and scaled to 16x16 slots.
+8. PNG 材质按实际尺寸采样并缩放到 16x16 槽位。
+9. Config decides whether overlays render in front of or behind item icons.
+10. 根据配置决定绘制在物品图标前方或后方。
+
+## Current Constraints
 
 ## 当前约束
 
+- Favorite identity only covers player inventory slots `0..40`.
 - 收藏身份只覆盖玩家物品栏 `0..40`。
+- Container-owned slot favorites are not implemented.
 - 容器自身槽位收藏尚未实现。
+- Item-movement policy has configuration entrypoints, but complex move tracking while bypass is held still needs work.
 - 物品移动策略已有配置入口，旁路状态下的复杂移动追踪仍需继续完善。
+- Visual feedback and actual sound playback still need implementation.
 - 视觉反馈和音效实际播放仍需补齐。
+- No automated test suite is currently established.
 - 尚未建立自动化测试套件。
+
+## Maintenance Rules
 
 ## 维护约定
 
+- Prefer putting new logic in `common`; keep loader layers as thin adapters.
 - 新逻辑优先放入 `common`，平台层保持薄适配。
+- Persistence and networking should pass logical slots or player inventory indices, not GUI slot ids.
 - 持久化和网络只传递逻辑槽位或玩家背包索引，不传递 GUI slot id。
-- 新增 Overlay 样式时，同时更新:
+- When adding an Overlay style, update:
+- 新增 Overlay 样式时，同时更新：
   - `NeoFavoriteItemsConfig.OverlayStyle`
+  - `OverlayRenderer` resource paths
   - `OverlayRenderer` 资源路径
+  - all three platform renderers
   - 三个平台渲染器
   - `common/src/main/resources/assets/neo_favorite_items/textures`
-- 新增配置项时，同时更新:
+- When adding a config option, update:
+- 新增配置项时，同时更新：
   - `NeoFavoriteItemsConfig`
   - `ConfigManager`
+  - language files or config comments
   - 语言文件或配置注释
+  - the configuration summary in `README.md`
   - `README.md` 的配置摘要
