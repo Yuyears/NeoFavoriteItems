@@ -29,6 +29,7 @@ Date: 2026-04-24
   - `ConfigManagerTest`
   - `DataPersistenceManagerTest`
   - `ReflectionHelperTest`
+  - `PlatformFavoriteSupportTest`
 - Persistence coverage additions in this round:
 - 本轮新增的持久化覆盖点：
   - client-only storage namespace by server address
@@ -39,6 +40,8 @@ Date: 2026-04-24
   - 旧 `itemfavorites` 数据的回退读取与迁移清理
   - cached preload/full-save round trip
   - 缓存预载与完整保存回路
+  - client storage namespace selection from server-list address, remote connection address, and default fallback
+  - 客户端存储命名空间按服务器列表地址、远端连接地址和默认回退的选择逻辑
 
 ## Coverage
 
@@ -69,8 +72,16 @@ Date: 2026-04-24
 - 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:compileJava :fabric:compileJava`
 - Result: passed
 - 结果：通过
+- Command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava`
+- 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava`
+- Result: passed
+- 结果：通过
 - Command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :forge:compileJava :neoforge:compileJava`
 - 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :forge:compileJava :neoforge:compileJava`
+- Result: passed
+- 结果：通过
+- Integration command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`
+- 集成命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`
 - Result: passed
 - 结果：通过
 

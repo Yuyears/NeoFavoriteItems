@@ -37,6 +37,10 @@ Date: 2026-04-24
 18. 持久化生命周期现在遵循“世界启动完整读取、玩家进入部分读取、玩家退出增量保存、世界关闭完整保存”。
 19. Legacy `itemfavorites/...` client data is now migrated into the new path on first successful read, and the old file is removed afterward.
 20. 旧 `itemfavorites/...` 客户端数据现在会在首次成功读取后迁移到新路径，并删除旧文件。
+21. Server-side full and incremental sync sends now check whether each player connection advertises the mod payload/channel before sending, preventing login failure for clients without the mod.
+22. 服务端全量和增量同步发包现在会先检查玩家连接是否声明了本模组 payload/channel，避免未安装客户端登录失败。
+23. Client-only persistence now treats a storage namespace change as a world-context reload, saving the previous namespace before loading the server-address or remote-address namespace.
+24. 仅客户端持久化现在会把存储命名空间变化视为世界上下文重载，先保存旧命名空间，再加载服务器地址或远端地址命名空间。
 
 ## Integration Validation Summary
 
@@ -54,10 +58,14 @@ Date: 2026-04-24
   - 持久化：客户端本地存储使用 `favoriteitems/<净化后的服务器地址>/players/<uuid>.dat`
 - Server-only expectation:
 - 仅服务端安装预期：
+  - Fabric: player-join full sync now uses the same guarded `sendFullSync` path as toggle resync
+  - Fabric：玩家加入时的全量同步现在与切换后的重同步使用同一个受保护的 `sendFullSync` 路径
   - Forge: compatibility display handled via custom `DisplayTest`
   - Forge：通过自定义 `DisplayTest` 处理兼容性显示
   - NeoForge: compatibility display set to ignore side mismatch in `neoforge.mods.toml`
   - NeoForge：在 `neoforge.mods.toml` 中设置忽略双端不对称带来的显示兼容性问题
+  - Server-to-client sync packets are skipped when the joining connection does not advertise the corresponding client payload/channel
+  - 当加入服务器的连接未声明对应客户端 payload/channel 时，服务端到客户端同步包会被跳过
 - Dual-install expectation:
 - 双端安装预期：
   - Full/incremental sync and bypass-state sync remain enabled
