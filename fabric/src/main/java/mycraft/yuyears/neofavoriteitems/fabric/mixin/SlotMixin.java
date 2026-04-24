@@ -19,6 +19,9 @@ public abstract class SlotMixin {
 
     @Inject(method = "mayPickup", at = @At("HEAD"), cancellable = true)
     private void neoFavoriteItems$guardLockedSlotPickup(Player player, CallbackInfoReturnable<Boolean> cir) {
+        if (player == null) {
+            return;
+        }
         if (ServerFavoriteService.shouldPreventSlotPickup((Slot) (Object) this, player)) {
             cir.setReturnValue(false);
         }
@@ -27,6 +30,7 @@ public abstract class SlotMixin {
     @Inject(method = "mayPlace", at = @At("HEAD"), cancellable = true)
     private void neoFavoriteItems$guardLockedSlotPlace(ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
         if (container instanceof Inventory inventory
+            && inventory.player != null
             && ServerFavoriteService.shouldPreventSlotPlace((Slot) (Object) this, inventory.player)) {
             cir.setReturnValue(false);
         }

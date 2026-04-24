@@ -10,7 +10,9 @@
     "RangedWrapperMixin",
     "SlotMixin"
   ],
-  "client": [],
+  "client": [
+    "MinecraftMixin"
+  ],
   "server": [],
   "injectors": {
     "defaultRequire": 1

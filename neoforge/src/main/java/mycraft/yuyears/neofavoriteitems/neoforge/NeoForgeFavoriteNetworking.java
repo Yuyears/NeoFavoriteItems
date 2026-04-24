@@ -1,9 +1,12 @@
 package mycraft.yuyears.neofavoriteitems.neoforge;
 
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
+import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
 import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -11,6 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.registration.NetworkRegistry;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 import java.util.HashSet;
@@ -20,20 +24,29 @@ public final class NeoForgeFavoriteNetworking {
     private NeoForgeFavoriteNetworking() {}
 
     public static void registerPackets(PayloadRegistrar registrar) {
-        registrar.playToServer(ToggleFavoritePayload.TYPE, ToggleFavoritePayload.STREAM_CODEC, ToggleFavoritePayload::handle);
-        registrar.playToServer(RequestFavoriteSyncPayload.TYPE, RequestFavoriteSyncPayload.STREAM_CODEC, RequestFavoriteSyncPayload::handle);
-        registrar.playToServer(BypassKeyStatePayload.TYPE, BypassKeyStatePayload.STREAM_CODEC, BypassKeyStatePayload::handle);
-        registrar.playToClient(SyncFavoritesPayload.TYPE, SyncFavoritesPayload.STREAM_CODEC, SyncFavoritesPayload::handle);
-        registrar.playToClient(SyncFavoriteChangesPayload.TYPE, SyncFavoriteChangesPayload.STREAM_CODEC, SyncFavoriteChangesPayload::handle);
+        PayloadRegistrar optionalRegistrar = registrar.optional();
+        optionalRegistrar.playToServer(ToggleFavoritePayload.TYPE, ToggleFavoritePayload.STREAM_CODEC, ToggleFavoritePayload::handle);
+        optionalRegistrar.playToServer(RequestFavoriteSyncPayload.TYPE, RequestFavoriteSyncPayload.STREAM_CODEC, RequestFavoriteSyncPayload::handle);
+        optionalRegistrar.playToServer(BypassKeyStatePayload.TYPE, BypassKeyStatePayload.STREAM_CODEC, BypassKeyStatePayload::handle);
+        optionalRegistrar.playToClient(SyncFavoritesPayload.TYPE, SyncFavoritesPayload.STREAM_CODEC, SyncFavoritesPayload::handle);
+        optionalRegistrar.playToClient(SyncFavoriteChangesPayload.TYPE, SyncFavoriteChangesPayload.STREAM_CODEC, SyncFavoriteChangesPayload::handle);
     }
 
     public static boolean trySendToggle(int inventoryIndex) {
+        if (!isServerPresent()) {
+            DebugLogger.debug("NeoForge toggle packet not sent: server_channel_unavailable inventoryIndex={}", inventoryIndex);
+            return false;
+        }
         PacketDistributor.sendToServer(new ToggleFavoritePayload(inventoryIndex));
         DebugLogger.debug("NeoForge sent toggle favorite packet: inventoryIndex={}", inventoryIndex);
         return true;
     }
 
     public static void sendBypassKeyState(boolean held) {
+        if (!isServerPresent()) {
+            DebugLogger.debug("NeoForge bypass key state packet not sent: server_channel_unavailable held={}", held);
+            return;
+        }
         PacketDistributor.sendToServer(new BypassKeyStatePayload(held));
         DebugLogger.debug("NeoForge sent bypass key state: held={}", held);
     }
@@ -47,8 +60,18 @@ public final class NeoForgeFavoriteNetworking {
     }
 
     private static void requestFullSync() {
+        if (!isServerPresent()) {
+            DebugLogger.debug("NeoForge full sync request not sent: server_channel_unavailable");
+            return;
+        }
         PacketDistributor.sendToServer(RequestFavoriteSyncPayload.INSTANCE);
         DebugLogger.debug("NeoForge requested full favorite sync");
+    }
+
+    public static boolean isServerPresent() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return minecraft.getConnection() != null
+            && NetworkRegistry.hasChannel(minecraft.getConnection().getConnection(), ConnectionProtocol.PLAY, ToggleFavoritePayload.TYPE.id());
     }
 
     public record ToggleFavoritePayload(int inventoryIndex) implements CustomPacketPayload {

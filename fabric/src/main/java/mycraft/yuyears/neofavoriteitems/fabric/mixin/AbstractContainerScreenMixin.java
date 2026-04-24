@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(AbstractContainerScreen.class)
 public abstract class AbstractContainerScreenMixin {
     @Inject(method = "slotClicked", at = @At("HEAD"), cancellable = true)
-    private void newItemFavorites$guardFavoriteSlot(Slot slot, int i, int j, ClickType clickType, CallbackInfo ci) {
+    private void neoFavoriteItems$guardFavoriteSlot(Slot slot, int i, int j, ClickType clickType, CallbackInfo ci) {
         DebugLogger.debug(
             "Fabric slotClicked: slotNull={} slotId={} button={} clickType={} lockOperation={} bypass={}",
             slot == null,

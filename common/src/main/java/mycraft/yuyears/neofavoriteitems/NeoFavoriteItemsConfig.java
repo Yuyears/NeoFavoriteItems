@@ -3,8 +3,8 @@ package mycraft.yuyears.neofavoriteitems;
 
 public class NeoFavoriteItemsConfig {
     public static class General {
-        public boolean lockEmptySlots = false;
-        public boolean autoUnlockEmptySlots = true;
+        public boolean lockEmptySlots = true;
+        public boolean autoUnlockEmptySlots = false;
         public boolean allowItemsIntoLockedEmptySlots = false;
     }
 
@@ -24,7 +24,7 @@ public class NeoFavoriteItemsConfig {
     }
 
     public static class SlotBehavior {
-        public SlotMoveBehavior moveBehavior = SlotMoveBehavior.FOLLOW_ITEM;
+        public SlotMoveBehavior moveBehavior = SlotMoveBehavior.STAY_AT_POSITION;
     }
 
     public static enum OverlayStyle {
@@ -41,14 +41,14 @@ public class NeoFavoriteItemsConfig {
     }
 
     public static class Overlay {
-        public OverlayStyle lockedStyle = OverlayStyle.LOCK;
-        public OverlayStyle holdingKeyLockedStyle = OverlayStyle.LOCK;
-        public OverlayStyle highlightStyle = OverlayStyle.HIGHLIGHT;
-        public int lockedOverlayColor = 0xFFFFD700;
+        public OverlayStyle lockedStyle = OverlayStyle.MARK;
+        public OverlayStyle holdingKeyLockedStyle = OverlayStyle.MARK;
+        public OverlayStyle highlightStyle = OverlayStyle.BORDER;
+        public int lockedOverlayColor = 0xFAFF413C;
         public float lockedOverlayOpacity = 0.7f;
-        public int lockableHighlightColor = 0xFF66CCFF;
+        public int lockableHighlightColor = 0xC823E600;
         public float lockableHighlightOpacity = 0.55f;
-        public int unlockableHighlightColor = 0xFFFFAA33;
+        public int unlockableHighlightColor = 0xB4FFC335;
         public float unlockableHighlightOpacity = 0.65f;
         public float colorOverlayOpacity = 0.35f;
         public float bypassOverlayOpacityMultiplier = 0.35f;

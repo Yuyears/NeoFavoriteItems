@@ -1,9 +1,11 @@
 package mycraft.yuyears.neofavoriteitems.forge;
 
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
+import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
 import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -20,7 +22,8 @@ import java.util.Set;
 public final class ForgeFavoriteNetworking {
     private static final SimpleChannel CHANNEL = ChannelBuilder
         .named(ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "favorites"))
-        .networkProtocolVersion(1)
+        .networkProtocolVersion(NeoFavoriteItemsConstants.NETWORK_PROTOCOL_VERSION)
+        .optional()
         .simpleChannel();
 
     private ForgeFavoriteNetworking() {}
@@ -49,12 +52,20 @@ public final class ForgeFavoriteNetworking {
     }
 
     public static boolean trySendToggle(int inventoryIndex) {
+        if (!isServerPresent()) {
+            DebugLogger.debug("Forge toggle packet not sent: server_channel_unavailable inventoryIndex={}", inventoryIndex);
+            return false;
+        }
         CHANNEL.send(new ToggleFavoritePayload(inventoryIndex), PacketDistributor.SERVER.noArg());
         DebugLogger.debug("Forge sent toggle favorite packet: inventoryIndex={}", inventoryIndex);
         return true;
     }
 
     public static void sendBypassKeyState(boolean held) {
+        if (!isServerPresent()) {
+            DebugLogger.debug("Forge bypass key state packet not sent: server_channel_unavailable held={}", held);
+            return;
+        }
         CHANNEL.send(new BypassKeyStatePayload(held), PacketDistributor.SERVER.noArg());
         DebugLogger.debug("Forge sent bypass key state: held={}", held);
     }
@@ -68,8 +79,18 @@ public final class ForgeFavoriteNetworking {
     }
 
     private static void requestFullSync() {
+        if (!isServerPresent()) {
+            DebugLogger.debug("Forge full sync request not sent: server_channel_unavailable");
+            return;
+        }
         CHANNEL.send(RequestFavoriteSyncPayload.INSTANCE, PacketDistributor.SERVER.noArg());
         DebugLogger.debug("Forge requested full favorite sync");
+    }
+
+    public static boolean isServerPresent() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return minecraft.getConnection() != null
+            && CHANNEL.isRemotePresent(minecraft.getConnection().getConnection());
     }
 
     private static void handleToggleFavorite(ToggleFavoritePayload payload, CustomPayloadEvent.Context context) {

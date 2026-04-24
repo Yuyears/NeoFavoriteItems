@@ -3,16 +3,14 @@ package mycraft.yuyears.neofavoriteitems.fabric;
 import com.mojang.blaze3d.platform.InputConstants;
 import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
-import mycraft.yuyears.neofavoriteitems.FavoritesManager;
+import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
-import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.fabric.mixin.KeyMappingAccessor;
+import mycraft.yuyears.neofavoriteitems.PlatformFavoriteSupport;
 import mycraft.yuyears.neofavoriteitems.fabric.render.FabricOverlayRenderer;
-import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
@@ -27,14 +25,7 @@ public class NeoFavoriteItemsFabricClient implements ClientModInitializer {
     private static boolean lastLoggedBypassLockKeyState;
 
     public static void showSlotToggleMessage(LogicalSlotIndex slot) {
-        var client = Minecraft.getInstance();
-        if (client.player == null) {
-            return;
-        }
-
-        boolean isFavorite = FavoritesManager.getInstance().isSlotFavorite(slot);
-        String key = isFavorite ? "text.neo_favorite_items.slot_marked" : "text.neo_favorite_items.slot_unmarked";
-        client.player.displayClientMessage(Component.translatable(key).withStyle(isFavorite ? ChatFormatting.GOLD : ChatFormatting.GRAY), true);
+        PlatformFavoriteSupport.showSlotToggleMessage(slot);
     }
 
     public static boolean isBypassKeyHeld() {
@@ -78,17 +69,8 @@ public class NeoFavoriteItemsFabricClient implements ClientModInitializer {
         NeoFavoriteItemsMod.getInstance().onClientInitialize();
 
         var client = Minecraft.getInstance();
-
-        ConfigManager.getInstance().initialize(
-            client.gameDirectory.toPath().resolve("config")
-        );
+        PlatformFavoriteSupport.initializeClient(client.gameDirectory.toPath());
         DebugLogger.debug("Fabric client initialized; config debug enabled");
-
-        DataPersistenceManager.getInstance().initialize(
-            client.gameDirectory.toPath(),
-            null,
-            false
-        );
 
         new FabricOverlayRenderer();
 
@@ -98,31 +80,21 @@ public class NeoFavoriteItemsFabricClient implements ClientModInitializer {
             if (client1.player != null) {
                 logKeyStatesIfChanged();
             }
-        });
-
-        ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client1, world) -> {
-            if (world != null && client1.player != null) {
-                ClientFavoriteSyncService.resetSession();
-                FavoritesManager.getInstance().setPlayer(client1.player.getUUID());
-                DataPersistenceManager.getInstance().loadData(client1.player.getUUID());
-            } else if (world == null && client1.player != null) {
-                DataPersistenceManager.getInstance().saveData(client1.player.getUUID());
-                FavoritesManager.getInstance().clearPlayer();
-            }
+            PlatformFavoriteSupport.synchronizeClientPersistence(client1, FabricFavoriteNetworking.isServerPresent());
         });
     }
 
     private void registerKeybindings() {
         lockOperationKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-            "key.neo_favorite_items.lock_operation",
-            GLFW.GLFW_KEY_LEFT_ALT,
-            "category.neo_favorite_items"
+            NeoFavoriteItemsConstants.LOCK_OPERATION_KEY_ID,
+            NeoFavoriteItemsConstants.DEFAULT_LOCK_OPERATION_KEY_CODE,
+            NeoFavoriteItemsConstants.KEY_CATEGORY
         ));
 
         bypassLockKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-            "key.neo_favorite_items.bypass_lock",
-            GLFW.GLFW_KEY_LEFT_CONTROL,
-            "category.neo_favorite_items"
+            NeoFavoriteItemsConstants.BYPASS_LOCK_KEY_ID,
+            NeoFavoriteItemsConstants.DEFAULT_BYPASS_LOCK_KEY_CODE,
+            NeoFavoriteItemsConstants.KEY_CATEGORY
         ));
         DebugLogger.debug("Registered Fabric keybindings: lockOperation default=LEFT_ALT, bypass default=LEFT_CONTROL");
     }

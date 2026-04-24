@@ -1,45 +1,64 @@
 
 package mycraft.yuyears.neofavoriteitems;
 
-import java.util.HashSet;
-import java.util.HashMap;
+import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+
 import mycraft.yuyears.neofavoriteitems.application.InteractionGuardService;
 import mycraft.yuyears.neofavoriteitems.domain.InteractionType;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
+import mycraft.yuyears.neofavoriteitems.persistence.FavoriteSlotCodec;
 
-public class FavoritesManager {
-    private static FavoritesManager instance;
+public class FavoritesManager implements FavoriteStateService, FavoriteSlotCodec {
+    private static final FavoritesManager INSTANCE = new FavoritesManager();
+
     private final Set<LogicalSlotIndex> clientFavoriteSlots;
     private final Map<UUID, Set<LogicalSlotIndex>> favoriteSlotsByPlayer;
-    private UUID currentPlayerUUID;
+    private final ThreadLocal<UUID> currentPlayerUUID;
 
     private FavoritesManager() {
-        this.clientFavoriteSlots = new HashSet<>();
-        this.favoriteSlotsByPlayer = new HashMap<>();
+        this.clientFavoriteSlots = ConcurrentHashMap.newKeySet();
+        this.favoriteSlotsByPlayer = new ConcurrentHashMap<>();
+        this.currentPlayerUUID = new ThreadLocal<>();
     }
 
     public static FavoritesManager getInstance() {
-        if (instance == null) {
-            instance = new FavoritesManager();
-        }
-        return instance;
+        return INSTANCE;
     }
 
+    public static FavoriteStateService getStateService() {
+        return INSTANCE;
+    }
+
+    public static FavoriteSlotCodec getCodec() {
+        return INSTANCE;
+    }
+
+    @Override
     public void setPlayer(UUID playerUUID) {
-        this.currentPlayerUUID = playerUUID;
+        currentPlayerUUID.set(playerUUID);
         if (playerUUID != null) {
-            this.favoriteSlotsByPlayer.computeIfAbsent(playerUUID, ignored -> new HashSet<>());
+            favoriteSlotsByPlayer.computeIfAbsent(playerUUID, ignored -> ConcurrentHashMap.newKeySet());
         }
     }
 
+    @Override
     public void clearPlayer() {
-        this.currentPlayerUUID = null;
-        this.clientFavoriteSlots.clear();
+        currentPlayerUUID.remove();
+        clientFavoriteSlots.clear();
+    }
+
+    @Override
+    public void removePlayer(UUID playerUUID) {
+        if (playerUUID != null) {
+            favoriteSlotsByPlayer.remove(playerUUID);
+        }
     }
 
     public boolean isSlotFavorite(int slot) {
@@ -48,6 +67,7 @@ public class FavoritesManager {
             .orElse(false);
     }
 
+    @Override
     public boolean isSlotFavorite(LogicalSlotIndex slot) {
         return activeSlots().contains(slot);
     }
@@ -69,6 +89,7 @@ public class FavoritesManager {
         SlotMappingService.fromPlayerInventoryIndex(slot).ifPresent(logicalSlot -> setSlotFavorite(logicalSlot, favorite));
     }
 
+    @Override
     public void setSlotFavorite(LogicalSlotIndex slot, boolean favorite) {
         Set<LogicalSlotIndex> favoriteSlots = activeSlots();
         if (favorite) {
@@ -78,20 +99,24 @@ public class FavoritesManager {
         }
     }
 
+    @Override
     public Set<Integer> getFavoriteSlots() {
         return activeSlots().stream()
             .map(LogicalSlotIndex::value)
-            .collect(Collectors.toCollection(HashSet::new));
+            .collect(Collectors.toCollection(java.util.HashSet::new));
     }
 
+    @Override
     public Set<LogicalSlotIndex> getFavoriteLogicalSlots() {
-        return new HashSet<>(activeSlots());
+        return new java.util.HashSet<>(activeSlots());
     }
 
+    @Override
     public void clearFavorites() {
         activeSlots().clear();
     }
 
+    @Override
     public void setFavoriteSlots(Set<LogicalSlotIndex> slots) {
         Set<LogicalSlotIndex> favoriteSlots = activeSlots();
         favoriteSlots.clear();
@@ -131,36 +156,56 @@ public class FavoritesManager {
             .denied();
     }
 
+    @Override
     public byte[] serialize() {
-        StringBuilder sb = new StringBuilder();
-        for (LogicalSlotIndex slot : activeSlots()) {
-            sb.append(slot.value()).append(",");
+        Set<LogicalSlotIndex> favoriteSlots = activeSlots();
+        StringBuilder serialized = new StringBuilder(Math.max(16, favoriteSlots.size() * 3));
+        Iterator<LogicalSlotIndex> iterator = favoriteSlots.iterator();
+        while (iterator.hasNext()) {
+            serialized.append(iterator.next().value());
+            if (iterator.hasNext()) {
+                serialized.append(',');
+            }
         }
-        return sb.toString().getBytes();
+        return serialized.toString().getBytes(StandardCharsets.UTF_8);
     }
 
+    @Override
     public void deserialize(byte[] data) {
         Set<LogicalSlotIndex> favoriteSlots = activeSlots();
         favoriteSlots.clear();
-        String str = new String(data);
-        if (!str.isEmpty()) {
-            String[] slots = str.split(",");
-            for (String slotStr : slots) {
-                if (!slotStr.isEmpty()) {
-                    try {
-                        SlotMappingService.fromPlayerInventoryIndex(Integer.parseInt(slotStr))
-                            .ifPresent(favoriteSlots::add);
-                    } catch (NumberFormatException e) {
-                    }
+
+        if (data == null || data.length == 0) {
+            return;
+        }
+
+        String serialized = new String(data, StandardCharsets.UTF_8);
+        if (serialized.isEmpty()) {
+            return;
+        }
+
+        String[] slots = serialized.split(",");
+        for (String slotText : slots) {
+            if (slotText.isEmpty()) {
+                continue;
+            }
+
+            try {
+                int slotIndex = Integer.parseInt(slotText);
+                if (SlotMappingService.fromPlayerInventoryIndex(slotIndex).map(favoriteSlots::add).isEmpty()) {
+                    DebugLogger.warn("Ignored favorite slot outside supported range during deserialize: slot={}", slotIndex);
                 }
+            } catch (NumberFormatException exception) {
+                DebugLogger.warn("Ignored malformed favorite slot entry during deserialize: value={}", slotText);
             }
         }
     }
 
     private Set<LogicalSlotIndex> activeSlots() {
-        if (currentPlayerUUID == null) {
+        UUID playerUUID = currentPlayerUUID.get();
+        if (playerUUID == null) {
             return clientFavoriteSlots;
         }
-        return favoriteSlotsByPlayer.computeIfAbsent(currentPlayerUUID, ignored -> new HashSet<>());
+        return favoriteSlotsByPlayer.computeIfAbsent(playerUUID, ignored -> ConcurrentHashMap.newKeySet());
     }
 }

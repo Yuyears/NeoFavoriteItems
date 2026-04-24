@@ -12,7 +12,8 @@
     "AbstractContainerScreenMixin",
     "CreativeModeInventoryScreenMixin",
     "CreativeSlotWrapperAccessor",
-    "KeyMappingAccessor"
+    "KeyMappingAccessor",
+    "MinecraftMixin"
   ],
   "server": [],
   "injectors": {

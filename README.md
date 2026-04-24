@@ -49,6 +49,28 @@
 - 可配置的交互守卫可阻止点击、丢弃、快速移动、Shift 点击、拖拽和交换等行为。
 - When the mod is installed on the server, favorite state and sync are server-authoritative while the client remains responsive locally.
 - 服务端安装本模组时，收藏状态与同步由服务端权威处理，同时客户端仍保持本地响应。
+- Outside GUI screens, dropping a locked selected hotbar stack is blocked on the client before the drop animation is played.
+- 在 GUI 外，若当前手持的快捷栏物品已锁定，客户端会在播放丢弃动画前直接阻止丢弃。
+- The mod now supports optional installation on both sides: client-only keeps local lock behavior, server-only allows join without client features, and dual-install enables server-authoritative sync.
+- 模组现已支持真正的双端可选安装：仅客户端安装时保留本地锁定功能，仅服务端安装时允许原版客户端加入但无模组功能，双端安装时启用服务端权威同步。
+- Persistence now follows installation mode:
+- 持久化现已按安装模式分流：
+  - Client-only multiplayer stores data under `favoriteitems/<server-address>/players/<uuid>.dat` in the client game directory.
+  - 仅客户端联机时，数据保存在客户端根目录 `favoriteitems/<服务器地址>/players/<uuid>.dat`。
+  - Dual-install singleplayer and dedicated-server play store data under `<world>/data/neo_favorite_items/players/<uuid>.dat`.
+  - 双端安装时，无论单人还是多人服务器，数据都保存在 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`。
+  - Legacy `itemfavorites/...` client data is migrated to the new directory on first successful read, then the old file is removed.
+  - 为兼容旧版本，首次成功读取旧的 `itemfavorites/...` 客户端数据后，会迁移到新目录并删除旧文件。
+- Persistence triggers are split by lifecycle:
+- 持久化触发时机按生命周期拆分：
+  - World/server start: initialize context and preload stored favorite files.
+  - 世界/服务端启动：初始化持久化上下文并预载已有收藏数据文件。
+  - Player join: load only that player's favorite data.
+  - 玩家进入世界：只读取该玩家数据。
+  - Player leave: save that player's current state incrementally.
+  - 玩家退出世界：增量保存该玩家当前状态。
+  - World/server stop: perform a full save flush for cached player data.
+  - 世界/服务端关闭：对缓存中的玩家数据执行一次完整保存收尾。
 - Config files and in-game text provide English and Simplified Chinese resources.
 - 配置文件和游戏内文本提供英文与简体中文资源。
 
@@ -174,6 +196,10 @@ Key bindings are managed through Minecraft Controls and are not written to the m
 
 - `ARCHITECTURE_DESIGN.md`: current architecture, layer responsibilities, and runtime flows
 - `ARCHITECTURE_DESIGN.md`：当前架构、分层职责和关键运行流程
+- `TEST_REPORT.md`: unit test summary and JaCoCo coverage snapshot
+- `TEST_REPORT.md`：单元测试摘要和 JaCoCo 覆盖率快照
+- `VERIFICATION_REPORT.md`: fix verification notes and integration validation summary
+- `VERIFICATION_REPORT.md`：问题修复验证说明与集成验证摘要
 - `TODO.md`: remaining work and validation items
 - `TODO.md`：仍需完成或验证的事项
 - `README.md`: user and developer entrypoint

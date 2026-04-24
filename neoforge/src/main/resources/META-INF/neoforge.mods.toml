@@ -7,6 +7,7 @@ license="MIT"
 modId="neo_favorite_items"
 version="${version}"
 displayName="New Item Favorites"
+displayTest="IGNORE_ALL_VERSION"
 description='''
 A versatile item favorites/lock mod for Minecraft
 '''

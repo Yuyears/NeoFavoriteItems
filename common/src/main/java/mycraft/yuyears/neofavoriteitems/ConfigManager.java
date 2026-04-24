@@ -2,8 +2,11 @@
 package mycraft.yuyears.neofavoriteitems;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ConfigManager {
     private static final String CONFIG_COMMENTS = """
@@ -170,9 +173,11 @@ public class ConfigManager {
     private static ConfigManager instance;
     private NeoFavoriteItemsConfig config;
     private Path configPath;
+    private final List<String> loadIssues;
 
     private ConfigManager() {
         this.config = new NeoFavoriteItemsConfig();
+        this.loadIssues = new ArrayList<>();
     }
 
     public static ConfigManager getInstance() {
@@ -183,7 +188,7 @@ public class ConfigManager {
     }
 
     public void initialize(Path configDir) {
-        this.configPath = configDir.resolve("neo-favorite-items.toml");
+        this.configPath = configDir.resolve(NeoFavoriteItemsConstants.CONFIG_FILE_NAME);
         loadConfig();
     }
 
@@ -191,18 +196,28 @@ public class ConfigManager {
         return config;
     }
 
+    public List<String> getLoadIssues() {
+        return List.copyOf(loadIssues);
+    }
+
     public void loadConfig() {
+        config = new NeoFavoriteItemsConfig();
+        loadIssues.clear();
         if (Files.exists(configPath)) {
             try {
-                String content = Files.readString(configPath);
+                String content = Files.readString(configPath, StandardCharsets.UTF_8);
                 parseConfig(content);
                 appendMissingConfigEntries(content);
             } catch (IOException e) {
-                e.printStackTrace();
+                recordLoadIssue("Failed to read config file " + configPath + "; regenerated defaults", e);
                 saveDefaultConfig();
             }
         } else {
             saveDefaultConfig();
+        }
+
+        if (!loadIssues.isEmpty()) {
+            DebugLogger.warn("Config loaded with {} issue(s); defaults were kept for invalid entries", loadIssues.size());
         }
     }
 
@@ -246,15 +261,15 @@ public class ConfigManager {
                 .append("# 0.0.1-alpha 新增的覆盖层颜色控制项").append(System.lineSeparator())
                 .append("# lockedOverlayColor / lockedOverlayOpacity apply to locked slots when not holding the lock operation key").append(System.lineSeparator())
                 .append("# lockedOverlayColor / lockedOverlayOpacity 用于未按住锁定操作键时的已锁定槽位").append(System.lineSeparator())
-                .append("lockedOverlayColor = \"rgba(255, 215, 0, 1.0)\"").append(System.lineSeparator())
+                .append("lockedOverlayColor = \"rgba(255,65,60,250)\"").append(System.lineSeparator())
                 .append("lockedOverlayOpacity = 0.7").append(System.lineSeparator())
                 .append("# lockableHighlightColor applies to non-favorite player inventory slots with items while holding the lock operation key").append(System.lineSeparator())
                 .append("# lockableHighlightColor 用于按住锁定操作键时，带有物品且尚未收藏的玩家背包槽位").append(System.lineSeparator())
-                .append("lockableHighlightColor = \"rgba(102, 204, 255, 1.0)\"").append(System.lineSeparator())
+                .append("lockableHighlightColor = \"rgba(35,230,0,200)\"").append(System.lineSeparator())
                 .append("lockableHighlightOpacity = 0.55").append(System.lineSeparator())
                 .append("# unlockableHighlightColor applies to favorite slots while holding the lock operation key").append(System.lineSeparator())
                 .append("# unlockableHighlightColor 用于按住锁定操作键时，已收藏且可取消收藏的槽位").append(System.lineSeparator())
-                .append("unlockableHighlightColor = \"rgba(255, 170, 51, 1.0)\"").append(System.lineSeparator())
+                .append("unlockableHighlightColor = \"rgba(255, 195, 53, 180)\"").append(System.lineSeparator())
                 .append("unlockableHighlightOpacity = 0.65").append(System.lineSeparator())
                 .append("# colorOverlayOpacity controls the base opacity of the COLOR_OVERLAY pure-color style").append(System.lineSeparator())
                 .append("# colorOverlayOpacity 控制 COLOR_OVERLAY 纯色覆盖层样式的基础透明度").append(System.lineSeparator())
@@ -289,7 +304,7 @@ public class ConfigManager {
         }
 
         if (!additions.isEmpty()) {
-            Files.writeString(configPath, content.stripTrailing() + System.lineSeparator() + additions);
+            Files.writeString(configPath, content.stripTrailing() + System.lineSeparator() + additions, StandardCharsets.UTF_8);
         }
     }
 
@@ -305,7 +320,10 @@ public class ConfigManager {
                 case "keybindings" -> setKeybindingValue(key, value);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            recordLoadIssue(
+                "Invalid config value [" + section + "] " + key + "=" + value + "; keeping default",
+                e
+            );
         }
     }
 
@@ -335,7 +353,7 @@ public class ConfigManager {
             try {
                 config.slotBehavior.moveBehavior = NeoFavoriteItemsConfig.SlotMoveBehavior.valueOf(cleanValue);
             } catch (IllegalArgumentException e) {
-                config.slotBehavior.moveBehavior = NeoFavoriteItemsConfig.SlotMoveBehavior.FOLLOW_ITEM;
+                recordLoadIssue("Unknown slot move behavior: " + cleanValue + "; using default " + config.slotBehavior.moveBehavior, e);
             }
         }
     }
@@ -546,7 +564,8 @@ public class ConfigManager {
         try {
             return NeoFavoriteItemsConfig.OverlayStyle.valueOf(cleanValue);
         } catch (IllegalArgumentException e) {
-            return NeoFavoriteItemsConfig.OverlayStyle.LOCK;
+            recordLoadIssue("Unknown overlay style: " + cleanValue + "; using default " + config.overlay.lockedStyle, e);
+            return config.overlay.lockedStyle;
         }
     }
 
@@ -573,13 +592,19 @@ public class ConfigManager {
     public void saveDefaultConfig() {
         try {
             Files.createDirectories(configPath.getParent());
-            Files.writeString(configPath, CONFIG_COMMENTS);
+            Files.writeString(configPath, CONFIG_COMMENTS, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            e.printStackTrace();
+            DebugLogger.error("Failed to write default config file: {}", configPath);
+            DebugLogger.error("Default config write failure", e);
         }
     }
 
     public void saveConfig() {
         saveDefaultConfig();
+    }
+
+    private void recordLoadIssue(String message, Exception exception) {
+        loadIssues.add(message);
+        DebugLogger.warn("{} ({})", message, exception.toString());
     }
 }

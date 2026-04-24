@@ -15,13 +15,13 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.Set;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class ServerFavoriteService {
-    private static final Map<UUID, Long> revisionsByPlayer = new HashMap<>();
-    private static final Map<UUID, Boolean> bypassStateByPlayer = new HashMap<>();
+    private static final Map<UUID, Long> revisionsByPlayer = new ConcurrentHashMap<>();
+    private static final Map<UUID, Boolean> bypassStateByPlayer = new ConcurrentHashMap<>();
 
     private ServerFavoriteService() {}
 
@@ -32,8 +32,8 @@ public final class ServerFavoriteService {
             return ToggleResult.rejected();
         }
 
+        FavoritesManager.getStateService().setPlayer(player.getUUID());
         FavoritesManager favoritesManager = FavoritesManager.getInstance();
-        favoritesManager.setPlayer(player.getUUID());
         boolean isFavorite = favoritesManager.isSlotFavorite(logicalSlot.get());
         boolean hasItem = !player.getInventory().getItem(inventoryIndex).isEmpty();
         if (!isFavorite && !hasItem && !ConfigManager.getInstance().getConfig().general.lockEmptySlots) {
@@ -56,9 +56,8 @@ public final class ServerFavoriteService {
     }
 
     public static Set<Integer> getFavoritesFor(ServerPlayer player) {
-        FavoritesManager favoritesManager = FavoritesManager.getInstance();
-        favoritesManager.setPlayer(player.getUUID());
-        return favoritesManager.getFavoriteSlots();
+        FavoritesManager.getStateService().setPlayer(player.getUUID());
+        return FavoritesManager.getStateService().getFavoriteSlots();
     }
 
     public static long currentRevision(ServerPlayer player) {
@@ -321,9 +320,7 @@ public final class ServerFavoriteService {
     }
 
     private static long nextRevision(ServerPlayer player) {
-        long revision = currentRevision(player) + 1L;
-        revisionsByPlayer.put(player.getUUID(), revision);
-        return revision;
+        return revisionsByPlayer.merge(player.getUUID(), 1L, Long::sum);
     }
 
     public record ToggleResult(boolean accepted, int changedSlot, boolean nowFavorite, long revision, Set<Integer> favoriteSlots) {

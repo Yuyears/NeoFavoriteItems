@@ -28,6 +28,9 @@ import java.util.Set;
 public abstract class SophisticatedSorterCoreUtilsMixin {
     @Inject(method = "sortInventory", at = @At("HEAD"), cancellable = true, remap = false)
     private static void neoFavoriteItems$sortInventorySkippingLockedSlots(ServerPlayer player, @Coerce Object sortBy, boolean usePinyin, CallbackInfo ci) {
+        if (player == null) {
+            return;
+        }
         Inventory inventory = player.getInventory();
         List<Integer> sortableSlots = new ArrayList<>();
         for (int inventoryIndex = 9; inventoryIndex < 36; inventoryIndex++) {
@@ -54,6 +57,9 @@ public abstract class SophisticatedSorterCoreUtilsMixin {
 
     @Inject(method = "transfer", at = @At("HEAD"), cancellable = true, remap = false)
     private static void neoFavoriteItems$transferUsingMenuSlotIds(Player player, boolean transferToContainer, boolean filter, CallbackInfo ci) {
+        if (player == null) {
+            return;
+        }
         AbstractContainerMenu menu = player.containerMenu;
         List<Slot> sourceSlots = new ArrayList<>();
         Set<Item> targetItems = new HashSet<>();

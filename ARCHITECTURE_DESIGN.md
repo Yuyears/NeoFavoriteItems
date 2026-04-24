@@ -2,7 +2,7 @@
 
 # Neo Favorite Items 架构说明
 
-Last updated: 2026-04-23
+Last updated: 2026-04-24
 
 最后更新：2026-04-23
 
@@ -99,6 +99,8 @@ Location: `common/.../application`
 - `ServerFavoriteService`：处理服务端收藏切换、校验、修订号、旁路状态和服务端交互保护
 - `ClientFavoriteSyncService`: applies full and incremental syncs, rejects stale revisions, and detects revision gaps
 - `ClientFavoriteSyncService`：应用客户端全量/增量同步、过滤过期修订并检测同步缺口
+- `ClientDropGuard`: decides whether a selected hotbar stack drop should be blocked before the client plays drop animation
+- `ClientDropGuard`：决定是否应在客户端播放丢弃动画前阻止当前手持快捷栏物品被丢弃
 
 ### Integration
 
@@ -123,8 +125,8 @@ Location: `common/.../persistence`
 
 - `DataPersistenceManager`: saves and loads favorite data by player UUID.
 - `DataPersistenceManager`：按玩家 UUID 保存和加载收藏数据。
-- It supports client-local directories, singleplayer world directories, and server player-data scenarios.
-- 支持客户端本地目录、单人世界目录和服务端玩家数据场景。
+- It supports client-local storage namespaces keyed by server address, world-save storage for integrated/dedicated servers, legacy client-path fallback, and cached full-save/full-load server flows.
+- 支持按服务器地址分命名空间的客户端本地存储、单人/专用服务端世界存档目录、旧客户端路径兼容回退，以及带缓存的服务端完整读写流程。
 
 ### Render
 
@@ -149,8 +151,8 @@ Location: `common/.../render`
 
 - `NeoFavoriteItemsFabric`: common initialization, server lifecycle, player join/leave handling, and server full sync.
 - `NeoFavoriteItemsFabric`：公共初始化、服务端生命周期、玩家加入/离开、服务端全量同步。
-- `NeoFavoriteItemsFabricClient`: client config, key bindings, overlay, client sync receivers, world-change load/save.
-- `NeoFavoriteItemsFabricClient`：客户端配置、按键、Overlay、客户端同步接收、世界切换加载/保存。
+- `NeoFavoriteItemsFabricClient`: client config, key bindings, overlay, client sync receivers, and per-tick client persistence synchronization.
+- `NeoFavoriteItemsFabricClient`：客户端配置、按键、Overlay、客户端同步接收，以及逐 tick 的客户端持久化上下文同步。
 - `FabricFavoriteNetworking`: Toggle, Full Sync, Delta Sync, and Bypass Key State payloads.
 - `FabricFavoriteNetworking`：Toggle、Full Sync、Delta Sync、Bypass Key State payload。
 - Mixins cover normal containers, creative slots, inventory interactions, and player inventory mutation protection.
@@ -214,6 +216,45 @@ Location: `common/.../render`
 9. Bypass-key state is polled on the client and synced to the server.
 10. 旁路键状态由客户端按键轮询同步到服务端。
 
+### Installation Modes
+
+### 安装模式
+
+1. Client only: the client keeps local favorites, local guards, and overlays. No server sync packets are sent when the remote side does not advertise the mod channel.
+2. 仅客户端安装：客户端保留本地收藏、交互守卫与 Overlay；当远端未声明模组通道时不会发送同步包。
+3. Server only: vanilla or unmodded clients may join, but they do not receive client features from this mod.
+4. 仅服务端安装：原版或未安装客户端可加入服务器，但不会获得本模组的客户端功能。
+5. Both sides installed: favorite state becomes server-authoritative with full/incremental sync and bypass-key state sync.
+6. 双端安装：收藏状态由服务端权威管理，并启用全量/增量同步和旁路键状态同步。
+
+### Persistence Lifecycle
+
+### 持久化生命周期
+
+1. Server/world start initializes the persistence context and preloads cached player data from the active storage root.
+2. 服务端/世界启动时会初始化持久化上下文，并从当前存储根目录预载玩家数据缓存。
+3. Player login performs a partial load for only that player's UUID.
+4. 玩家进入世界时，只对该玩家 UUID 执行部分读取。
+5. Player logout performs an incremental save for only that player's current state.
+6. 玩家退出世界时，只对该玩家当前状态执行增量保存。
+7. Server/world stop flushes online-player state and then writes the full cache back to disk.
+8. 服务端/世界关闭时，会先收集在线玩家状态，再把完整缓存回写到磁盘。
+9. Client-only multiplayer uses `favoriteitems/<sanitized-server-address>/players/<uuid>.dat`.
+10. 仅客户端联机模式使用 `favoriteitems/<净化后的服务器地址>/players/<uuid>.dat`。
+11. Dual-install singleplayer and dedicated-server modes use `<world>/data/neo_favorite_items/players/<uuid>.dat`.
+12. 双端安装下的单人与多人服务端模式统一使用 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`。
+
+### Hotbar Drop Guard
+
+### 快捷栏丢弃拦截
+
+1. Outside GUI screens, vanilla triggers selected-slot drops from `Minecraft.handleKeybinds`.
+2. 在 GUI 外，原版通过 `Minecraft.handleKeybinds` 触发当前手持槽位的丢弃。
+3. Loader-specific client mixins redirect the `LocalPlayer.drop(boolean)` call.
+4. 三个平台的客户端 Mixin 会重定向 `LocalPlayer.drop(boolean)` 调用。
+5. `ClientDropGuard` checks favorite state and bypass-key rules before the drop packet or animation is emitted.
+6. `ClientDropGuard` 会在发出丢弃数据包或播放动画前检查收藏状态和旁路规则。
+
 ### Overlay Rendering
 
 ### Overlay 渲染
@@ -241,8 +282,8 @@ Location: `common/.../render`
 - 物品移动策略已有配置入口，旁路状态下的复杂移动追踪仍需继续完善。
 - Visual feedback and actual sound playback still need implementation.
 - 视觉反馈和音效实际播放仍需补齐。
-- No automated test suite is currently established.
-- 尚未建立自动化测试套件。
+- Automated unit tests now cover favorites state, client sync, drop guard, config loading, persistence, and reflection cache behavior.
+- 现已建立自动化单元测试，覆盖收藏状态、客户端同步、丢弃拦截、配置加载、持久化和反射缓存行为。
 
 ## Maintenance Rules
 

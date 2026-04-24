@@ -21,6 +21,9 @@ public abstract class SophisticatedCoreInventoryHelperMixin {
         int startSlot,
         CallbackInfoReturnable<ItemStack> cir
     ) {
+        if (player == null) {
+            return;
+        }
         Inventory inventory = player.getInventory();
         ItemStack remaining = stack.copy();
         List<Integer> emptySlots = new ArrayList<>();

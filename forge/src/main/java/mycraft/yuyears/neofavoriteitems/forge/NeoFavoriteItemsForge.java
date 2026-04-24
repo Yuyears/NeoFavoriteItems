@@ -2,20 +2,15 @@
 package mycraft.yuyears.neofavoriteitems.forge;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
-import mycraft.yuyears.neofavoriteitems.FavoritesManager;
+import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
-import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
-import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
+import mycraft.yuyears.neofavoriteitems.PlatformFavoriteSupport;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.forge.render.ForgeOverlayRenderer;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
-import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraftforge.client.event.AddGuiOverlayLayersEvent;
@@ -25,7 +20,10 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.IExtensionPoint;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -51,6 +49,7 @@ public class NeoFavoriteItemsForge {
 
     public NeoFavoriteItemsForge(net.minecraftforge.eventbus.api.IEventBus modEventBus) {
         NeoFavoriteItemsMod.getInstance().initialize();
+        ModLoadingContext.get().registerExtensionPoint(IExtensionPoint.DisplayTest.class, IExtensionPoint.DisplayTest.IGNORE_SERVER_VERSION);
         
         var modBus = modEventBus;
         modBus.addListener(this::setup);
@@ -71,17 +70,7 @@ public class NeoFavoriteItemsForge {
         NeoFavoriteItemsMod.getInstance().onClientInitialize();
         
         var gameDirectory = FMLLoader.getGamePath();
-        
-        ConfigManager.getInstance().initialize(
-            gameDirectory.resolve("config")
-        );
-        
-        // 初始化数据持久化管理器
-        DataPersistenceManager.getInstance().initialize(
-            gameDirectory,
-            null, // 世界目录将在世界加载时设置
-            false
-        );
+        PlatformFavoriteSupport.initializeClient(gameDirectory);
         
         // 初始化Overlay渲染器
         overlayRenderer = new ForgeOverlayRenderer();
@@ -89,14 +78,14 @@ public class NeoFavoriteItemsForge {
 
     private void registerKeyBindings(final RegisterKeyMappingsEvent event) {
         lockOperationKey = new net.minecraft.client.KeyMapping(
-            "key.neo_favorite_items.lock_operation",
-            GLFW.GLFW_KEY_LEFT_ALT,
-            "category.neo_favorite_items"
+            NeoFavoriteItemsConstants.LOCK_OPERATION_KEY_ID,
+            NeoFavoriteItemsConstants.DEFAULT_LOCK_OPERATION_KEY_CODE,
+            NeoFavoriteItemsConstants.KEY_CATEGORY
         );
         bypassLockKey = new net.minecraft.client.KeyMapping(
-            "key.neo_favorite_items.bypass_lock",
-            GLFW.GLFW_KEY_LEFT_CONTROL,
-            "category.neo_favorite_items"
+            NeoFavoriteItemsConstants.BYPASS_LOCK_KEY_ID,
+            NeoFavoriteItemsConstants.DEFAULT_BYPASS_LOCK_KEY_CODE,
+            NeoFavoriteItemsConstants.KEY_CATEGORY
         );
         
         event.register(lockOperationKey);
@@ -119,59 +108,38 @@ public class NeoFavoriteItemsForge {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
+        PlatformFavoriteSupport.initializeServer(event.getServer().getServerDirectory());
         NeoFavoriteItemsMod.getInstance().onServerInitialize();
     }
 
     @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        PlatformFavoriteSupport.onServerStopping(event.getServer().getPlayerList().getPlayers());
+    }
+
+    @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-        // 加载玩家数据
-        FavoritesManager.getInstance().setPlayer(event.getEntity().getUUID());
-        DataPersistenceManager.getInstance().loadData(event.getEntity().getUUID());
-        if (event.getEntity().level().isClientSide()) {
-            ClientFavoriteSyncService.resetSession();
-        } else if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-            ServerFavoriteService.resetRevision(serverPlayer);
-            ForgeFavoriteNetworking.sendFullSync(serverPlayer);
-        }
+        PlatformFavoriteSupport.onPlayerLoggedIn(event.getEntity(), ForgeFavoriteNetworking::sendFullSync);
     }
 
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        // 保存玩家数据
-        DataPersistenceManager.getInstance().saveData(event.getEntity().getUUID());
-        ServerFavoriteService.clearPlayerState(event.getEntity());
-        FavoritesManager.getInstance().clearPlayer();
+        PlatformFavoriteSupport.onPlayerLoggedOut(event.getEntity());
     }
 
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
             var minecraft = Minecraft.getInstance();
-            if (minecraft.player == null) {
-                return;
+            if (minecraft.player != null) {
+                logKeyStatesIfChanged();
             }
-
-            logKeyStatesIfChanged();
-            
-            // 当世界加载时，设置世界保存目录
-            if (minecraft.level != null && minecraft.getSingleplayerServer() != null) {
-                DataPersistenceManager.getInstance().setWorldSaveDirectory(
-                    minecraft.getSingleplayerServer().getServerDirectory()
-                );
-            }
-            
+            PlatformFavoriteSupport.synchronizeClientPersistence(minecraft, ForgeFavoriteNetworking.isServerPresent());
         }
     }
 
     public static void showSlotToggleMessage(LogicalSlotIndex slot) {
-        var minecraft = Minecraft.getInstance();
-        if (minecraft.player == null) {
-            return;
-        }
-
-        boolean isFavorite = FavoritesManager.getInstance().isSlotFavorite(slot);
-        String key = isFavorite ? "text.neo_favorite_items.slot_marked" : "text.neo_favorite_items.slot_unmarked";
-        minecraft.player.displayClientMessage(Component.translatable(key).withStyle(isFavorite ? ChatFormatting.GOLD : ChatFormatting.GRAY), true);
+        PlatformFavoriteSupport.showSlotToggleMessage(slot);
     }
 
 

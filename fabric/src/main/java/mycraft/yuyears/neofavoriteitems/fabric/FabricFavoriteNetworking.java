@@ -67,7 +67,7 @@ public final class FabricFavoriteNetworking {
     }
 
     public static boolean trySendToggle(int inventoryIndex) {
-        if (!ClientPlayNetworking.canSend(ToggleFavoritePayload.TYPE)) {
+        if (!isServerPresent()) {
             DebugLogger.debug("Fabric toggle packet not sent: server_receiver_unavailable inventoryIndex={}", inventoryIndex);
             return false;
         }
@@ -78,7 +78,7 @@ public final class FabricFavoriteNetworking {
     }
 
     public static void requestFullSync() {
-        if (!ClientPlayNetworking.canSend(RequestFavoriteSyncPayload.TYPE)) {
+        if (!isServerPresent()) {
             DebugLogger.debug("Fabric full sync request not sent: server_receiver_unavailable");
             return;
         }
@@ -87,12 +87,16 @@ public final class FabricFavoriteNetworking {
     }
 
     public static void sendBypassKeyState(boolean held) {
-        if (!ClientPlayNetworking.canSend(BypassKeyStatePayload.TYPE)) {
+        if (!isServerPresent()) {
             DebugLogger.debug("Fabric bypass key state packet not sent: server_receiver_unavailable held={}", held);
             return;
         }
         ClientPlayNetworking.send(new BypassKeyStatePayload(held));
         DebugLogger.debug("Fabric sent bypass key state: held={}", held);
+    }
+
+    public static boolean isServerPresent() {
+        return ClientPlayNetworking.canSend(ToggleFavoritePayload.TYPE);
     }
 
     public static SyncFavoritesPayload createFullSyncPayload(ServerPlayer player) {

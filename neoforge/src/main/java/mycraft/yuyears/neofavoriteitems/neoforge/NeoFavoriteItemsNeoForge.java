@@ -2,21 +2,16 @@
 package mycraft.yuyears.neofavoriteitems.neoforge;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
-import mycraft.yuyears.neofavoriteitems.FavoritesManager;
+import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
-import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
-import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
+import mycraft.yuyears.neofavoriteitems.PlatformFavoriteSupport;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
 import mycraft.yuyears.neofavoriteitems.neoforge.render.NeoForgeOverlayRenderer;
-import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.network.chat.Component;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
@@ -30,6 +25,7 @@ import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import org.lwjgl.glfw.GLFW;
 
@@ -63,17 +59,7 @@ public class NeoFavoriteItemsNeoForge {
         NeoFavoriteItemsMod.getInstance().onClientInitialize();
         
         var gameDirectory = FMLLoader.getGamePath();
-        
-        ConfigManager.getInstance().initialize(
-            gameDirectory.resolve("config")
-        );
-        
-        // 初始化数据持久化管理器
-        DataPersistenceManager.getInstance().initialize(
-            gameDirectory,
-            null, // 世界目录将在世界加载时设置
-            false
-        );
+        PlatformFavoriteSupport.initializeClient(gameDirectory);
         
         // 初始化Overlay渲染器
         overlayRenderer = new NeoForgeOverlayRenderer();
@@ -81,14 +67,14 @@ public class NeoFavoriteItemsNeoForge {
 
     private void registerKeyBindings(final RegisterKeyMappingsEvent event) {
         lockOperationKey = new net.minecraft.client.KeyMapping(
-            "key.neo_favorite_items.lock_operation",
-            GLFW.GLFW_KEY_LEFT_ALT,
-            "category.neo_favorite_items"
+            NeoFavoriteItemsConstants.LOCK_OPERATION_KEY_ID,
+            NeoFavoriteItemsConstants.DEFAULT_LOCK_OPERATION_KEY_CODE,
+            NeoFavoriteItemsConstants.KEY_CATEGORY
         );
         bypassLockKey = new net.minecraft.client.KeyMapping(
-            "key.neo_favorite_items.bypass_lock",
-            GLFW.GLFW_KEY_LEFT_CONTROL,
-            "category.neo_favorite_items"
+            NeoFavoriteItemsConstants.BYPASS_LOCK_KEY_ID,
+            NeoFavoriteItemsConstants.DEFAULT_BYPASS_LOCK_KEY_CODE,
+            NeoFavoriteItemsConstants.KEY_CATEGORY
         );
         
         event.register(lockOperationKey);
@@ -109,60 +95,42 @@ public class NeoFavoriteItemsNeoForge {
     }
 
     private void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        NeoForgeFavoriteNetworking.registerPackets(event.registrar(NeoFavoriteItemsMod.MOD_ID).versioned("1"));
+        NeoForgeFavoriteNetworking.registerPackets(event.registrar(NeoFavoriteItemsMod.MOD_ID).versioned(NeoFavoriteItemsConstants.NETWORK_PROTOCOL_VERSION_STRING));
     }
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
+        PlatformFavoriteSupport.initializeServer(event.getServer().getServerDirectory());
         NeoFavoriteItemsMod.getInstance().onServerInitialize();
     }
 
     @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        PlatformFavoriteSupport.onServerStopping(event.getServer().getPlayerList().getPlayers());
+    }
+
+    @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-        // 加载玩家数据
-        FavoritesManager.getInstance().setPlayer(event.getEntity().getUUID());
-        DataPersistenceManager.getInstance().loadData(event.getEntity().getUUID());
-        if (event.getEntity().level().isClientSide()) {
-            ClientFavoriteSyncService.resetSession();
-        } else if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-            ServerFavoriteService.resetRevision(serverPlayer);
-            NeoForgeFavoriteNetworking.sendFullSync(serverPlayer);
-        }
+        PlatformFavoriteSupport.onPlayerLoggedIn(event.getEntity(), NeoForgeFavoriteNetworking::sendFullSync);
     }
 
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        // 保存玩家数据
-        DataPersistenceManager.getInstance().saveData(event.getEntity().getUUID());
-        ServerFavoriteService.clearPlayerState(event.getEntity());
-        FavoritesManager.getInstance().clearPlayer();
+        PlatformFavoriteSupport.onPlayerLoggedOut(event.getEntity());
     }
 
     @SubscribeEvent
     public void onClientTick(ClientTickEvent.Post event) {
         var minecraft = Minecraft.getInstance();
-        if (minecraft.player == null) return;
-
-        logKeyStatesIfChanged();
-            
-        // 当世界加载时，设置世界保存目录
-        if (minecraft.level != null && minecraft.getSingleplayerServer() != null) {
-            DataPersistenceManager.getInstance().setWorldSaveDirectory(
-                minecraft.getSingleplayerServer().getServerDirectory()
-            );
+        if (minecraft.player != null) {
+            logKeyStatesIfChanged();
         }
-            
+
+        PlatformFavoriteSupport.synchronizeClientPersistence(minecraft, NeoForgeFavoriteNetworking.isServerPresent());
     }
 
     public static void showSlotToggleMessage(LogicalSlotIndex slot) {
-        var minecraft = Minecraft.getInstance();
-        if (minecraft.player == null) {
-            return;
-        }
-
-        boolean isFavorite = FavoritesManager.getInstance().isSlotFavorite(slot);
-        String key = isFavorite ? "text.neo_favorite_items.slot_marked" : "text.neo_favorite_items.slot_unmarked";
-        minecraft.player.displayClientMessage(Component.translatable(key).withStyle(isFavorite ? ChatFormatting.GOLD : ChatFormatting.GRAY), true);
+        PlatformFavoriteSupport.showSlotToggleMessage(slot);
     }
 
     private LogicalSlotIndex getHoveredSlot(Minecraft minecraft) {
