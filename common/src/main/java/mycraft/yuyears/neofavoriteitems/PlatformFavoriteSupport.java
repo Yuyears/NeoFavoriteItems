@@ -12,6 +12,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
 import java.nio.file.Path;
+import java.net.SocketAddress;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -19,6 +21,8 @@ public final class PlatformFavoriteSupport {
     private static UUID activeClientPlayerId;
     private static boolean clientWorldActive;
     private static boolean clientServerAuthoritative;
+    private static Path activeClientWorldDirectory;
+    private static String activeClientStorageNamespace = NeoFavoriteItemsConstants.DEFAULT_SERVER_DIRECTORY;
 
     private PlatformFavoriteSupport() {}
 
@@ -67,18 +71,21 @@ public final class PlatformFavoriteSupport {
     }
 
     public static void synchronizeClientPersistence(Minecraft minecraft, boolean serverAuthoritative) {
-        updateClientStorageTarget(minecraft);
+        ClientStorageTarget storageTarget = resolveClientStorageTarget(minecraft);
+        boolean storageChanged = !Objects.equals(activeClientWorldDirectory, storageTarget.worldDirectory())
+            || !Objects.equals(activeClientStorageNamespace, storageTarget.namespace());
 
         if (minecraft.player != null && minecraft.level != null) {
             UUID playerUUID = minecraft.player.getUUID();
             boolean worldChanged = !clientWorldActive || !playerUUID.equals(activeClientPlayerId);
             boolean authorityChanged = clientServerAuthoritative != serverAuthoritative;
 
-            if (worldChanged || authorityChanged) {
+            if (worldChanged || authorityChanged || storageChanged) {
                 if (clientWorldActive && activeClientPlayerId != null && !clientServerAuthoritative) {
                     DataPersistenceManager.getInstance().saveData(activeClientPlayerId);
                 }
 
+                applyClientStorageTarget(storageTarget);
                 ClientFavoriteSyncService.resetSession();
                 FavoritesManager.getStateService().setPlayer(playerUUID);
                 FavoritesManager.getStateService().clearFavorites();
@@ -90,6 +97,8 @@ public final class PlatformFavoriteSupport {
                 activeClientPlayerId = playerUUID;
                 clientWorldActive = true;
                 clientServerAuthoritative = serverAuthoritative;
+                activeClientWorldDirectory = storageTarget.worldDirectory();
+                activeClientStorageNamespace = storageTarget.namespace();
             }
             return;
         }
@@ -105,9 +114,12 @@ public final class PlatformFavoriteSupport {
 
         FavoritesManager.getStateService().clearPlayer();
         ClientFavoriteSyncService.resetSession();
+        applyClientStorageTarget(storageTarget);
         activeClientPlayerId = null;
         clientWorldActive = false;
         clientServerAuthoritative = false;
+        activeClientWorldDirectory = storageTarget.worldDirectory();
+        activeClientStorageNamespace = storageTarget.namespace();
     }
 
     public static void showSlotToggleMessage(LogicalSlotIndex slot) {
@@ -126,22 +138,44 @@ public final class PlatformFavoriteSupport {
         );
     }
 
-    private static void updateClientStorageTarget(Minecraft minecraft) {
+    private static ClientStorageTarget resolveClientStorageTarget(Minecraft minecraft) {
         if (minecraft.level != null && minecraft.getSingleplayerServer() != null) {
-            DataPersistenceManager.getInstance().setWorldSaveDirectory(
-                minecraft.getSingleplayerServer().getServerDirectory()
+            return new ClientStorageTarget(
+                minecraft.getSingleplayerServer().getServerDirectory(),
+                NeoFavoriteItemsConstants.DEFAULT_SERVER_DIRECTORY
             );
-            DataPersistenceManager.getInstance().setClientStorageNamespace(NeoFavoriteItemsConstants.DEFAULT_SERVER_DIRECTORY);
-            return;
         }
 
-        DataPersistenceManager.getInstance().setWorldSaveDirectory(null);
         ServerData currentServer = minecraft.getCurrentServer();
-        if (currentServer != null) {
-            DataPersistenceManager.getInstance().setClientStorageNamespace(currentServer.ip);
-            return;
+        String remoteAddress = null;
+        if (minecraft.getConnection() != null && minecraft.getConnection().getConnection() != null) {
+            SocketAddress socketAddress = minecraft.getConnection().getConnection().getRemoteAddress();
+            remoteAddress = socketAddress == null ? null : socketAddress.toString();
         }
 
-        DataPersistenceManager.getInstance().setClientStorageNamespace(NeoFavoriteItemsConstants.DEFAULT_SERVER_DIRECTORY);
+        return new ClientStorageTarget(null, selectClientStorageNamespace(currentServer == null ? null : currentServer.ip, remoteAddress));
     }
+
+    static String selectClientStorageNamespace(String serverDataIp, String remoteAddress) {
+        if (serverDataIp != null && !serverDataIp.isBlank()) {
+            return serverDataIp;
+        }
+
+        if (remoteAddress != null && !remoteAddress.isBlank()) {
+            String normalized = remoteAddress.trim();
+            if (normalized.startsWith("/")) {
+                normalized = normalized.substring(1);
+            }
+            return normalized;
+        }
+
+        return NeoFavoriteItemsConstants.DEFAULT_SERVER_DIRECTORY;
+    }
+
+    private static void applyClientStorageTarget(ClientStorageTarget storageTarget) {
+        DataPersistenceManager.getInstance().setWorldSaveDirectory(storageTarget.worldDirectory());
+        DataPersistenceManager.getInstance().setClientStorageNamespace(storageTarget.namespace());
+    }
+
+    private record ClientStorageTarget(Path worldDirectory, String namespace) {}
 }

@@ -4,7 +4,7 @@
 
 Last updated: 2026-04-24
 
-最后更新：2026-04-23
+最后更新：2026-04-24
 
 This document records the current project structure and implementation boundaries. It describes the repository as it exists now, not an older migration draft.
 
@@ -222,8 +222,8 @@ Location: `common/.../render`
 
 1. Client only: the client keeps local favorites, local guards, and overlays. No server sync packets are sent when the remote side does not advertise the mod channel.
 2. 仅客户端安装：客户端保留本地收藏、交互守卫与 Overlay；当远端未声明模组通道时不会发送同步包。
-3. Server only: vanilla or unmodded clients may join, but they do not receive client features from this mod.
-4. 仅服务端安装：原版或未安装客户端可加入服务器，但不会获得本模组的客户端功能。
+3. Server only: vanilla or unmodded clients may join. Server-side login still loads favorite data, but platform networking checks the player's advertised payload/channel support before sending full or incremental sync packets.
+4. 仅服务端安装：原版或未安装客户端可加入服务器。服务端登录流程仍读取收藏数据，但平台网络层会先检查该玩家连接声明的 payload/channel 支持，再发送全量或增量同步包。
 5. Both sides installed: favorite state becomes server-authoritative with full/incremental sync and bypass-key state sync.
 6. 双端安装：收藏状态由服务端权威管理，并启用全量/增量同步和旁路键状态同步。
 
@@ -239,8 +239,8 @@ Location: `common/.../render`
 6. 玩家退出世界时，只对该玩家当前状态执行增量保存。
 7. Server/world stop flushes online-player state and then writes the full cache back to disk.
 8. 服务端/世界关闭时，会先收集在线玩家状态，再把完整缓存回写到磁盘。
-9. Client-only multiplayer uses `favoriteitems/<sanitized-server-address>/players/<uuid>.dat`.
-10. 仅客户端联机模式使用 `favoriteitems/<净化后的服务器地址>/players/<uuid>.dat`。
+9. Client-only multiplayer uses `favoriteitems/<sanitized-server-address>/players/<uuid>.dat`; if the server list entry is not available yet, the client falls back to the active connection remote address before using the default namespace.
+10. 仅客户端联机模式使用 `favoriteitems/<净化后的服务器地址>/players/<uuid>.dat`；如果服务器列表条目暂不可用，客户端会先回退到当前连接远端地址，最后才使用默认命名空间。
 11. Dual-install singleplayer and dedicated-server modes use `<world>/data/neo_favorite_items/players/<uuid>.dat`.
 12. 双端安装下的单人与多人服务端模式统一使用 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`。
 

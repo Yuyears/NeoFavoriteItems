@@ -10,6 +10,9 @@ architectury {
 
 configurations.configureEach {
     exclude(group = "net.fabricmc", module = "fabric-log4j-util")
+    // 排除 Fabric API，避免编译时找不到 EnvType 类的警告
+    exclude(group = "net.fabricmc.fabric-api")
+    exclude(group = "net.fabricmc", module = "fabric-loader")
 }
 
 dependencies {
@@ -33,4 +36,9 @@ tasks.processResources {
     
     // 包含 common 模块的资源文件
     from(project(":common").sourceSets.main.get().resources.srcDirs)
+}
+
+// 设置 Java 编译编码为 UTF-8，避免中文注释乱码
+tasks.withType<JavaCompile> {
+    options.encoding = "UTF-8"
 }

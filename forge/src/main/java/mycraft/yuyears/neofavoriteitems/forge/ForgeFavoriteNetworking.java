@@ -71,6 +71,10 @@ public final class ForgeFavoriteNetworking {
     }
 
     public static void sendFullSync(ServerPlayer player) {
+        if (!canSendTo(player)) {
+            DebugLogger.debug("Forge full sync skipped: client_channel_unavailable player={}", player.getGameProfile().getName());
+            return;
+        }
         CHANNEL.send(createFullSyncPayload(player), PacketDistributor.PLAYER.with(player));
     }
 
@@ -104,7 +108,7 @@ public final class ForgeFavoriteNetworking {
             if (result.accepted()) {
                 Set<Integer> addedSlots = result.nowFavorite() ? Set.of(result.changedSlot()) : Set.of();
                 Set<Integer> removedSlots = result.nowFavorite() ? Set.of() : Set.of(result.changedSlot());
-                CHANNEL.send(new SyncFavoriteChangesPayload(result.revision(), addedSlots, removedSlots), PacketDistributor.PLAYER.with(player));
+                sendIncrementalSync(player, new SyncFavoriteChangesPayload(result.revision(), addedSlots, removedSlots));
             } else {
                 sendFullSync(player);
             }
@@ -145,6 +149,18 @@ public final class ForgeFavoriteNetworking {
             }
         });
         context.setPacketHandled(true);
+    }
+
+    private static void sendIncrementalSync(ServerPlayer player, SyncFavoriteChangesPayload payload) {
+        if (!canSendTo(player)) {
+            DebugLogger.debug("Forge incremental sync skipped: client_channel_unavailable player={}", player.getGameProfile().getName());
+            return;
+        }
+        CHANNEL.send(payload, PacketDistributor.PLAYER.with(player));
+    }
+
+    private static boolean canSendTo(ServerPlayer player) {
+        return player != null && CHANNEL.isRemotePresent(player.connection.getConnection());
     }
 
     public record ToggleFavoritePayload(int inventoryIndex) implements CustomPacketPayload {

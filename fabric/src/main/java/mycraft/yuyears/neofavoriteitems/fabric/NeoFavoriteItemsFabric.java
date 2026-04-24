@@ -32,7 +32,7 @@ public class NeoFavoriteItemsFabric implements ModInitializer {
         // 处理玩家加入和离开事件
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             var player = handler.getPlayer();
-            PlatformFavoriteSupport.onPlayerLoggedIn(player, joinedPlayer -> sender.sendPacket(FabricFavoriteNetworking.createFullSyncPayload(joinedPlayer)));
+            PlatformFavoriteSupport.onPlayerLoggedIn(player, FabricFavoriteNetworking::sendFullSync);
         });
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {

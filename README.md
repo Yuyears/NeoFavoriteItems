@@ -55,8 +55,8 @@
 - 模组现已支持真正的双端可选安装：仅客户端安装时保留本地锁定功能，仅服务端安装时允许原版客户端加入但无模组功能，双端安装时启用服务端权威同步。
 - Persistence now follows installation mode:
 - 持久化现已按安装模式分流：
-  - Client-only multiplayer stores data under `favoriteitems/<server-address>/players/<uuid>.dat` in the client game directory.
-  - 仅客户端联机时，数据保存在客户端根目录 `favoriteitems/<服务器地址>/players/<uuid>.dat`。
+  - Client-only multiplayer stores data under `favoriteitems/<server-address>/players/<uuid>.dat` in the client game directory, falling back to the active remote address when the server list entry is temporarily unavailable.
+  - 仅客户端联机时，数据保存在客户端根目录 `favoriteitems/<服务器地址>/players/<uuid>.dat`；如果服务器列表条目暂不可用，会回退使用当前连接远端地址。
   - Dual-install singleplayer and dedicated-server play store data under `<world>/data/neo_favorite_items/players/<uuid>.dat`.
   - 双端安装时，无论单人还是多人服务器，数据都保存在 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`。
   - Legacy `itemfavorites/...` client data is migrated to the new directory on first successful read, then the old file is removed.
@@ -71,6 +71,8 @@
   - 玩家退出世界：增量保存该玩家当前状态。
   - World/server stop: perform a full save flush for cached player data.
   - 世界/服务端关闭：对缓存中的玩家数据执行一次完整保存收尾。
+- Server-only installation keeps login compatible with unmodded clients by checking the target player's advertised payload/channel support before sending sync packets.
+- 仅服务端安装时，服务端会在发送同步包前检查目标玩家连接声明的 payload/channel 支持，从而保持未安装客户端的登录兼容性。
 - Config files and in-game text provide English and Simplified Chinese resources.
 - 配置文件和游戏内文本提供英文与简体中文资源。
 

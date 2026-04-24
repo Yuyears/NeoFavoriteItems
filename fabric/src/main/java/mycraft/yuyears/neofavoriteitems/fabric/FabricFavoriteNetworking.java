@@ -35,7 +35,7 @@ public final class FabricFavoriteNetworking {
                 if (result.accepted()) {
                     Set<Integer> addedSlots = result.nowFavorite() ? Set.of(result.changedSlot()) : Set.of();
                     Set<Integer> removedSlots = result.nowFavorite() ? Set.of() : Set.of(result.changedSlot());
-                    ServerPlayNetworking.send(player, new SyncFavoriteChangesPayload(result.revision(), addedSlots, removedSlots));
+                    sendIncrementalSync(player, new SyncFavoriteChangesPayload(result.revision(), addedSlots, removedSlots));
                 } else {
                     sendFullSync(player);
                 }
@@ -103,8 +103,24 @@ public final class FabricFavoriteNetworking {
         return new SyncFavoritesPayload(ServerFavoriteService.currentRevision(player), ServerFavoriteService.getFavoritesFor(player));
     }
 
-    private static void sendFullSync(ServerPlayer player) {
+    public static void sendFullSync(ServerPlayer player) {
+        if (!canSendTo(player, SyncFavoritesPayload.TYPE)) {
+            DebugLogger.debug("Fabric full sync skipped: client_receiver_unavailable player={}", player.getGameProfile().getName());
+            return;
+        }
         ServerPlayNetworking.send(player, createFullSyncPayload(player));
+    }
+
+    private static void sendIncrementalSync(ServerPlayer player, SyncFavoriteChangesPayload payload) {
+        if (!canSendTo(player, SyncFavoriteChangesPayload.TYPE)) {
+            DebugLogger.debug("Fabric incremental sync skipped: client_receiver_unavailable player={}", player.getGameProfile().getName());
+            return;
+        }
+        ServerPlayNetworking.send(player, payload);
+    }
+
+    private static boolean canSendTo(ServerPlayer player, CustomPacketPayload.Type<?> payloadType) {
+        return player != null && ServerPlayNetworking.canSend(player, payloadType);
     }
 
     public record ToggleFavoritePayload(int inventoryIndex) implements CustomPacketPayload {

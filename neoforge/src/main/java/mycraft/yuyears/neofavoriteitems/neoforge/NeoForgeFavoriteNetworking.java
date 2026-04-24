@@ -52,6 +52,10 @@ public final class NeoForgeFavoriteNetworking {
     }
 
     public static void sendFullSync(ServerPlayer player) {
+        if (!canSendTo(player, SyncFavoritesPayload.TYPE.id())) {
+            DebugLogger.debug("NeoForge full sync skipped: client_channel_unavailable player={}", player.getGameProfile().getName());
+            return;
+        }
         PacketDistributor.sendToPlayer(player, createFullSyncPayload(player));
     }
 
@@ -96,7 +100,7 @@ public final class NeoForgeFavoriteNetworking {
                 if (result.accepted()) {
                     Set<Integer> addedSlots = result.nowFavorite() ? Set.of(result.changedSlot()) : Set.of();
                     Set<Integer> removedSlots = result.nowFavorite() ? Set.of() : Set.of(result.changedSlot());
-                    PacketDistributor.sendToPlayer(player, new SyncFavoriteChangesPayload(result.revision(), addedSlots, removedSlots));
+                    sendIncrementalSync(player, new SyncFavoriteChangesPayload(result.revision(), addedSlots, removedSlots));
                 } else {
                     sendFullSync(player);
                 }
@@ -231,5 +235,18 @@ public final class NeoForgeFavoriteNetworking {
             slots.add(buffer.readInt());
         }
         return slots;
+    }
+
+    private static void sendIncrementalSync(ServerPlayer player, SyncFavoriteChangesPayload payload) {
+        if (!canSendTo(player, SyncFavoriteChangesPayload.TYPE.id())) {
+            DebugLogger.debug("NeoForge incremental sync skipped: client_channel_unavailable player={}", player.getGameProfile().getName());
+            return;
+        }
+        PacketDistributor.sendToPlayer(player, payload);
+    }
+
+    private static boolean canSendTo(ServerPlayer player, ResourceLocation payloadId) {
+        return player != null
+            && NetworkRegistry.hasChannel(player.connection.getConnection(), ConnectionProtocol.PLAY, payloadId);
     }
 }
