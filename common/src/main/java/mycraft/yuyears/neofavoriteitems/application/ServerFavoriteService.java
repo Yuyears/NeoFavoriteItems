@@ -3,15 +3,18 @@ package mycraft.yuyears.neofavoriteitems.application;
 import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.FavoritesManager;
+import mycraft.yuyears.neofavoriteitems.domain.InteractionDecision;
 import mycraft.yuyears.neofavoriteitems.domain.InteractionType;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.Equipable;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.Set;
@@ -91,12 +94,27 @@ public final class ServerFavoriteService {
 
         FavoritesManager.getInstance().setPlayer(player.getUUID());
         int inventoryIndex = slot.getContainerSlot();
-        var decision = InteractionGuardService.getInstance().evaluate(
-            inventoryIndex,
-            toInteractionType(clickType),
-            isBypassKeyHeld(player),
-            slot.hasItem()
-        );
+        if (clickType == ClickType.SWAP && shouldCancelSwap(player, inventoryIndex, button, slot.hasItem())) {
+            DebugLogger.debug(
+                "Server canceled menu swap: player={} inventoryIndex={} slotId={} button={}",
+                player.getName().getString(),
+                inventoryIndex,
+                slotId,
+                button
+            );
+            return true;
+        }
+        if (clickType == ClickType.QUICK_MOVE && shouldCancelQuickMoveTarget(player, slot.getItem())) {
+            DebugLogger.debug(
+                "Server canceled quick move into locked target: player={} sourceInventoryIndex={} slotId={}",
+                player.getName().getString(),
+                inventoryIndex,
+                slotId
+            );
+            return true;
+        }
+
+        var decision = evaluateExistingItem(player, inventoryIndex, toInteractionType(clickType), slot.hasItem());
         if (decision.denied()) {
             DebugLogger.debug(
                 "Server canceled menu click: player={} inventoryIndex={} slotId={} clickType={} button={}",
@@ -109,6 +127,18 @@ public final class ServerFavoriteService {
             return true;
         }
         return false;
+    }
+
+    public static boolean shouldCancelOffhandSwap(Player player) {
+        if (player == null || player.level().isClientSide()) {
+            return false;
+        }
+        return shouldCancelSwap(
+            player,
+            player.getInventory().selected,
+            40,
+            !player.getInventory().getItem(player.getInventory().selected).isEmpty()
+        );
     }
 
     public static boolean shouldPreventSlotPickup(Slot slot, Player player) {
@@ -136,18 +166,18 @@ public final class ServerFavoriteService {
         return false;
     }
 
-    public static boolean shouldPreventSlotPlace(Slot slot, Player player) {
+    public static boolean shouldPreventSlotPlace(Slot slot, Player player, ItemStack incomingStack) {
         if (!isServerPlayerInventorySlot(slot, player)) {
             return false;
         }
 
         FavoritesManager.getInstance().setPlayer(player.getUUID());
         int inventoryIndex = slot.getContainerSlot();
-        var decision = InteractionGuardService.getInstance().evaluate(
+        var decision = InteractionGuardService.getInstance().evaluateIncomingItem(
             inventoryIndex,
             InteractionType.CLICK,
             isBypassKeyHeld(player),
-            slot.hasItem()
+            incomingStack != null && !incomingStack.isEmpty()
         );
         if (decision.denied()) {
             DebugLogger.debug(
@@ -225,12 +255,19 @@ public final class ServerFavoriteService {
 
         Player player = inventory.player;
         FavoritesManager.getInstance().setPlayer(player.getUUID());
-        var decision = InteractionGuardService.getInstance().evaluate(
-            inventoryIndex,
-            InteractionType.QUICK_MOVE,
-            isBypassKeyHeld(player),
-            !currentStack.isEmpty()
-        );
+        var decision = newStack.isEmpty()
+            ? InteractionGuardService.getInstance().evaluate(
+                inventoryIndex,
+                InteractionType.QUICK_MOVE,
+                isBypassKeyHeld(player),
+                !currentStack.isEmpty()
+            )
+            : InteractionGuardService.getInstance().evaluateIncomingItem(
+                inventoryIndex,
+                InteractionType.QUICK_MOVE,
+                isBypassKeyHeld(player),
+                true
+            );
         if (decision.denied()) {
             DebugLogger.debug(
                 "Server prevented inventory set: player={} inventoryIndex={} reason={} currentEmpty={} newEmpty={}",
@@ -306,6 +343,74 @@ public final class ServerFavoriteService {
 
     private static boolean isBypassKeyHeld(Player player) {
         return bypassStateByPlayer.getOrDefault(player.getUUID(), false);
+    }
+
+    private static InteractionDecision evaluateExistingItem(Player player, int inventoryIndex, InteractionType type, boolean hasItem) {
+        return InteractionGuardService.getInstance().evaluate(
+            inventoryIndex,
+            type,
+            isBypassKeyHeld(player),
+            hasItem
+        );
+    }
+
+    private static InteractionDecision evaluateIncomingItem(Player player, int inventoryIndex, InteractionType type, boolean incomingHasItem) {
+        return InteractionGuardService.getInstance().evaluateIncomingItem(
+            inventoryIndex,
+            type,
+            isBypassKeyHeld(player),
+            incomingHasItem
+        );
+    }
+
+    private static boolean shouldCancelSwap(Player player, int clickedInventoryIndex, int button, boolean clickedHasItem) {
+        int partnerInventoryIndex = swapButtonToInventoryIndex(button);
+        if (!SlotMappingService.isPlayerInventoryIndex(partnerInventoryIndex) || partnerInventoryIndex == clickedInventoryIndex) {
+            return false;
+        }
+
+        FavoritesManager.getInstance().setPlayer(player.getUUID());
+        Inventory inventory = player.getInventory();
+        boolean partnerHasItem = !inventory.getItem(partnerInventoryIndex).isEmpty();
+        return evaluateExistingItem(player, clickedInventoryIndex, InteractionType.SWAP, clickedHasItem).denied()
+            || evaluateIncomingItem(player, clickedInventoryIndex, InteractionType.SWAP, partnerHasItem).denied()
+            || evaluateExistingItem(player, partnerInventoryIndex, InteractionType.SWAP, partnerHasItem).denied()
+            || evaluateIncomingItem(player, partnerInventoryIndex, InteractionType.SWAP, clickedHasItem).denied();
+    }
+
+    private static int swapButtonToInventoryIndex(int button) {
+        if (button >= 0 && button <= 8) {
+            return button;
+        }
+        if (button == 40) {
+            return 40;
+        }
+        return -1;
+    }
+
+    private static boolean shouldCancelQuickMoveTarget(Player player, ItemStack sourceStack) {
+        if (sourceStack.isEmpty()) {
+            return false;
+        }
+        int targetInventoryIndex = equipmentInventoryIndexFor(sourceStack);
+        return targetInventoryIndex >= 0
+            && evaluateIncomingItem(player, targetInventoryIndex, InteractionType.QUICK_MOVE, true).denied();
+    }
+
+    private static int equipmentInventoryIndexFor(ItemStack stack) {
+        Equipable equipable = Equipable.get(stack);
+        if (equipable == null) {
+            return -1;
+        }
+        EquipmentSlot slot = equipable.getEquipmentSlot();
+        return switch (slot) {
+            case HEAD -> 39;
+            case CHEST -> 38;
+            case LEGS -> 37;
+            case FEET -> 36;
+            case OFFHAND -> 40;
+            default -> -1;
+        };
     }
 
     private static InteractionType toInteractionType(ClickType clickType) {

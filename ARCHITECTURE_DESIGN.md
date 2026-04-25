@@ -2,9 +2,9 @@
 
 # Neo Favorite Items 架构说明
 
-Last updated: 2026-04-24
+Last updated: 2026-04-25
 
-最后更新：2026-04-24
+最后更新：2026-04-25
 
 This document records the current project structure and implementation boundaries. It describes the repository as it exists now, not an older migration draft.
 
@@ -95,6 +95,8 @@ Location: `common/.../application`
 
 - `InteractionGuardService`: decides whether an interaction should be allowed based on favorite state, config, bypass key, and slot contents
 - `InteractionGuardService`：根据收藏状态、配置、旁路键和槽位内容做拦截决策
+- `InteractionGuardService.evaluateIncomingItem`: applies target-slot semantics for composite moves so locked slots can reject incoming stacks before vanilla removes the source item
+- `InteractionGuardService.evaluateIncomingItem`：为复合移动提供目标槽语义，使锁定槽位能在原版移除来源物品前拒绝放入
 - `ServerFavoriteService`: handles server-side toggles, validation, revisions, bypass state, and server interaction protection
 - `ServerFavoriteService`：处理服务端收藏切换、校验、修订号、旁路状态和服务端交互保护
 - `ClientFavoriteSyncService`: applies full and incremental syncs, rejects stale revisions, and detects revision gaps
@@ -213,10 +215,14 @@ Location: `common/.../render`
 6. `InteractionGuardService` 根据配置和收藏状态返回决策。
 7. The platform layer cancels or allows the interaction according to that decision.
 8. 平台层按决策取消交互或允许继续。
-9. Bypass-key state is polled on the client and synced to the server.
-10. 旁路键状态由客户端按键轮询同步到服务端。
-11. When the lock-operation key is held, client `slotClicked` mixins consume left-click pickup events and toggle the reached player-inventory slot. This also covers Mouse Tweaks drag clicks because it simulates movement by invoking `slotClicked` for each entered slot.
-12. 按住锁定操作键时，客户端 `slotClicked` Mixin 会消费左键 PICKUP 事件并切换经过的玩家物品栏槽位。Mouse Tweaks 的拖动点击通过为每个进入的槽位调用 `slotClicked` 实现，因此同样会进入该流程。
+9. Composite moves evaluate both ends: the source slot uses normal removal semantics and the destination slot uses incoming-item semantics.
+10. 复合移动会同时检查两端：来源槽使用普通取出语义，目标槽使用放入语义。
+11. Offhand swaps check the hovered/selected slot and slot `40`; quick-moving equipment checks the corresponding armor/offhand target before allowing the source move.
+12. 副手交换会同时检查悬停/当前槽与 `40` 号副手槽；Shift 点击装备会先检查对应护甲/副手目标槽再允许来源移动。
+13. Bypass-key state is polled on the client and synced to the server.
+14. 旁路键状态由客户端按键轮询同步到服务端。
+15. When the lock-operation key is held, client `slotClicked` mixins consume left-click pickup events and toggle the reached player-inventory slot. This also covers Mouse Tweaks drag clicks because it simulates movement by invoking `slotClicked` for each entered slot.
+16. 按住锁定操作键时，客户端 `slotClicked` Mixin 会消费左键 PICKUP 事件并切换经过的玩家物品栏槽位。Mouse Tweaks 的拖动点击通过为每个进入的槽位调用 `slotClicked` 实现，因此同样会进入该流程。
 
 ### Installation Modes
 
@@ -286,6 +292,8 @@ Location: `common/.../render`
 - 视觉反馈和音效实际播放仍需补齐。
 - Automated unit tests now cover favorites state, client sync, drop guard, config loading, persistence, and reflection cache behavior.
 - 现已建立自动化单元测试，覆盖收藏状态、客户端同步、丢弃拦截、配置加载、持久化和反射缓存行为。
+- Interaction decision tests now cover locked incoming targets for offhand swaps and armor quick-move equipment.
+- 交互决策测试现已覆盖副手交换和护甲 Shift 装备中的锁定目标槽放入判定。
 
 ## Maintenance Rules
 

@@ -46,7 +46,7 @@ public abstract class AbstractContainerScreenMixin {
             return;
         }
 
-        if (NeoForgeSlotInteractionHandler.shouldCancelGuardedInteraction(slot, clickType)) {
+        if (NeoForgeSlotInteractionHandler.shouldCancelGuardedInteraction(slot, clickType, button)) {
             ci.cancel();
         }
     }

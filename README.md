@@ -8,8 +8,8 @@
 - Mod ID：`neo_favorite_items`
 - Package: `mycraft.yuyears.neofavoriteitems`
 - 包名：`mycraft.yuyears.neofavoriteitems`
-- Version: `0.0.1-beta-build1`
-- 版本：`0.0.1-beta-build1`
+- Version: `0.0.1-beta-hotfix-build2`
+- 版本：`0.0.1-beta-hotfix-build2`
 - Java: 21
 - Java：21
 - Build system: Gradle Kotlin DSL + Architectury Loom
@@ -47,6 +47,8 @@
 - Overlay 颜色支持 `0xAARRGGBB` 和 `luv(L, u, v, alpha)` 两种写法。
 - Configurable guards can block click, drop, quick move, Shift-click, drag, and swap actions.
 - 可配置的交互守卫可阻止点击、丢弃、快速移动、Shift 点击、拖拽和交换等行为。
+- Composite moves now guard both sides of the operation: locked slots are treated as blocked sources when an item would be removed and blocked targets when an item would be inserted. This covers GUI and GUI-outside offhand swaps plus quick-moving equipment into locked armor/offhand slots.
+- 复合移动现在会同时保护操作两端：锁定槽位在物品被取出时视为受保护来源，在物品被放入时视为受保护目标。该规则覆盖 GUI 内外副手交换，以及 Shift 点击装备进入已锁定护甲/副手槽。
 - Mouse Tweaks-style drag clicks are supported on all three loaders: holding the lock-operation key and dragging across player inventory slots toggles each slot reached by the simulated click flow.
 - 三个平台均支持 Mouse Tweaks 风格的拖动点击：按住锁定操作键拖过玩家物品栏槽位时，会按模拟点击流程切换经过的每个槽位。
 - When the mod is installed on the server, favorite state and sync are server-authoritative while the client remains responsive locally.
@@ -143,9 +145,10 @@ Build outputs:
 
 构建产物：
 
-- `fabric/build/libs/neo_favorite_items-fabric-0.0.1-beta-<build_number>.jar`
-- `forge/build/libs/neo_favorite_items-forge-0.0.1-beta-<build_number>.jar`
-- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.1-beta-<build_number>.jar`
+- `fabric/build/libs/neo_favorite_items-fabric-0.0.1-beta-hotfix-<build_number>.jar`
+- `forge/build/libs/neo_favorite_items-forge-0.0.1-beta-hotfix-<build_number>.jar`
+- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.1-beta-hotfix-<build_number>.jar`
+- `build/result/neo_favorite_items-<loader>-0.0.1-beta-hotfix-<build_number>.jar`
 
 `build_number` is stored in `gradle.properties` and automatically increments when running `build`, `assemble`, `jar`, or `remapJar` tasks. When `mod_version` changes, the next increment resets the build number to `build1`. It does not increment for `compileJava`, `runClient`, `help`, or `--dry-run`. Use `-Pskip_build_number_increment=true` when a release rebuild must keep the current build number.
 

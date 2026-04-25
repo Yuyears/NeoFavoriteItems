@@ -6,6 +6,7 @@
   "mixins": [
     "AbstractContainerMenuMixin",
     "InventoryMixin",
+    "ServerGamePacketListenerImplMixin",
     "SlotMixin"
   ],
   "client": [

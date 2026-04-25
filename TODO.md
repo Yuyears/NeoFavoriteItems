@@ -1,8 +1,8 @@
 # Neo Favorite Items TODO
 
-Last updated: 2026-04-24
+Last updated: 2026-04-25
 
-最后更新：2026-04-24
+最后更新：2026-04-25
 
 ## Checklist Summary
 
@@ -24,6 +24,8 @@ Last updated: 2026-04-24
 - [ ] P2：补齐视觉反馈和音效反馈触发。
 - [ ] P2: Evaluate config hot reload or an in-game config screen.
 - [ ] P2：评估配置热重载或游戏内配置界面。
+- [ ] P2: Split server-affecting configuration and client-only configuration into separate config files.
+- [ ] P2：将会影响服务端行为的配置与纯客户端配置拆分到两个独立配置文件中。
 - [ ] P3: Clean up unused helpers and repeated platform-layer code.
 - [ ] P3：清理未使用 helper 和平台层重复代码。
 
@@ -57,6 +59,10 @@ Last updated: 2026-04-24
 - 三个平台玩家登录/登出加载保存流程
 - Mouse Tweaks-style drag-click lock toggling through client `slotClicked` handling on Fabric, Forge, and NeoForge
 - 通过 Fabric、Forge、NeoForge 客户端 `slotClicked` 处理支持 Mouse Tweaks 风格拖动点击切换锁定
+- Composite-move guards for offhand swaps and quick-moving equipment into locked armor/offhand targets
+- 针对副手交换和 Shift 点击装备进入锁定护甲/副手目标槽的复合移动保护
+- Automated interaction-decision tests for locked incoming offhand and armor targets
+- 为锁定副手/护甲放入目标补充自动化交互决策测试
 
 ## Priority Roadmap
 
@@ -94,6 +100,8 @@ Last updated: 2026-04-24
 - 补齐视觉反馈和音效反馈的实际触发逻辑。
 - Evaluate whether config hot reload or an in-game config screen is needed.
 - 评估是否需要配置热重载或游戏内配置界面。
+- Split server-affecting settings, such as lock rules, persistence/sync behavior, and interaction protection, from client-only settings, such as overlays, local feedback, and key-related presentation, into separate config files.
+- 将会影响服务端行为的配置（如锁定规则、持久化/同步行为、交互保护）与纯客户端配置（如 Overlay、本地反馈、按键相关展示）拆分到独立配置文件中。
 
 ### P3 Cleanup
 
@@ -123,8 +131,8 @@ Last updated: 2026-04-24
 - 服务端权威同步已存在，但仍需要更多多人实际场景验证。
 - `FavoritesManager` is still a singleton state manager; it can later evolve into clearer state service/repository interfaces.
 - `FavoritesManager` 仍是单例状态管理器，后续可继续演进为更清晰的状态服务/仓库接口。
-- No automated test suite is established yet; validation currently relies mainly on compilation and manual runtime checks.
-- 自动化测试体系尚未建立，当前主要依赖编译和手动运行验证。
+- Automated tests cover core common-layer behavior, but loader-specific and in-game behavior still require manual runtime matrix validation.
+- 自动化测试已覆盖 common 层核心行为，但平台特定和实机行为仍需手工矩阵验证。
 
 ## Request Buffer
 

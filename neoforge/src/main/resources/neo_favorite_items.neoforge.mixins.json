@@ -9,6 +9,7 @@
     "InventoryMixin",
     "InvWrapperMixin",
     "RangedWrapperMixin",
+    "ServerGamePacketListenerImplMixin",
     "SophisticatedCoreInventoryHelperMixin",
     "SophisticatedSorterCoreUtilsMixin",
     "SlotMixin"

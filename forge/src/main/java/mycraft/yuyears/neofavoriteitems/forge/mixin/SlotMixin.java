@@ -31,7 +31,7 @@ public abstract class SlotMixin {
     private void neoFavoriteItems$guardLockedSlotPlace(ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
         if (container instanceof Inventory inventory
             && inventory.player != null
-            && ServerFavoriteService.shouldPreventSlotPlace((Slot) (Object) this, inventory.player)) {
+            && ServerFavoriteService.shouldPreventSlotPlace((Slot) (Object) this, inventory.player, stack)) {
             cir.setReturnValue(false);
         }
     }

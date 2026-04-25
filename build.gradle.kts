@@ -97,3 +97,37 @@ allprojects {
     }
 
 }
+
+val loaderProjectNames = listOf("fabric", "forge", "neoforge")
+val copyLoaderJarsToResult = tasks.register<Copy>("copyLoaderJarsToResult") {
+    group = "build"
+    description = "Copies Fabric, Forge, and NeoForge release jars into build/result."
+
+    into(layout.buildDirectory.dir("result"))
+
+    doFirst {
+        delete(layout.buildDirectory.dir("result"))
+    }
+
+    loaderProjectNames.forEach { loaderName ->
+        from(project(":$loaderName").layout.buildDirectory.dir("libs")) {
+            include("${rootProject.property("archives_base_name")}-$loaderName-${rootProject.property("mod_version")}-$resolvedBuildNumber.jar")
+        }
+    }
+}
+
+tasks.named("build") {
+    dependsOn(copyLoaderJarsToResult)
+}
+
+gradle.projectsEvaluated {
+    copyLoaderJarsToResult.configure {
+        dependsOn(loaderProjectNames.map { ":$it:remapJar" })
+    }
+
+    loaderProjectNames.forEach { loaderName ->
+        project(":$loaderName").tasks.named("remapJar").configure {
+            finalizedBy(copyLoaderJarsToResult)
+        }
+    }
+}

@@ -2,9 +2,9 @@
 
 # 修复验证报告
 
-Date: 2026-04-24
+Date: 2026-04-25
 
-日期：2026-04-24
+日期：2026-04-25
 
 ## Purpose
 
@@ -41,6 +41,10 @@ Date: 2026-04-24
 22. 服务端全量和增量同步发包现在会先检查玩家连接是否声明了本模组 payload/channel，避免未安装客户端登录失败。
 23. Client-only persistence now treats a storage namespace change as a world-context reload, saving the previous namespace before loading the server-address or remote-address namespace.
 24. 仅客户端持久化现在会把存储命名空间变化视为世界上下文重载，先保存旧命名空间，再加载服务器地址或远端地址命名空间。
+25. Locked incoming targets are now rejected before composite moves proceed, preventing offhand-swap and armor quick-move desync/item loss cases.
+26. 锁定的放入目标槽现在会在复合移动继续前被拒绝，避免副手交换和护甲 Shift 装备导致不同步或吞物品。
+27. GUI and GUI-outside offhand swaps now check both the selected/hovered slot and the offhand slot before client prediction or server mutation.
+28. GUI 内外副手交换现在会在客户端预测或服务端变更前同时检查当前/悬停槽与副手槽。
 
 ## Integration Validation Summary
 
@@ -74,6 +78,12 @@ Date: 2026-04-24
   - 当远端通道存在时，本地回退逻辑不会生效
   - Persistence uses the active world save under `data/neo_favorite_items/players/<uuid>.dat`
   - 持久化使用当前世界目录下的 `data/neo_favorite_items/players/<uuid>.dat`
+- Composite move expectation:
+- 复合移动预期：
+  - Offhand swaps are canceled when either side is locked and would receive or lose an item, unless bypass is held and enabled.
+  - 当任一侧锁定且会接收或失去物品时，副手交换会被取消；启用并按住旁路键时除外。
+  - Shift-click equipment moves are canceled before the source stack is removed when the destination armor/offhand slot is locked.
+  - 当目标护甲/副手槽已锁定时，Shift 点击装备会在来源物品被移除前取消。
 
 ## Remaining Manual Checks
 
@@ -95,6 +105,12 @@ Date: 2026-04-24
   - 整组丢弃（`Ctrl+Q`）
   - bypass key held
   - 按住旁路键时的行为
+- In-game validation of composite movement blocking on all three loaders:
+- 三个平台都需要验证复合移动拦截：
+  - GUI and GUI-outside offhand swap (`F`) with locked empty and non-empty offhand slots
+  - GUI 内外副手交换（`F`），覆盖锁定空副手槽和锁定非空副手槽
+  - Shift-click equippable armor into locked empty armor slots
+  - Shift 点击可装备护甲进入锁定空护甲槽
 - Manual matrix validation for persistence paths and lifecycle timing:
 - 持久化路径与生命周期时机的手工矩阵验证：
   - client-only join to unmodded server

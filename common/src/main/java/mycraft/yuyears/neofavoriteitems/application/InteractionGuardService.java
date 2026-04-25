@@ -39,6 +39,15 @@ public class InteractionGuardService {
             .orElseGet(InteractionDecision::allow);
     }
 
+    public InteractionDecision evaluateIncomingItem(int slot, InteractionType interactionType, boolean holdingBypassKey, boolean incomingHasItem) {
+        if (!incomingHasItem) {
+            return InteractionDecision.allow();
+        }
+        return SlotMappingService.fromPlayerInventoryIndex(slot)
+            .map(logicalSlot -> evaluateIncomingItem(logicalSlot, interactionType, holdingBypassKey))
+            .orElseGet(InteractionDecision::allow);
+    }
+
     public InteractionDecision evaluate(LogicalSlotIndex slot, InteractionType interactionType, boolean holdingBypassKey) {
         return evaluate(slot, interactionType, holdingBypassKey, true);
     }
@@ -73,6 +82,27 @@ public class InteractionGuardService {
         }
 
         DebugLogger.debug("Interaction allowed: slot={} type={} reason=config_allows", slot.value(), interactionType);
+        return InteractionDecision.allow();
+    }
+
+    public InteractionDecision evaluateIncomingItem(LogicalSlotIndex slot, InteractionType interactionType, boolean holdingBypassKey) {
+        if (!favoritesManager.isSlotFavorite(slot)) {
+            DebugLogger.debug("Incoming item allowed: slot={} type={} reason=not_locked", slot.value(), interactionType);
+            return InteractionDecision.allow();
+        }
+
+        NeoFavoriteItemsConfig config = configManager.getConfig();
+        if (holdingBypassKey && config.lockBehavior.allowBypassWithKey) {
+            DebugLogger.debug("Incoming item bypassed: slot={} type={} reason=bypass_key", slot.value(), interactionType);
+            return InteractionDecision.allowBypass();
+        }
+
+        if (shouldBlockByConfig(config, interactionType)) {
+            DebugLogger.debug("Incoming item denied: slot={} type={} reason=locked_target", slot.value(), interactionType);
+            return InteractionDecision.deny("favorite_slot_" + interactionType.name().toLowerCase() + "_target");
+        }
+
+        DebugLogger.debug("Incoming item allowed: slot={} type={} reason=config_allows", slot.value(), interactionType);
         return InteractionDecision.allow();
     }
 

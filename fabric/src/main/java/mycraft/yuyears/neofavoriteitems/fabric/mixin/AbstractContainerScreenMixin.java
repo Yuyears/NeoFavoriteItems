@@ -46,7 +46,7 @@ public abstract class AbstractContainerScreenMixin {
             return;
         }
 
-        if (FabricSlotInteractionHandler.shouldCancelGuardedInteraction(slot, clickType)) {
+        if (FabricSlotInteractionHandler.shouldCancelGuardedInteraction(slot, clickType, j)) {
             ci.cancel();
         }
     }

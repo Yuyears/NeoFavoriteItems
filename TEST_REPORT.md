@@ -2,9 +2,9 @@
 
 # 测试报告
 
-Date: 2026-04-24
+Date: 2026-04-25
 
-日期：2026-04-24
+日期：2026-04-25
 
 ## Purpose
 
@@ -26,12 +26,21 @@ Date: 2026-04-24
   - `FavoritesManagerTest`
   - `ClientFavoriteSyncServiceTest`
   - `ClientDropGuardTest`
+  - `InteractionGuardServiceTest`
   - `ConfigManagerTest`
   - `DataPersistenceManagerTest`
   - `ReflectionHelperTest`
   - `PlatformFavoriteSupportTest`
-- Persistence coverage additions in this round:
-- 本轮新增的持久化覆盖点：
+- Interaction coverage additions in this round:
+- 本轮新增的交互覆盖点：
+  - locked empty offhand rejects incoming GUI/GUI-outside swap targets
+  - 锁定空副手槽拒绝 GUI 内外副手交换放入
+  - locked empty armor slots reject quick-move equipment targets
+  - 锁定空护甲槽拒绝 Shift 点击装备放入目标
+  - bypass key still allows incoming items when configured
+  - 按配置启用旁路键时，旁路键仍可放行放入行为
+- Existing persistence coverage:
+- 既有持久化覆盖点：
   - client-only storage namespace by server address
   - 单端客户端按服务器地址分存储目录
   - dual-install world-save path selection
@@ -72,12 +81,8 @@ Date: 2026-04-24
 - 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:compileJava :fabric:compileJava`
 - Result: passed
 - 结果：通过
-- Command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava`
-- 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava`
-- Result: passed
-- 结果：通过
-- Command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :forge:compileJava :neoforge:compileJava`
-- 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :forge:compileJava :neoforge:compileJava`
+- Command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
+- 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
 - Result: passed
 - 结果：通过
 - Integration command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`
