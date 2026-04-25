@@ -155,8 +155,8 @@ Location: `common/.../render`
 - `NeoFavoriteItemsFabricClient`：客户端配置、按键、Overlay、客户端同步接收，以及逐 tick 的客户端持久化上下文同步。
 - `FabricFavoriteNetworking`: Toggle, Full Sync, Delta Sync, and Bypass Key State payloads.
 - `FabricFavoriteNetworking`：Toggle、Full Sync、Delta Sync、Bypass Key State payload。
-- Mixins cover normal containers, creative slots, inventory interactions, and player inventory mutation protection.
-- Mixin 覆盖普通容器、创造模式槽位、物品栏交互和玩家背包变更保护。
+- Mixins cover normal containers, creative slots, inventory interactions, client `slotClicked` lock toggles, and player inventory mutation protection.
+- Mixin 覆盖普通容器、创造模式槽位、物品栏交互、客户端 `slotClicked` 锁定切换和玩家背包变更保护。
 
 ### Forge
 
@@ -166,8 +166,8 @@ Location: `common/.../render`
 - `NeoFavoriteItemsForge`：Mod 入口、事件总线、按键、GUI Layer、玩家登录/登出、服务端同步。
 - `ForgeFavoriteNetworking`: Forge SimpleChannel packet registration and send/receive handling.
 - `ForgeFavoriteNetworking`：Forge SimpleChannel 网络包注册与收发。
-- Mixins and Forge adapters reuse common decision services.
-- Mixin 和 Forge 适配类复用 common 决策服务。
+- Mixins and Forge adapters reuse common decision services, including client `slotClicked` handling for normal clicks and Mouse Tweaks simulated drag clicks.
+- Mixin 和 Forge 适配类复用 common 决策服务，包括普通点击与 Mouse Tweaks 模拟拖动点击的客户端 `slotClicked` 处理。
 
 ### NeoForge
 
@@ -177,8 +177,8 @@ Location: `common/.../render`
 - `NeoFavoriteItemsNeoForge`：Mod 入口、NeoForge 事件、按键、GUI Layer、payload handler、玩家登录/登出。
 - `NeoForgeFavoriteNetworking`: NeoForge payload registration and send/receive handling.
 - `NeoForgeFavoriteNetworking`：NeoForge payload 注册与收发。
-- Mixins and NeoForge adapters reuse common decision services.
-- Mixin 和 NeoForge 适配类复用 common 决策服务。
+- Mixins and NeoForge adapters reuse common decision services, including client `slotClicked` handling for normal clicks and Mouse Tweaks simulated drag clicks.
+- Mixin 和 NeoForge 适配类复用 common 决策服务，包括普通点击与 Mouse Tweaks 模拟拖动点击的客户端 `slotClicked` 处理。
 
 ## Runtime Flows
 
@@ -215,6 +215,8 @@ Location: `common/.../render`
 8. 平台层按决策取消交互或允许继续。
 9. Bypass-key state is polled on the client and synced to the server.
 10. 旁路键状态由客户端按键轮询同步到服务端。
+11. When the lock-operation key is held, client `slotClicked` mixins consume left-click pickup events and toggle the reached player-inventory slot. This also covers Mouse Tweaks drag clicks because it simulates movement by invoking `slotClicked` for each entered slot.
+12. 按住锁定操作键时，客户端 `slotClicked` Mixin 会消费左键 PICKUP 事件并切换经过的玩家物品栏槽位。Mouse Tweaks 的拖动点击通过为每个进入的槽位调用 `slotClicked` 实现，因此同样会进入该流程。
 
 ### Installation Modes
 

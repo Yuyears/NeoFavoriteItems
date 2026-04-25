@@ -3,15 +3,20 @@
   "minVersion": "0.8",
   "package": "mycraft.yuyears.neofavoriteitems.neoforge.mixin",
   "compatibilityLevel": "JAVA_21",
+  "plugin": "mycraft.yuyears.neofavoriteitems.neoforge.mixin.NeoForgeCompatMixinPlugin",
   "mixins": [
     "AbstractContainerMenuMixin",
     "InventoryMixin",
     "InvWrapperMixin",
     "RangedWrapperMixin",
+    "SophisticatedCoreInventoryHelperMixin",
+    "SophisticatedSorterCoreUtilsMixin",
     "SlotMixin"
   ],
   "client": [
-    "MinecraftMixin"
+    "AbstractContainerScreenMixin",
+    "MinecraftMixin",
+    "MouseTweaksMainMixin"
   ],
   "server": [],
   "injectors": {

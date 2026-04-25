@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "neo_favorite_items",
   "version": "${version}",
-  "name": "New Item Favorites",
+  "name": "Neo Favorite Items",
   "description": "A versatile item favorites/lock mod for Minecraft",
   "authors": [],
   "contact": {},
@@ -17,7 +17,8 @@
     ]
   },
   "mixins": [
-    "neo_favorite_items.mixins.json"
+    "neo_favorite_items.mixins.json",
+    "neo_favorite_items.fabric.compat.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.15.11",

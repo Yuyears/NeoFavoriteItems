@@ -11,6 +11,7 @@
     "SlotMixin"
   ],
   "client": [
+    "AbstractContainerScreenMixin",
     "MinecraftMixin"
   ],
   "server": [],

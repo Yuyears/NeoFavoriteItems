@@ -1,0 +1,15 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "mycraft.yuyears.neofavoriteitems.fabric.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "mycraft.yuyears.neofavoriteitems.fabric.mixin.FabricCompatMixinPlugin",
+  "mixins": [],
+  "client": [
+    "MouseTweaksMainMixin"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

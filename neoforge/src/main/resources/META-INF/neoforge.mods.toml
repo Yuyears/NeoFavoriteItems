@@ -6,7 +6,7 @@ license="MIT"
 [[mods]]
 modId="neo_favorite_items"
 version="${version}"
-displayName="New Item Favorites"
+displayName="Neo Favorite Items"
 displayTest="IGNORE_ALL_VERSION"
 description='''
 A versatile item favorites/lock mod for Minecraft
@@ -14,6 +14,3 @@ A versatile item favorites/lock mod for Minecraft
 
 [[mixins]]
 config="neo_favorite_items.neoforge.mixins.json"
-
-[[mixins]]
-config="neo_favorite_items.neoforge.compat.mixins.json"

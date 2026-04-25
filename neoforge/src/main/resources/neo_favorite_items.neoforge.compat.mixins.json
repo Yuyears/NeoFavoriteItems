@@ -8,7 +8,9 @@
     "SophisticatedCoreInventoryHelperMixin",
     "SophisticatedSorterCoreUtilsMixin"
   ],
-  "client": [],
+  "client": [
+    "MouseTweaksMainMixin"
+  ],
   "server": [],
   "injectors": {
     "defaultRequire": 0

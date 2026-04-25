@@ -10,7 +10,7 @@ import java.util.List;
 
 public class ConfigManager {
     private static final String CONFIG_COMMENTS = """
-        # New Item Favorites Mod Configuration
+        # Neo Favorite Items Mod Configuration
         # 新物品收藏模组配置
         # =====================================
         

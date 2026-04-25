@@ -1,4 +1,4 @@
-package mycraft.yuyears.neofavoriteitems.fabric;
+package mycraft.yuyears.neofavoriteitems.neoforge;
 
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.ConfigManager;
@@ -9,20 +9,20 @@ import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 
-public final class FabricSlotInteractionHandler {
-    private FabricSlotInteractionHandler() {}
+public final class NeoForgeSlotInteractionHandler {
+    private NeoForgeSlotInteractionHandler() {}
 
     public static boolean handleLockOperationToggle(Slot slot) {
-        if (slot == null || !FabricSlotResolver.isPlayerInventorySlot(slot)) {
+        if (slot == null || !NeoForgeSlotResolver.isPlayerInventorySlot(slot)) {
             return false;
         }
 
-        int inventoryIndex = FabricSlotResolver.getPlayerInventoryIndex(slot);
-        boolean hasItem = FabricSlotResolver.hasItem(slot);
+        int inventoryIndex = NeoForgeSlotResolver.getPlayerInventoryIndex(slot);
+        boolean hasItem = NeoForgeSlotResolver.hasItem(slot);
         var logicalSlot = SlotMappingService.fromPlayerInventoryIndex(inventoryIndex);
         if (logicalSlot.isEmpty()) {
             DebugLogger.debug(
-                "Fabric slot toggle ignored: inventoryIndex={} reason={}",
+                "NeoForge slot toggle ignored: inventoryIndex={} reason={}",
                 inventoryIndex,
                 "unmapped_slot"
             );
@@ -30,20 +30,20 @@ public final class FabricSlotInteractionHandler {
         }
         if (!hasItem && !ConfigManager.getInstance().getConfig().general.lockEmptySlots) {
             DebugLogger.debug(
-                "Fabric slot toggle ignored: inventoryIndex={} hasItem=false reason=empty_slot_disabled",
+                "NeoForge slot toggle ignored: inventoryIndex={} hasItem=false reason=empty_slot_disabled",
                 inventoryIndex
             );
             return true;
         }
 
-        if (FabricFavoriteNetworking.trySendToggle(inventoryIndex)) {
+        if (NeoForgeFavoriteNetworking.trySendToggle(inventoryIndex)) {
             return true;
         }
 
         FavoritesManager.getInstance().toggleSlotFavorite(logicalSlot.get());
-        NeoFavoriteItemsFabricClient.showSlotToggleMessage(logicalSlot.get());
+        NeoFavoriteItemsNeoForge.showSlotToggleMessage(logicalSlot.get());
         DebugLogger.debug(
-            "Fabric slot lock toggled: logicalSlot={} inventoryIndex={} nowLocked={}",
+            "NeoForge slot lock toggled: logicalSlot={} inventoryIndex={} nowLocked={}",
             logicalSlot.get().value(),
             inventoryIndex,
             FavoritesManager.getInstance().isSlotFavorite(logicalSlot.get())
@@ -52,19 +52,19 @@ public final class FabricSlotInteractionHandler {
     }
 
     public static boolean shouldCancelGuardedInteraction(Slot slot, ClickType clickType) {
-        if (slot == null || !FabricSlotResolver.isPlayerInventorySlot(slot)) {
+        if (slot == null || !NeoForgeSlotResolver.isPlayerInventorySlot(slot)) {
             return false;
         }
 
-        int inventoryIndex = FabricSlotResolver.getPlayerInventoryIndex(slot);
+        int inventoryIndex = NeoForgeSlotResolver.getPlayerInventoryIndex(slot);
         var decision = InteractionGuardService.getInstance().evaluate(
             inventoryIndex,
             toInteractionType(clickType),
-            NeoFavoriteItemsFabricClient.isBypassKeyHeld(),
-            FabricSlotResolver.hasItem(slot)
+            NeoFavoriteItemsNeoForge.isBypassKeyHeld(),
+            NeoForgeSlotResolver.hasItem(slot)
         );
         if (decision.denied()) {
-            DebugLogger.debug("Fabric slot interaction canceled: inventoryIndex={} clickType={}", inventoryIndex, clickType);
+            DebugLogger.debug("NeoForge slot interaction canceled: inventoryIndex={} clickType={}", inventoryIndex, clickType);
             return true;
         }
         return false;

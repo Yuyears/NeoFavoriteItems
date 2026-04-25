@@ -47,7 +47,9 @@ public class NeoFavoriteItemsNeoForge {
         if (IS_CLIENT) {
             // 创建客户端事件处理器实例并注册到模组总线和 Forge 总线
             ClientEventHandler clientHandler = new ClientEventHandler();
-            modBus.register(clientHandler);
+            modBus.addListener(clientHandler::onRegisterKeyMappings);
+            modBus.addListener(clientHandler::onClientSetup);
+            modBus.addListener(clientHandler::onRegisterGuiLayers);
             NeoForge.EVENT_BUS.register(clientHandler);
         }
         
@@ -100,7 +102,6 @@ public class NeoFavoriteItemsNeoForge {
         private static boolean lastLoggedBypassLockKeyState;
         private NeoForgeOverlayRenderer overlayRenderer;
 
-        @SubscribeEvent
         public void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
             lockOperationKey = new net.minecraft.client.KeyMapping(
                 NeoFavoriteItemsConstants.LOCK_OPERATION_KEY_ID,
@@ -118,7 +119,6 @@ public class NeoFavoriteItemsNeoForge {
             DebugLogger.debug("Registered NeoForge keybindings: lockOperation default=LEFT_ALT, bypass default=LEFT_CONTROL");
         }
 
-        @SubscribeEvent
         public void onClientSetup(FMLClientSetupEvent event) {
             NeoFavoriteItemsMod.getInstance().onClientInitialize();
             
@@ -129,7 +129,6 @@ public class NeoFavoriteItemsNeoForge {
             overlayRenderer = new NeoForgeOverlayRenderer();
         }
 
-        @SubscribeEvent
         public void onRegisterGuiLayers(RegisterGuiLayersEvent event) {
             event.registerAbove(
                 VanillaGuiLayers.HOTBAR,

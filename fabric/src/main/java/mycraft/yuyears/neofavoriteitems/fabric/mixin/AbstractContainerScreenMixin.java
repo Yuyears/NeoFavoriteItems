@@ -30,10 +30,19 @@ public abstract class AbstractContainerScreenMixin {
             return;
         }
 
-        if (NeoFavoriteItemsFabricClient.isLockOperationKeyHeld() && j == 0 && clickType == ClickType.PICKUP) {
+        if (NeoFavoriteItemsFabricClient.isLockOperationKeyHeld()
+            && j == 0
+            && clickType == ClickType.PICKUP) {
             if (FabricSlotInteractionHandler.handleLockOperationToggle(slot)) {
                 ci.cancel();
             }
+            return;
+        }
+
+        if (NeoFavoriteItemsFabricClient.isLockOperationKeyHeld()
+            && j == 0
+            && clickType == ClickType.QUICK_MOVE) {
+            ci.cancel();
             return;
         }
 

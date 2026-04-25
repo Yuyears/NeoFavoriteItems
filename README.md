@@ -8,8 +8,8 @@
 - Mod ID：`neo_favorite_items`
 - Package: `mycraft.yuyears.neofavoriteitems`
 - 包名：`mycraft.yuyears.neofavoriteitems`
-- Version: `0.0.1-alpha-build1`
-- 版本：`0.0.1-alpha-build1`
+- Version: `0.0.1-beta-build1`
+- 版本：`0.0.1-beta-build1`
 - Java: 21
 - Java：21
 - Build system: Gradle Kotlin DSL + Architectury Loom
@@ -47,6 +47,8 @@
 - Overlay 颜色支持 `0xAARRGGBB` 和 `luv(L, u, v, alpha)` 两种写法。
 - Configurable guards can block click, drop, quick move, Shift-click, drag, and swap actions.
 - 可配置的交互守卫可阻止点击、丢弃、快速移动、Shift 点击、拖拽和交换等行为。
+- Mouse Tweaks-style drag clicks are supported on all three loaders: holding the lock-operation key and dragging across player inventory slots toggles each slot reached by the simulated click flow.
+- 三个平台均支持 Mouse Tweaks 风格的拖动点击：按住锁定操作键拖过玩家物品栏槽位时，会按模拟点击流程切换经过的每个槽位。
 - When the mod is installed on the server, favorite state and sync are server-authoritative while the client remains responsive locally.
 - 服务端安装本模组时，收藏状态与同步由服务端权威处理，同时客户端仍保持本地响应。
 - Outside GUI screens, dropping a locked selected hotbar stack is blocked on the client before the drop animation is played.
@@ -141,13 +143,13 @@ Build outputs:
 
 构建产物：
 
-- `fabric/build/libs/neo_favorite_items-fabric-0.0.1-alpha-<build_number>.jar`
-- `forge/build/libs/neo_favorite_items-forge-0.0.1-alpha-<build_number>.jar`
-- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.1-alpha-<build_number>.jar`
+- `fabric/build/libs/neo_favorite_items-fabric-0.0.1-beta-<build_number>.jar`
+- `forge/build/libs/neo_favorite_items-forge-0.0.1-beta-<build_number>.jar`
+- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.1-beta-<build_number>.jar`
 
-`build_number` is stored in `gradle.properties` and automatically increments when running `build`, `assemble`, `jar`, or `remapJar` tasks. It does not increment for `compileJava`, `runClient`, `help`, or `--dry-run`. Use `-Pskip_build_number_increment=true` when a release rebuild must keep the current build number.
+`build_number` is stored in `gradle.properties` and automatically increments when running `build`, `assemble`, `jar`, or `remapJar` tasks. When `mod_version` changes, the next increment resets the build number to `build1`. It does not increment for `compileJava`, `runClient`, `help`, or `--dry-run`. Use `-Pskip_build_number_increment=true` when a release rebuild must keep the current build number.
 
-`build_number` 保存在 `gradle.properties` 中，执行 `build`、`assemble`、`jar` 或 `remapJar` 任务时会自动递增。执行 `compileJava`、`runClient`、`help` 或 `--dry-run` 时不会递增。如果发布重构建需要保持当前构建号，可使用 `-Pskip_build_number_increment=true`。
+`build_number` 保存在 `gradle.properties` 中，执行 `build`、`assemble`、`jar` 或 `remapJar` 任务时会自动递增。当 `mod_version` 变化时，下一次递增会把构建号重置为 `build1`。执行 `compileJava`、`runClient`、`help` 或 `--dry-run` 时不会递增。如果发布重构建需要保持当前构建号，可使用 `-Pskip_build_number_increment=true`。
 
 ## Development Runs
 

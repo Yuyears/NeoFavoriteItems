@@ -23,6 +23,7 @@ fun shouldIncrementBuildNumber(): Boolean {
 
 fun incrementBuildNumberIfNeeded(): String {
     val currentBuildNumber = property("build_number") as String
+    val currentModVersion = property("mod_version") as String
     if (!shouldIncrementBuildNumber()) {
         return currentBuildNumber
     }
@@ -32,12 +33,31 @@ fun incrementBuildNumberIfNeeded(): String {
     val buildNumberRegex = Regex("""(?m)^build_number=(build)?(\d+)\s*$""")
     val match = buildNumberRegex.find(propertiesText)
         ?: error("Missing build_number entry in gradle.properties")
+    val buildNumberVersionRegex = Regex("""(?m)^build_number_version=(.+?)\s*$""")
+    val versionMatch = buildNumberVersionRegex.find(propertiesText)
+    val previousBuildNumberVersion = versionMatch?.groupValues?.get(1)
 
     val prefix = match.groupValues[1].ifEmpty { "build" }
-    val nextNumber = match.groupValues[2].toInt() + 1
+    val versionChanged = previousBuildNumberVersion != currentModVersion
+    val nextNumber = if (versionChanged) 1 else match.groupValues[2].toInt() + 1
     val nextBuildNumber = "$prefix$nextNumber"
-    propertiesFile.writeText(buildNumberRegex.replace(propertiesText, "build_number=$nextBuildNumber"))
-    logger.lifecycle("Incremented build_number: $currentBuildNumber -> $nextBuildNumber")
+    val versionedPropertiesText = if (versionMatch == null) {
+        propertiesText.replace(
+            buildNumberRegex,
+            "build_number_version=$currentModVersion${System.lineSeparator()}build_number=$nextBuildNumber"
+        )
+    } else {
+        buildNumberVersionRegex.replace(
+            buildNumberRegex.replace(propertiesText, "build_number=$nextBuildNumber"),
+            "build_number_version=$currentModVersion"
+        )
+    }
+    propertiesFile.writeText(versionedPropertiesText)
+    if (versionChanged) {
+        logger.lifecycle("Reset build_number for version change: $previousBuildNumberVersion -> $currentModVersion; $currentBuildNumber -> $nextBuildNumber")
+    } else {
+        logger.lifecycle("Incremented build_number: $currentBuildNumber -> $nextBuildNumber")
+    }
     return nextBuildNumber
 }
 

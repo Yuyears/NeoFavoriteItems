@@ -3,7 +3,6 @@ package mycraft.yuyears.neofavoriteitems.forge.mixin;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
-
 import java.util.List;
 import java.util.Set;
 
@@ -35,6 +34,10 @@ public class ForgeCompatMixinPlugin implements IMixinConfigPlugin {
         // Check if SophisticatedCoreInventoryHelperMixin should be applied
         if (mixinClassName.endsWith("SophisticatedCoreInventoryHelperMixin")) {
             return isModLoaded(SOPHISTICATED_CORE_MOD_ID);
+        }
+
+        if (mixinClassName.endsWith("MouseTweaksMainMixin")) {
+            return true;
         }
         
         // Apply other mixins by default
@@ -74,4 +77,5 @@ public class ForgeCompatMixinPlugin implements IMixinConfigPlugin {
             return false;
         }
     }
+
 }
