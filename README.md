@@ -49,6 +49,10 @@
 - 可配置的交互守卫可阻止点击、丢弃、快速移动、Shift 点击、拖拽和交换等行为。
 - Composite moves now guard both sides of the operation: locked slots are treated as blocked sources when an item would be removed and blocked targets when an item would be inserted. This covers GUI and GUI-outside offhand swaps plus quick-moving equipment into locked armor/offhand slots.
 - 复合移动现在会同时保护操作两端：锁定槽位在物品被取出时视为受保护来源，在物品被放入时视为受保护目标。该规则覆盖 GUI 内外副手交换，以及 Shift 点击装备进入已锁定护甲/副手槽。
+- Slot-level guards also cover standard `Slot` APIs such as safe insert, safe take, remove, and set operations so custom menus that use Minecraft slot semantics are protected without per-screen compatibility code.
+- 槽位级守卫还覆盖 `safeInsert`、`safeTake`、`remove` 和 `set` 等标准 `Slot` API，因此使用 Minecraft 槽位语义的自定义菜单无需逐个界面适配也能受到保护。
+- AE2 terminal `MOVE_REGION` is handled through AE2's shared menu abstractions when AE2 is present, covering space-left-click transfers without adapting each terminal screen separately.
+- 安装 AE2 时，AE2 终端的 `MOVE_REGION` 会通过 AE2 公共菜单抽象层处理，覆盖空格+左键转移，而不需要逐个终端界面适配。
 - Mouse Tweaks-style drag clicks are supported on all three loaders: holding the lock-operation key and dragging across player inventory slots toggles each slot reached by the simulated click flow.
 - 三个平台均支持 Mouse Tweaks 风格的拖动点击：按住锁定操作键拖过玩家物品栏槽位时，会按模拟点击流程切换经过的每个槽位。
 - When the mod is installed on the server, favorite state and sync are server-authoritative while the client remains responsive locally.
@@ -153,6 +157,10 @@ Build outputs:
 `build_number` is stored in `gradle.properties` and automatically increments when running `build`, `assemble`, `jar`, or `remapJar` tasks. When `mod_version` changes, the next increment resets the build number to `build1`. It does not increment for `compileJava`, `runClient`, `help`, or `--dry-run`. Use `-Pskip_build_number_increment=true` when a release rebuild must keep the current build number.
 
 `build_number` 保存在 `gradle.properties` 中，执行 `build`、`assemble`、`jar` 或 `remapJar` 任务时会自动递增。当 `mod_version` 变化时，下一次递增会把构建号重置为 `build1`。执行 `compileJava`、`runClient`、`help` 或 `--dry-run` 时不会递增。如果发布重构建需要保持当前构建号，可使用 `-Pskip_build_number_increment=true`。
+
+The result-copy task uses lazy task-path dependencies so focused commands such as `.\gradle.bat :common:test` work with Gradle configuration-on-demand.
+
+构建结果复制任务使用惰性任务路径依赖，因此 `.\gradle.bat :common:test` 等聚焦命令可在 Gradle configure-on-demand 下正常运行。
 
 ## Development Runs
 

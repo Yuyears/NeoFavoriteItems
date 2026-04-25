@@ -17,8 +17,8 @@ Date: 2026-04-25
 
 ## 自动化测试
 
-- Command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`
-- 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`
+- Command: `.\gradle.bat --no-daemon --no-build-cache :common:test`
+- 命令：`.\gradle.bat --no-daemon --no-build-cache :common:test`
 - Result: passed
 - 结果：通过
 - Scope:
@@ -37,8 +37,14 @@ Date: 2026-04-25
   - 锁定空副手槽拒绝 GUI 内外副手交换放入
   - locked empty armor slots reject quick-move equipment targets
   - 锁定空护甲槽拒绝 Shift 点击装备放入目标
+  - locked slots reject quick-move source removal
+  - 锁定槽作为快速移动来源时拒绝取出
   - bypass key still allows incoming items when configured
-  - 按配置启用旁路键时，旁路键仍可放行放入行为
+  - 按配置启用旁路键时，旁路键仍可放行放入和来源取出行为
+- AE2 compatibility note:
+- AE2 兼容说明：
+  - AE2 menu-layer hooks are compile/build verified, but require in-game validation because AE2 is an optional runtime dependency and the exact terminal behavior is not covered by common unit tests.
+  - AE2 菜单层钩子已通过编译/构建验证，但 AE2 是可选运行时依赖，且具体终端行为不在 common 单元测试覆盖范围内，因此仍需实机验证。
 - Existing persistence coverage:
 - 既有持久化覆盖点：
   - client-only storage namespace by server address
@@ -77,16 +83,16 @@ Date: 2026-04-25
 
 ## 构建验证
 
-- Command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:compileJava :fabric:compileJava`
-- 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:compileJava :fabric:compileJava`
+- Command: `.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
+- 命令：`.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
 - Result: passed
 - 结果：通过
-- Command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
-- 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
-- Result: passed
-- 结果：通过
-- Integration command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`
-- 集成命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`
+- Scope includes conditional AE2 compatibility mixins for Fabric, Forge, and NeoForge.
+- 范围包含 Fabric、Forge、NeoForge 三端条件加载的 AE2 兼容 Mixin。
+- NeoForge resource metadata now registers `neo_favorite_items.neoforge.compat.mixins.json`.
+- NeoForge 资源元数据现在会注册 `neo_favorite_items.neoforge.compat.mixins.json`。
+- Integration command: `.\gradle.bat --no-daemon --no-build-cache -Pskip_build_number_increment=true build`
+- 集成命令：`.\gradle.bat --no-daemon --no-build-cache -Pskip_build_number_increment=true build`
 - Result: passed
 - 结果：通过
 

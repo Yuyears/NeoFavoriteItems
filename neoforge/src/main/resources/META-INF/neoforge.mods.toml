@@ -14,3 +14,6 @@ A versatile item favorites/lock mod for Minecraft
 
 [[mixins]]
 config="neo_favorite_items.neoforge.mixins.json"
+
+[[mixins]]
+config="neo_favorite_items.neoforge.compat.mixins.json"

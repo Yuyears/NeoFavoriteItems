@@ -5,12 +5,10 @@
   "compatibilityLevel": "JAVA_21",
   "plugin": "mycraft.yuyears.neofavoriteitems.neoforge.mixin.NeoForgeCompatMixinPlugin",
   "mixins": [
-    "SophisticatedCoreInventoryHelperMixin",
-    "SophisticatedSorterCoreUtilsMixin"
+    "AppEngMenuMixin",
+    "AppEngStorageMenuMixin"
   ],
-  "client": [
-    "MouseTweaksMainMixin"
-  ],
+  "client": [],
   "server": [],
   "injectors": {
     "defaultRequire": 0

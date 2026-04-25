@@ -10,6 +10,8 @@ import java.util.Set;
 
 public class FabricCompatMixinPlugin implements IMixinConfigPlugin {
     private static final String MOUSE_TWEAKS_MAIN_CLASS = "yalter.mousetweaks.Main";
+    private static final String APPENG_MENU_CLASS = "appeng.menu.AEBaseMenu";
+    private static final String APPENG_STORAGE_MENU_CLASS = "appeng.menu.me.common.MEStorageMenu";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -24,6 +26,12 @@ public class FabricCompatMixinPlugin implements IMixinConfigPlugin {
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         if (mixinClassName.endsWith("MouseTweaksMainMixin")) {
             return isClassPresent(MOUSE_TWEAKS_MAIN_CLASS);
+        }
+        if (mixinClassName.endsWith("AppEngMenuMixin")) {
+            return isClassPresent(APPENG_MENU_CLASS);
+        }
+        if (mixinClassName.endsWith("AppEngStorageMenuMixin")) {
+            return isClassPresent(APPENG_STORAGE_MENU_CLASS);
         }
         return true;
     }

@@ -103,6 +103,7 @@ val copyLoaderJarsToResult = tasks.register<Copy>("copyLoaderJarsToResult") {
     group = "build"
     description = "Copies Fabric, Forge, and NeoForge release jars into build/result."
 
+    dependsOn(loaderProjectNames.map { ":$it:remapJar" })
     into(layout.buildDirectory.dir("result"))
 
     doFirst {
@@ -121,13 +122,7 @@ tasks.named("build") {
 }
 
 gradle.projectsEvaluated {
-    copyLoaderJarsToResult.configure {
-        dependsOn(loaderProjectNames.map { ":$it:remapJar" })
-    }
-
     loaderProjectNames.forEach { loaderName ->
-        project(":$loaderName").tasks.named("remapJar").configure {
-            finalizedBy(copyLoaderJarsToResult)
-        }
+        project(":$loaderName").tasks.findByName("remapJar")?.finalizedBy(copyLoaderJarsToResult)
     }
 }

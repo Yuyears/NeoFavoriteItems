@@ -63,6 +63,12 @@ Last updated: 2026-04-25
 - 针对副手交换和 Shift 点击装备进入锁定护甲/副手目标槽的复合移动保护
 - Automated interaction-decision tests for locked incoming offhand and armor targets
 - 为锁定副手/护甲放入目标补充自动化交互决策测试
+- Generic slot-level guards for standard `Slot` mutation APIs: `safeInsert`, `safeTake`, `tryRemove`, `remove`, `set`, and `setByPlayer`
+- 为标准 `Slot` 变更 API 补充通用槽位级守卫：`safeInsert`、`safeTake`、`tryRemove`、`remove`、`set` 和 `setByPlayer`
+- Conditional AE2 shared-menu compatibility for terminal `MOVE_REGION` transfers through `AEBaseMenu` and `MEStorageMenu`
+- 通过 `AEBaseMenu` 与 `MEStorageMenu` 补充条件加载的 AE2 公共菜单层兼容，处理终端 `MOVE_REGION` 转移
+- Gradle result-copy task no longer breaks focused `:common:test` runs under configuration-on-demand.
+- Gradle 构建结果复制任务不再破坏 configure-on-demand 下聚焦执行的 `:common:test`。
 
 ## Priority Roadmap
 
@@ -76,6 +82,8 @@ Last updated: 2026-04-25
 - 在三个加载器中实机验证 Mouse Tweaks 拖动点击切换锁定。
 - Continue validating behavior consistency across Fabric, Forge, and NeoForge in creative mode, normal containers, hotbar swaps, dragging, and external item transfers.
 - 继续实测 Fabric、Forge、NeoForge 在创造模式、普通容器、快捷栏交换、拖拽和外部物品转移中的一致性。
+- Re-test AE2 terminal space-left-click MOVE_REGION behavior against the shared-menu compatibility hook on NeoForge first, then Fabric/Forge when available.
+- 优先在 NeoForge 上复测 AE2 终端空格+左键 MOVE_REGION 是否已被公共菜单层兼容钩子覆盖，随后再验证 Fabric/Forge。
 - Validate multiplayer installation modes: client-only, server-only, and both-sides-installed.
 - 验证多人安装模式：仅客户端、仅服务端、双端均安装。
 

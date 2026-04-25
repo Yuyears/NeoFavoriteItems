@@ -39,6 +39,14 @@ public class ForgeCompatMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("MouseTweaksMainMixin")) {
             return true;
         }
+
+        if (mixinClassName.endsWith("AppEngMenuMixin")) {
+            return true;
+        }
+
+        if (mixinClassName.endsWith("AppEngStorageMenuMixin")) {
+            return true;
+        }
         
         // Apply other mixins by default
         return true;

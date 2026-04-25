@@ -58,6 +58,24 @@ class InteractionGuardServiceTest {
     }
 
     @Test
+    void lockedSourceRejectsQuickMoveRemoval() {
+        FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(9), true);
+
+        assertTrue(InteractionGuardService.getInstance()
+            .evaluate(9, InteractionType.QUICK_MOVE, false, true)
+            .denied());
+    }
+
+    @Test
+    void lockedSourceQuickMoveAllowsBypass() {
+        FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(9), true);
+
+        assertFalse(InteractionGuardService.getInstance()
+            .evaluate(9, InteractionType.QUICK_MOVE, true, true)
+            .denied());
+    }
+
+    @Test
     void incomingCheckIgnoresUnlockedTargetAndEmptyIncomingStack() {
         FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(38), true);
 

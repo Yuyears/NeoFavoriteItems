@@ -159,6 +159,10 @@ Location: `common/.../render`
 - `FabricFavoriteNetworking`：Toggle、Full Sync、Delta Sync、Bypass Key State payload。
 - Mixins cover normal containers, creative slots, inventory interactions, client `slotClicked` lock toggles, and player inventory mutation protection.
 - Mixin 覆盖普通容器、创造模式槽位、物品栏交互、客户端 `slotClicked` 锁定切换和玩家背包变更保护。
+- Player inventory mutation protection includes standard `Slot` mutation APIs such as `safeInsert`, `safeTake`, `tryRemove`, `remove`, `set`, and `setByPlayer`, avoiding risky global item-read hiding while covering custom menus that respect Minecraft slot semantics.
+- 玩家背包变更保护覆盖 `safeInsert`、`safeTake`、`tryRemove`、`remove`、`set` 和 `setByPlayer` 等标准 `Slot` 变更 API，在不隐藏全局物品读取的前提下覆盖遵循 Minecraft 槽位语义的自定义菜单。
+- Optional compatibility mixins are isolated in non-required compat configs. AE2 compatibility targets shared abstractions (`AEBaseMenu` and `MEStorageMenu`) and avoids early `ModList`/class-presence decisions, following the Mouse Tweaks-style runtime mixin application pattern.
+- 可选兼容 Mixin 隔离在非 required 的 compat 配置中。AE2 兼容目标限定在公共抽象（`AEBaseMenu` 与 `MEStorageMenu`），并避免过早依赖 `ModList`/类存在性判断，采用更接近 Mouse Tweaks 的运行时 Mixin 应用方式。
 
 ### Forge
 
@@ -219,10 +223,16 @@ Location: `common/.../render`
 10. 复合移动会同时检查两端：来源槽使用普通取出语义，目标槽使用放入语义。
 11. Offhand swaps check the hovered/selected slot and slot `40`; quick-moving equipment checks the corresponding armor/offhand target before allowing the source move.
 12. 副手交换会同时检查悬停/当前槽与 `40` 号副手槽；Shift 点击装备会先检查对应护甲/副手目标槽再允许来源移动。
-13. Bypass-key state is polled on the client and synced to the server.
-14. 旁路键状态由客户端按键轮询同步到服务端。
-15. When the lock-operation key is held, client `slotClicked` mixins consume left-click pickup events and toggle the reached player-inventory slot. This also covers Mouse Tweaks drag clicks because it simulates movement by invoking `slotClicked` for each entered slot.
-16. 按住锁定操作键时，客户端 `slotClicked` Mixin 会消费左键 PICKUP 事件并切换经过的玩家物品栏槽位。Mouse Tweaks 的拖动点击通过为每个进入的槽位调用 `slotClicked` 实现，因此同样会进入该流程。
+13. Standard slot mutations are guarded at `Slot` API boundaries so custom menu flows that call `safeInsert`, `safeTake`, `tryRemove`, `remove`, `set`, or `setByPlayer` still reuse the common decision service.
+14. 标准槽位变更会在 `Slot` API 边界被守卫，因此调用 `safeInsert`、`safeTake`、`tryRemove`、`remove`、`set` 或 `setByPlayer` 的自定义菜单流程仍会复用 common 决策服务。
+15. AE2 `MOVE_REGION` uses AE2 menu-layer compatibility: player-slot sources are blocked in `AEBaseMenu.quickMoveStack`, and network-to-player region moves are canceled from `MEStorageMenu.handleNetworkInteraction` when they would target a locked player inventory slot.
+16. AE2 的 `MOVE_REGION` 通过 AE2 菜单层兼容处理：玩家槽作为来源时在 `AEBaseMenu.quickMoveStack` 拦截，网络物品批量移入玩家背包时在 `MEStorageMenu.handleNetworkInteraction` 预检查锁定目标槽并取消。
+17. The guard deliberately does not hide `Slot.getItem` or `Inventory.getItem`, because global read interception can break menu synchronization and third-party inspection logic.
+18. 守卫刻意不隐藏 `Slot.getItem` 或 `Inventory.getItem`，因为全局读取拦截可能破坏菜单同步和第三方检查逻辑。
+19. Bypass-key state is polled on the client and synced to the server.
+20. 旁路键状态由客户端按键轮询同步到服务端。
+21. When the lock-operation key is held, client `slotClicked` mixins consume left-click pickup events and toggle the reached player-inventory slot. This also covers Mouse Tweaks drag clicks because it simulates movement by invoking `slotClicked` for each entered slot.
+22. 按住锁定操作键时，客户端 `slotClicked` Mixin 会消费左键 PICKUP 事件并切换经过的玩家物品栏槽位。Mouse Tweaks 的拖动点击通过为每个进入的槽位调用 `slotClicked` 实现，因此同样会进入该流程。
 
 ### Installation Modes
 
@@ -294,6 +304,10 @@ Location: `common/.../render`
 - 现已建立自动化单元测试，覆盖收藏状态、客户端同步、丢弃拦截、配置加载、持久化和反射缓存行为。
 - Interaction decision tests now cover locked incoming targets for offhand swaps and armor quick-move equipment.
 - 交互决策测试现已覆盖副手交换和护甲 Shift 装备中的锁定目标槽放入判定。
+- Interaction decision tests also cover locked quick-move source removal and bypass behavior.
+- 交互决策测试也已覆盖锁定槽作为快速移动来源时的取出拒绝，以及旁路键放行行为。
+- AE2 compatibility is intentionally common-abstraction based and still needs in-game verification with the user's AE2 terminal scenario.
+- AE2 兼容刻意基于公共抽象层实现，仍需用用户的 AE2 终端场景做实机验证。
 
 ## Maintenance Rules
 
@@ -303,6 +317,8 @@ Location: `common/.../render`
 - 新逻辑优先放入 `common`，平台层保持薄适配。
 - Persistence and networking should pass logical slots or player inventory indices, not GUI slot ids.
 - 持久化和网络只传递逻辑槽位或玩家背包索引，不传递 GUI slot id。
+- Prefer safe, semantic API boundaries before adding mod-specific compatibility. Do not globally hide `getItem` reads unless a future fix proves the synchronization impact is acceptable.
+- 优先选择安全的语义 API 边界，再考虑模组特定兼容；除非后续修复能证明同步影响可控，否则不要全局隐藏 `getItem` 读取。
 - When adding an Overlay style, update:
 - 新增 Overlay 样式时，同时更新：
   - `NeoFavoriteItemsConfig.OverlayStyle`

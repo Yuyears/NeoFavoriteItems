@@ -4,7 +4,10 @@
   "package": "mycraft.yuyears.neofavoriteitems.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
   "plugin": "mycraft.yuyears.neofavoriteitems.fabric.mixin.FabricCompatMixinPlugin",
-  "mixins": [],
+  "mixins": [
+    "AppEngMenuMixin",
+    "AppEngStorageMenuMixin"
+  ],
   "client": [
     "MouseTweaksMainMixin"
   ],
