@@ -67,6 +67,10 @@ Last updated: 2026-04-25
 - 为标准 `Slot` 变更 API 补充通用槽位级守卫：`safeInsert`、`safeTake`、`tryRemove`、`remove`、`set` 和 `setByPlayer`
 - Conditional AE2 shared-menu compatibility for terminal `MOVE_REGION` transfers through `AEBaseMenu` and `MEStorageMenu`
 - 通过 `AEBaseMenu` 与 `MEStorageMenu` 补充条件加载的 AE2 公共菜单层兼容，处理终端 `MOVE_REGION` 转移
+- NeoForge dedicated-server installation modes validated: client-only, server-only, and both-sides-installed.
+- NeoForge 真实专用服务端安装模式已验证：仅客户端、仅服务端、双端均安装。
+- NeoForge interaction validation completed for normal drop, bypass-key drop, GUI/GUI-outside offhand swaps with locked empty and non-empty offhand slots, shift-click equippable armor into locked empty armor slots, and AE2 terminal space-left-click `MOVE_REGION` into and out of locked player inventory slots.
+- NeoForge 交互实机验证已覆盖：普通丢弃、按住旁路键丢弃、GUI 内外副手交换（覆盖锁定空副手槽和锁定非空副手槽）、锁定空护甲槽 Shift 点击可装备护甲，以及 AE2 终端空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出。
 - Gradle result-copy task no longer breaks focused `:common:test` runs under configuration-on-demand.
 - Gradle 构建结果复制任务不再破坏 configure-on-demand 下聚焦执行的 `:common:test`。
 
@@ -80,12 +84,12 @@ Last updated: 2026-04-25
 
 - In-game validation of Mouse Tweaks drag-click lock toggling on all three loaders.
 - 在三个加载器中实机验证 Mouse Tweaks 拖动点击切换锁定。
-- Continue validating behavior consistency across Fabric, Forge, and NeoForge in creative mode, normal containers, hotbar swaps, dragging, and external item transfers.
-- 继续实测 Fabric、Forge、NeoForge 在创造模式、普通容器、快捷栏交换、拖拽和外部物品转移中的一致性。
-- Re-test AE2 terminal space-left-click MOVE_REGION behavior against the shared-menu compatibility hook on NeoForge first, then Fabric/Forge when available.
-- 优先在 NeoForge 上复测 AE2 终端空格+左键 MOVE_REGION 是否已被公共菜单层兼容钩子覆盖，随后再验证 Fabric/Forge。
-- Validate multiplayer installation modes: client-only, server-only, and both-sides-installed.
-- 验证多人安装模式：仅客户端、仅服务端、双端均安装。
+- Continue validating behavior consistency across Fabric and Forge in creative mode, normal containers, hotbar swaps, dragging, and external item transfers. NeoForge has validated the high-risk drop, offhand, armor quick-move, and AE2 `MOVE_REGION` paths listed above.
+- 继续实测 Fabric、Forge 在创造模式、普通容器、快捷栏交换、拖拽和外部物品转移中的一致性。NeoForge 已验证上方列出的高风险丢弃、副手、护甲快速移动和 AE2 `MOVE_REGION` 路径。
+- Re-test AE2 terminal space-left-click MOVE_REGION behavior against the shared-menu compatibility hook on Fabric/Forge when available.
+- 后续在 Fabric/Forge 上复测 AE2 终端空格+左键 MOVE_REGION 是否已被公共菜单层兼容钩子覆盖。
+- Validate multiplayer installation modes on Fabric and Forge: client-only, server-only, and both-sides-installed. NeoForge is validated.
+- 验证 Fabric、Forge 多人安装模式：仅客户端、仅服务端、双端均安装。NeoForge 已验证。
 
 ### P1 Test Coverage And Core Semantics
 
@@ -135,12 +139,12 @@ Last updated: 2026-04-25
 
 - Favorite slots currently only cover player inventory slots; chest, furnace, and other container-owned slots are not supported.
 - 当前只支持玩家物品栏槽位收藏，不支持箱子、熔炉等容器自身槽位收藏。
-- Server-authoritative sync exists, but it still needs more real multiplayer validation.
-- 服务端权威同步已存在，但仍需要更多多人实际场景验证。
+- Server-authoritative sync exists, and NeoForge dedicated-server installation modes are validated; Fabric and Forge still need real multiplayer matrix validation.
+- 服务端权威同步已存在，NeoForge 真实专用服务端安装模式已验证；Fabric 和 Forge 仍需要多人矩阵实测。
 - `FavoritesManager` is still a singleton state manager; it can later evolve into clearer state service/repository interfaces.
 - `FavoritesManager` 仍是单例状态管理器，后续可继续演进为更清晰的状态服务/仓库接口。
-- Automated tests cover core common-layer behavior, but loader-specific and in-game behavior still require manual runtime matrix validation.
-- 自动化测试已覆盖 common 层核心行为，但平台特定和实机行为仍需手工矩阵验证。
+- Automated tests cover core common-layer behavior. NeoForge has completed the listed high-risk in-game checks, while Fabric and Forge still require manual runtime matrix validation.
+- 自动化测试已覆盖 common 层核心行为。NeoForge 已完成上述高风险实机检查，Fabric 和 Forge 仍需手工运行矩阵验证。
 
 ## Request Buffer
 

@@ -43,8 +43,10 @@ Date: 2026-04-25
   - 按配置启用旁路键时，旁路键仍可放行放入和来源取出行为
 - AE2 compatibility note:
 - AE2 兼容说明：
-  - AE2 menu-layer hooks are compile/build verified, but require in-game validation because AE2 is an optional runtime dependency and the exact terminal behavior is not covered by common unit tests.
-  - AE2 菜单层钩子已通过编译/构建验证，但 AE2 是可选运行时依赖，且具体终端行为不在 common 单元测试覆盖范围内，因此仍需实机验证。
+  - AE2 menu-layer hooks are compile/build verified. NeoForge in-game validation has covered terminal space-left-click `MOVE_REGION` into and out of locked player inventory slots.
+  - AE2 菜单层钩子已通过编译/构建验证。NeoForge 实机验证已覆盖终端空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出。
+  - Fabric and Forge AE2 runtime behavior still require manual validation because AE2 is an optional runtime dependency and terminal behavior is not covered by common unit tests.
+  - Fabric、Forge 的 AE2 运行时行为仍需手工验证，因为 AE2 是可选运行时依赖，且具体终端行为不在 common 单元测试覆盖范围内。
 - Existing persistence coverage:
 - 既有持久化覆盖点：
   - client-only storage namespace by server address
@@ -109,9 +111,32 @@ Date: 2026-04-25
 - Verified that preload plus full-save cache flow preserves player favorite sets
 - 已验证预载加完整保存的缓存流程能够保持玩家收藏状态
 
+## Manual Runtime Validation
+
+## 手工运行验证
+
+- NeoForge dedicated-server installation modes passed:
+- NeoForge 真实专用服务端安装模式已通过：
+  - client-only
+  - 仅客户端安装
+  - server-only
+  - 仅服务端安装
+  - both-sides-installed
+  - 双端均安装
+- NeoForge high-risk interaction checks passed:
+- NeoForge 高风险交互检查已通过：
+  - normal drop and bypass-key drop behavior
+  - 普通丢弃与按住旁路键时的行为
+  - GUI and GUI-outside offhand swap with locked empty and non-empty offhand slots
+  - GUI 内外副手交换，覆盖锁定空副手槽和锁定非空副手槽
+  - shift-click equippable armor into locked empty armor slots
+  - 锁定空护甲槽 Shift 点击可装备护甲
+  - AE2 terminal space-left-click `MOVE_REGION` into and out of locked player inventory slots
+  - AE2 终端空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出
+
 ## Notes
 
 ## 说明
 
-- These results cover automated verification in the current workspace. They do not replace in-game multiplayer matrix testing.
-- 以上结果对应当前工作区内的自动化验证，不替代实际游戏中的多人联机矩阵测试。
+- These results cover automated verification in the current workspace plus the NeoForge manual runtime checks listed above. Fabric and Forge still need in-game multiplayer matrix testing.
+- 以上结果覆盖当前工作区内的自动化验证，以及上方列出的 NeoForge 手工运行验证。Fabric 和 Forge 仍需实际游戏中的多人联机矩阵测试。

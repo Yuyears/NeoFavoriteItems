@@ -107,28 +107,55 @@ Date: 2026-04-25
   - Space-left-click region moves from the AE2 network into locked player inventory slots are canceled before AE2 starts moving repeated stacks.
   - 从 AE2 网络向锁定玩家背包槽批量放入的空格+左键区域转移会在 AE2 开始重复搬运前被取消。
 
-## Remaining Manual Checks
+## Manual Validation Completed
 
-## 仍需手工验证
+## 已完成实机验证
 
-- Real dedicated-server join validation for:
-- 真实专用服务端联机验证：
+- NeoForge dedicated-server installation modes:
+- NeoForge 真实专用服务端安装模式：
   - client mod present, server absent
   - 客户端安装、服务端未安装
   - client absent, server mod present
   - 客户端未安装、服务端安装
   - both sides present
   - 双端都安装
-- In-game validation of selected-hotbar drop blocking on all three loaders, including:
-- 三个平台都需要验证 GUI 外快捷栏丢弃拦截：
+- NeoForge drop behavior:
+- NeoForge 丢弃行为：
+  - normal selected-hotbar drop
+  - 当前快捷栏普通丢弃
+  - bypass key held
+  - 按住旁路键时的行为
+- NeoForge composite movement behavior:
+- NeoForge 复合移动行为：
+  - GUI and GUI-outside offhand swap (`F`) with locked empty and non-empty offhand slots
+  - GUI 内外副手交换（`F`），覆盖锁定空副手槽和锁定非空副手槽
+  - Shift-click equippable armor into locked empty armor slots
+  - Shift 点击可装备护甲进入锁定空护甲槽
+  - AE2 terminal space-left-click `MOVE_REGION` into and out of locked player inventory slots
+  - AE2 终端空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出
+
+## Remaining Manual Checks
+
+## 仍需手工验证
+
+- Fabric and Forge dedicated-server join validation for:
+- Fabric、Forge 真实专用服务端联机验证：
+  - client mod present, server absent
+  - 客户端安装、服务端未安装
+  - client absent, server mod present
+  - 客户端未安装、服务端安装
+  - both sides present
+  - 双端都安装
+- Fabric and Forge in-game validation of selected-hotbar drop blocking, including:
+- Fabric、Forge 仍需验证 GUI 外快捷栏丢弃拦截：
   - normal drop (`Q`)
   - 普通丢弃（`Q`）
   - full-stack drop (`Ctrl+Q`)
   - 整组丢弃（`Ctrl+Q`）
   - bypass key held
   - 按住旁路键时的行为
-- In-game validation of composite movement blocking on all three loaders:
-- 三个平台都需要验证复合移动拦截：
+- Fabric and Forge in-game validation of composite movement blocking:
+- Fabric、Forge 仍需验证复合移动拦截：
   - GUI and GUI-outside offhand swap (`F`) with locked empty and non-empty offhand slots
   - GUI 内外副手交换（`F`），覆盖锁定空副手槽和锁定非空副手槽
   - Shift-click equippable armor into locked empty armor slots

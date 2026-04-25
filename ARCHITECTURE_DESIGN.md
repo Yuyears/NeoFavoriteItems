@@ -306,8 +306,8 @@ Location: `common/.../render`
 - 交互决策测试现已覆盖副手交换和护甲 Shift 装备中的锁定目标槽放入判定。
 - Interaction decision tests also cover locked quick-move source removal and bypass behavior.
 - 交互决策测试也已覆盖锁定槽作为快速移动来源时的取出拒绝，以及旁路键放行行为。
-- AE2 compatibility is intentionally common-abstraction based and still needs in-game verification with the user's AE2 terminal scenario.
-- AE2 兼容刻意基于公共抽象层实现，仍需用用户的 AE2 终端场景做实机验证。
+- AE2 compatibility is intentionally common-abstraction based. The NeoForge AE2 terminal scenario has been validated for space-left-click `MOVE_REGION` into and out of locked player inventory slots; Fabric and Forge still need runtime checks.
+- AE2 兼容刻意基于公共抽象层实现。NeoForge 的 AE2 终端场景已验证空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出；Fabric 和 Forge 仍需运行时验证。
 
 ## Maintenance Rules
 
