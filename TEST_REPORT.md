@@ -2,9 +2,9 @@
 
 # 测试报告
 
-Date: 2026-04-25
+Date: 2026-04-26
 
-日期：2026-04-25
+日期：2026-04-26
 
 ## Purpose
 
@@ -47,6 +47,10 @@ Date: 2026-04-25
   - AE2 菜单层钩子已通过编译/构建验证。NeoForge 实机验证已覆盖终端空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出。
   - Fabric and Forge AE2 runtime behavior still require manual validation because AE2 is an optional runtime dependency and terminal behavior is not covered by common unit tests.
   - Fabric、Forge 的 AE2 运行时行为仍需手工验证，因为 AE2 是可选运行时依赖，且具体终端行为不在 common 单元测试覆盖范围内。
+- JustDireThings compatibility note:
+- JustDireThings 兼容说明：
+  - Forge/NeoForge item-handler wrapper guards now leave read APIs transparent and protect only mutation APIs. This is compile-verified; in-game JDT screen validation is still recommended.
+  - Forge/NeoForge item-handler 包装器守卫现在保持读取 API 透明，只保护变更 API。该项已通过编译验证，仍建议进行 JDT 界面实机复测。
 - Existing persistence coverage:
 - 既有持久化覆盖点：
   - client-only storage namespace by server address

@@ -2,9 +2,9 @@
 
 # 修复验证报告
 
-Date: 2026-04-25
+Date: 2026-04-26
 
-日期：2026-04-25
+日期：2026-04-26
 
 ## Purpose
 
@@ -55,6 +55,8 @@ Date: 2026-04-25
 36. AE2 兼容 Mixin 现在避免过早使用 `ModList` 或类存在性判断，改为接近 Mouse Tweaks 的方式，在目标类转换时由可选 Mixin 配置应用。
 37. The Gradle result-copy task now uses lazy task-path dependencies and no longer breaks focused common-module test runs under configuration-on-demand.
 38. Gradle 构建结果复制任务现在使用惰性任务路径依赖，不再破坏 configure-on-demand 下聚焦执行的 common 模块测试。
+39. Forge/NeoForge `InvWrapper` and `RangedWrapper` guards no longer hide locked player inventory stacks from read APIs, fixing custom GUIs such as JustDireThings that rendered locked slots as empty.
+40. Forge/NeoForge 的 `InvWrapper` 与 `RangedWrapper` 守卫不再通过读取 API 隐藏锁定玩家背包物品，修复 JustDireThings 等自定义 GUI 中锁定槽显示为空的问题。
 
 ## Integration Validation Summary
 
@@ -100,6 +102,12 @@ Date: 2026-04-25
   - 使用原版 `Slot` 变更 API 的自定义菜单，会在锁定玩家背包槽的来源取出或目标放入边界被阻止。
   - The guard does not intercept `Slot.getItem` or `Inventory.getItem`, preserving normal menu sync and third-party inspection behavior.
   - 守卫不拦截 `Slot.getItem` 或 `Inventory.getItem`，以保留正常菜单同步和第三方检查行为。
+- Item-handler player inventory expectation:
+- Item handler 玩家背包预期：
+  - Forge/NeoForge `InvWrapper` and `RangedWrapper` expose real stack and slot-limit reads, while `isItemValid`, `extractItem`, `insertItem`, and `setStackInSlot` still enforce lock rules.
+  - Forge/NeoForge 的 `InvWrapper` 与 `RangedWrapper` 会暴露真实物品和槽位上限读取，同时仍通过 `isItemValid`、`extractItem`、`insertItem` 与 `setStackInSlot` 执行锁定规则。
+  - JustDireThings screens that add player slots through `InvWrapper(playerInventory)` should display locked slots normally instead of as empty.
+  - JustDireThings 中通过 `InvWrapper(playerInventory)` 添加玩家槽位的界面应正常显示锁定槽，而不是显示为空。
 - AE2 terminal expectation:
 - AE2 终端预期：
   - Space-left-click region moves from locked player inventory slots are canceled at the AE2 shared quick-move entrypoint.

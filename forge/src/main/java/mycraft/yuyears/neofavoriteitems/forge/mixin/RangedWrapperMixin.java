@@ -20,24 +20,8 @@ public abstract class RangedWrapperMixin {
     @Shadow @Final private IItemHandlerModifiable compose;
     @Shadow @Final private int minSlot;
 
-    @Inject(method = "getStackInSlot", at = @At("HEAD"), cancellable = true)
-    private void neoFavoriteItems$hideLockedPlayerInventoryStack(int slot, CallbackInfoReturnable<ItemStack> cir) {
-        Inventory inventory = getPlayerInventory();
-        if (inventory != null && ServerFavoriteService.shouldHideInventoryStack(inventory, minSlot + slot)) {
-            cir.setReturnValue(ItemStack.EMPTY);
-        }
-    }
-
-    @Inject(method = "getSlotLimit", at = @At("HEAD"), cancellable = true)
-    private void neoFavoriteItems$hideLockedPlayerInventorySlotLimit(int slot, CallbackInfoReturnable<Integer> cir) {
-        Inventory inventory = getPlayerInventory();
-        if (inventory != null && ServerFavoriteService.shouldHideInventoryStack(inventory, minSlot + slot)) {
-            cir.setReturnValue(0);
-        }
-    }
-
     @Inject(method = "isItemValid", at = @At("HEAD"), cancellable = true)
-    private void neoFavoriteItems$hideLockedPlayerInventoryValidity(int slot, ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
+    private void neoFavoriteItems$guardLockedPlayerInventoryValidity(int slot, ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
         Inventory inventory = getPlayerInventory();
         if (inventory != null && ServerFavoriteService.shouldPreventInventorySet(inventory, minSlot + slot, stack)) {
             cir.setReturnValue(false);

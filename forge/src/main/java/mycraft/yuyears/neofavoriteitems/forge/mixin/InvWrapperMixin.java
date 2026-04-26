@@ -16,26 +16,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class InvWrapperMixin {
     @Shadow public abstract Container getInv();
 
-    @Inject(method = "getStackInSlot", at = @At("HEAD"), cancellable = true)
-    private void neoFavoriteItems$hideLockedPlayerInventoryStack(int slot, CallbackInfoReturnable<ItemStack> cir) {
-        Container container = getInv();
-        if (container instanceof Inventory inventory
-            && ServerFavoriteService.shouldHideInventoryStack(inventory, slot)) {
-            cir.setReturnValue(ItemStack.EMPTY);
-        }
-    }
-
-    @Inject(method = "getSlotLimit", at = @At("HEAD"), cancellable = true)
-    private void neoFavoriteItems$hideLockedPlayerInventorySlotLimit(int slot, CallbackInfoReturnable<Integer> cir) {
-        Container container = getInv();
-        if (container instanceof Inventory inventory
-            && ServerFavoriteService.shouldHideInventoryStack(inventory, slot)) {
-            cir.setReturnValue(0);
-        }
-    }
-
     @Inject(method = "isItemValid", at = @At("HEAD"), cancellable = true)
-    private void neoFavoriteItems$hideLockedPlayerInventoryValidity(int slot, ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
+    private void neoFavoriteItems$guardLockedPlayerInventoryValidity(int slot, ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
         Container container = getInv();
         if (container instanceof Inventory inventory
             && ServerFavoriteService.shouldPreventInventorySet(inventory, slot, stack)) {

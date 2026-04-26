@@ -2,9 +2,9 @@
 
 # Neo Favorite Items 架构说明
 
-Last updated: 2026-04-25
+Last updated: 2026-04-26
 
-最后更新：2026-04-25
+最后更新：2026-04-26
 
 This document records the current project structure and implementation boundaries. It describes the repository as it exists now, not an older migration draft.
 
@@ -161,6 +161,8 @@ Location: `common/.../render`
 - Mixin 覆盖普通容器、创造模式槽位、物品栏交互、客户端 `slotClicked` 锁定切换和玩家背包变更保护。
 - Player inventory mutation protection includes standard `Slot` mutation APIs such as `safeInsert`, `safeTake`, `tryRemove`, `remove`, `set`, and `setByPlayer`, avoiding risky global item-read hiding while covering custom menus that respect Minecraft slot semantics.
 - 玩家背包变更保护覆盖 `safeInsert`、`safeTake`、`tryRemove`、`remove`、`set` 和 `setByPlayer` 等标准 `Slot` 变更 API，在不隐藏全局物品读取的前提下覆盖遵循 Minecraft 槽位语义的自定义菜单。
+- Forge/NeoForge additionally guard player-inventory item-handler wrappers (`InvWrapper` and `RangedWrapper`) only at mutation boundaries such as validity checks, extraction, insertion, and direct writes. Read APIs such as `getStackInSlot` and `getSlotLimit` are left untouched so item-handler-backed custom GUIs keep rendering real player inventory contents.
+- Forge/NeoForge 还会在玩家背包 item-handler 包装器（`InvWrapper` 与 `RangedWrapper`）的变更边界进行保护，例如有效性检查、提取、放入和直接写入。`getStackInSlot` 与 `getSlotLimit` 等读取 API 不再被改写，以保证基于 item handler 的自定义 GUI 继续显示真实玩家背包内容。
 - Optional compatibility mixins are isolated in non-required compat configs. AE2 compatibility targets shared abstractions (`AEBaseMenu` and `MEStorageMenu`) and avoids early `ModList`/class-presence decisions, following the Mouse Tweaks-style runtime mixin application pattern.
 - 可选兼容 Mixin 隔离在非 required 的 compat 配置中。AE2 兼容目标限定在公共抽象（`AEBaseMenu` 与 `MEStorageMenu`），并避免过早依赖 `ModList`/类存在性判断，采用更接近 Mouse Tweaks 的运行时 Mixin 应用方式。
 
@@ -225,14 +227,16 @@ Location: `common/.../render`
 12. 副手交换会同时检查悬停/当前槽与 `40` 号副手槽；Shift 点击装备会先检查对应护甲/副手目标槽再允许来源移动。
 13. Standard slot mutations are guarded at `Slot` API boundaries so custom menu flows that call `safeInsert`, `safeTake`, `tryRemove`, `remove`, `set`, or `setByPlayer` still reuse the common decision service.
 14. 标准槽位变更会在 `Slot` API 边界被守卫，因此调用 `safeInsert`、`safeTake`、`tryRemove`、`remove`、`set` 或 `setByPlayer` 的自定义菜单流程仍会复用 common 决策服务。
-15. AE2 `MOVE_REGION` uses AE2 menu-layer compatibility: player-slot sources are blocked in `AEBaseMenu.quickMoveStack`, and network-to-player region moves are canceled from `MEStorageMenu.handleNetworkInteraction` when they would target a locked player inventory slot.
-16. AE2 的 `MOVE_REGION` 通过 AE2 菜单层兼容处理：玩家槽作为来源时在 `AEBaseMenu.quickMoveStack` 拦截，网络物品批量移入玩家背包时在 `MEStorageMenu.handleNetworkInteraction` 预检查锁定目标槽并取消。
-17. The guard deliberately does not hide `Slot.getItem` or `Inventory.getItem`, because global read interception can break menu synchronization and third-party inspection logic.
-18. 守卫刻意不隐藏 `Slot.getItem` 或 `Inventory.getItem`，因为全局读取拦截可能破坏菜单同步和第三方检查逻辑。
-19. Bypass-key state is polled on the client and synced to the server.
-20. 旁路键状态由客户端按键轮询同步到服务端。
-21. When the lock-operation key is held, client `slotClicked` mixins consume left-click pickup events and toggle the reached player-inventory slot. This also covers Mouse Tweaks drag clicks because it simulates movement by invoking `slotClicked` for each entered slot.
-22. 按住锁定操作键时，客户端 `slotClicked` Mixin 会消费左键 PICKUP 事件并切换经过的玩家物品栏槽位。Mouse Tweaks 的拖动点击通过为每个进入的槽位调用 `slotClicked` 实现，因此同样会进入该流程。
+15. Forge/NeoForge item-handler-backed player inventory views keep read APIs transparent while guarding extraction, insertion, and direct mutation. This protects external transfers without making locked slots look empty in custom screens such as JustDireThings.
+16. Forge/NeoForge 中基于 item handler 的玩家背包视图保持读取 API 透明，只拦截提取、放入和直接变更。这样既能保护外部转移，也不会让 JustDireThings 等自定义界面中的锁定槽显示为空。
+17. AE2 `MOVE_REGION` uses AE2 menu-layer compatibility: player-slot sources are blocked in `AEBaseMenu.quickMoveStack`, and network-to-player region moves are canceled from `MEStorageMenu.handleNetworkInteraction` when they would target a locked player inventory slot.
+18. AE2 的 `MOVE_REGION` 通过 AE2 菜单层兼容处理：玩家槽作为来源时在 `AEBaseMenu.quickMoveStack` 拦截，网络物品批量移入玩家背包时在 `MEStorageMenu.handleNetworkInteraction` 预检查锁定目标槽并取消。
+19. The guard deliberately does not hide `Slot.getItem`, `Inventory.getItem`, item-handler `getStackInSlot`, or item-handler slot-limit reads, because read interception can break menu synchronization, rendering, and third-party inspection logic.
+20. 守卫刻意不隐藏 `Slot.getItem`、`Inventory.getItem`、item-handler `getStackInSlot` 或 item-handler 槽位上限读取，因为读取拦截可能破坏菜单同步、渲染和第三方检查逻辑。
+21. Bypass-key state is polled on the client and synced to the server.
+22. 旁路键状态由客户端按键轮询同步到服务端。
+23. When the lock-operation key is held, client `slotClicked` mixins consume left-click pickup events and toggle the reached player-inventory slot. This also covers Mouse Tweaks drag clicks because it simulates movement by invoking `slotClicked` for each entered slot.
+24. 按住锁定操作键时，客户端 `slotClicked` Mixin 会消费左键 PICKUP 事件并切换经过的玩家物品栏槽位。Mouse Tweaks 的拖动点击通过为每个进入的槽位调用 `slotClicked` 实现，因此同样会进入该流程。
 
 ### Installation Modes
 

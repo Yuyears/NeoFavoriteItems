@@ -216,33 +216,6 @@ public final class ServerFavoriteService {
         return false;
     }
 
-    public static boolean shouldHideInventoryStack(Inventory inventory, int inventoryIndex) {
-        if (!isServerPlayerInventoryIndex(inventory, inventoryIndex)) {
-            return false;
-        }
-
-        Player player = inventory.player;
-        FavoritesManager.getInstance().setPlayer(player.getUUID());
-        ItemStack currentStack = inventory.getItem(inventoryIndex);
-        var decision = InteractionGuardService.getInstance().evaluate(
-            inventoryIndex,
-            InteractionType.QUICK_MOVE,
-            isBypassKeyHeld(player),
-            !currentStack.isEmpty()
-        );
-        if (decision.denied()) {
-            DebugLogger.debug(
-                "Server hid inventory stack from item handler: player={} inventoryIndex={} reason={} currentEmpty={}",
-                player.getName().getString(),
-                inventoryIndex,
-                decision.reason(),
-                currentStack.isEmpty()
-            );
-            return true;
-        }
-        return false;
-    }
-
     public static boolean shouldPreventInventorySet(Inventory inventory, int inventoryIndex, ItemStack newStack) {
         if (!isServerPlayerInventoryIndex(inventory, inventoryIndex)) {
             return false;

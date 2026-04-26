@@ -51,6 +51,8 @@
 - 复合移动现在会同时保护操作两端：锁定槽位在物品被取出时视为受保护来源，在物品被放入时视为受保护目标。该规则覆盖 GUI 内外副手交换，以及 Shift 点击装备进入已锁定护甲/副手槽。
 - Slot-level guards also cover standard `Slot` APIs such as safe insert, safe take, remove, and set operations so custom menus that use Minecraft slot semantics are protected without per-screen compatibility code.
 - 槽位级守卫还覆盖 `safeInsert`、`safeTake`、`remove` 和 `set` 等标准 `Slot` API，因此使用 Minecraft 槽位语义的自定义菜单无需逐个界面适配也能受到保护。
+- Forge/NeoForge item-handler wrappers for player inventory no longer hide locked stacks from read APIs, so custom GUIs such as JustDireThings still render the actual player items while extraction, insertion, and direct writes remain guarded.
+- Forge/NeoForge 的玩家背包 item-handler 包装器不再在读取 API 中隐藏锁定物品，因此 JustDireThings 等自定义 GUI 仍会显示真实玩家物品，同时提取、放入和直接写入仍会被拦截。
 - AE2 terminal `MOVE_REGION` is handled through AE2's shared menu abstractions when AE2 is present, covering space-left-click transfers without adapting each terminal screen separately.
 - 安装 AE2 时，AE2 终端的 `MOVE_REGION` 会通过 AE2 公共菜单抽象层处理，覆盖空格+左键转移，而不需要逐个终端界面适配。
 - Mouse Tweaks-style drag clicks are supported on all three loaders: holding the lock-operation key and dragging across player inventory slots toggles each slot reached by the simulated click flow.
