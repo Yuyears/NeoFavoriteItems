@@ -49,8 +49,12 @@ Date: 2026-04-26
   - Fabric、Forge 的 AE2 运行时行为仍需手工验证，因为 AE2 是可选运行时依赖，且具体终端行为不在 common 单元测试覆盖范围内。
 - JustDireThings compatibility note:
 - JustDireThings 兼容说明：
-  - Forge/NeoForge item-handler wrapper guards now leave read APIs transparent and protect only mutation APIs. This is compile-verified; in-game JDT screen validation is still recommended.
-  - Forge/NeoForge item-handler 包装器守卫现在保持读取 API 透明，只保护变更 API。该项已通过编译验证，仍建议进行 JDT 界面实机复测。
+  - Forge/NeoForge item-handler wrapper guards now leave read APIs transparent and protect only mutation APIs.
+  - Forge/NeoForge item-handler 包装器守卫现在保持读取 API 透明，只保护变更 API。
+  - Forge/NeoForge slot resolvers now recognize player inventory `SlotItemHandler(InvWrapper/RangedWrapper)` slots for overlay rendering and early click guards.
+  - Forge/NeoForge 槽位解析器现在会识别玩家背包 `SlotItemHandler(InvWrapper/RangedWrapper)` 槽位，以支持 Overlay 渲染和提前点击拦截。
+  - These paths are compile-verified; in-game JDT screen validation is still recommended.
+  - 这些路径已通过编译验证，仍建议进行 JDT 界面实机复测。
 - Existing persistence coverage:
 - 既有持久化覆盖点：
   - client-only storage namespace by server address

@@ -53,6 +53,8 @@
 - 槽位级守卫还覆盖 `safeInsert`、`safeTake`、`remove` 和 `set` 等标准 `Slot` API，因此使用 Minecraft 槽位语义的自定义菜单无需逐个界面适配也能受到保护。
 - Forge/NeoForge item-handler wrappers for player inventory no longer hide locked stacks from read APIs, so custom GUIs such as JustDireThings still render the actual player items while extraction, insertion, and direct writes remain guarded.
 - Forge/NeoForge 的玩家背包 item-handler 包装器不再在读取 API 中隐藏锁定物品，因此 JustDireThings 等自定义 GUI 仍会显示真实玩家物品，同时提取、放入和直接写入仍会被拦截。
+- Forge/NeoForge slot resolution also recognizes player slots exposed as `SlotItemHandler(InvWrapper/RangedWrapper)`, enabling overlays and early click guards in item-handler-backed GUIs.
+- Forge/NeoForge 的槽位解析也能识别以 `SlotItemHandler(InvWrapper/RangedWrapper)` 暴露的玩家槽位，因此基于 item handler 的 GUI 中也会渲染 Overlay 并提前拦截点击。
 - AE2 terminal `MOVE_REGION` is handled through AE2's shared menu abstractions when AE2 is present, covering space-left-click transfers without adapting each terminal screen separately.
 - 安装 AE2 时，AE2 终端的 `MOVE_REGION` 会通过 AE2 公共菜单抽象层处理，覆盖空格+左键转移，而不需要逐个终端界面适配。
 - Mouse Tweaks-style drag clicks are supported on all three loaders: holding the lock-operation key and dragging across player inventory slots toggles each slot reached by the simulated click flow.

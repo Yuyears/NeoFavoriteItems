@@ -21,6 +21,8 @@ import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 public final class ServerFavoriteService {
     private static final Map<UUID, Long> revisionsByPlayer = new ConcurrentHashMap<>();
@@ -88,12 +90,12 @@ public final class ServerFavoriteService {
         }
 
         Slot slot = menu.slots.get(slotId);
-        if (!(slot.container instanceof Inventory) || slot.container != player.getInventory()) {
+        int inventoryIndex = resolvePlayerInventoryIndex(slot, player);
+        if (inventoryIndex < 0) {
             return false;
         }
 
         FavoritesManager.getInstance().setPlayer(player.getUUID());
-        int inventoryIndex = slot.getContainerSlot();
         if (clickType == ClickType.SWAP && shouldCancelSwap(player, inventoryIndex, button, slot.hasItem())) {
             DebugLogger.debug(
                 "Server canceled menu swap: player={} inventoryIndex={} slotId={} button={}",
@@ -147,7 +149,7 @@ public final class ServerFavoriteService {
         }
 
         FavoritesManager.getInstance().setPlayer(player.getUUID());
-        int inventoryIndex = slot.getContainerSlot();
+        int inventoryIndex = resolvePlayerInventoryIndex(slot, player);
         var decision = InteractionGuardService.getInstance().evaluate(
             inventoryIndex,
             InteractionType.CLICK,
@@ -172,7 +174,7 @@ public final class ServerFavoriteService {
         }
 
         FavoritesManager.getInstance().setPlayer(player.getUUID());
-        int inventoryIndex = slot.getContainerSlot();
+        int inventoryIndex = resolvePlayerInventoryIndex(slot, player);
         var decision = InteractionGuardService.getInstance().evaluateIncomingItem(
             inventoryIndex,
             InteractionType.CLICK,
@@ -303,8 +305,7 @@ public final class ServerFavoriteService {
         return player != null
             && !player.level().isClientSide()
             && slot != null
-            && slot.container instanceof Inventory
-            && slot.container == player.getInventory();
+            && resolvePlayerInventoryIndex(slot, player) >= 0;
     }
 
     private static boolean isServerPlayerInventoryIndex(Inventory inventory, int inventoryIndex) {
@@ -312,6 +313,68 @@ public final class ServerFavoriteService {
             && inventory.player != null
             && !inventory.player.level().isClientSide()
             && SlotMappingService.isPlayerInventoryIndex(inventoryIndex);
+    }
+
+    private static int resolvePlayerInventoryIndex(Slot slot, Player player) {
+        if (slot == null || player == null || player.level().isClientSide()) {
+            return -1;
+        }
+        Inventory inventory = player.getInventory();
+        if (slot.container instanceof Inventory && slot.container == inventory) {
+            return slot.getContainerSlot();
+        }
+
+        Object handler = invokeNoArg(slot, "getItemHandler");
+        if (handler != null) {
+            return resolveItemHandlerInventoryIndex(handler, slot.getContainerSlot(), inventory);
+        }
+        return -1;
+    }
+
+    private static int resolveItemHandlerInventoryIndex(Object handler, int slot, Inventory inventory) {
+        String className = handler.getClass().getName();
+        if (className.endsWith(".items.wrapper.InvWrapper")) {
+            Object container = invokeNoArg(handler, "getInv");
+            return container == inventory ? slot : -1;
+        }
+        if (className.endsWith(".items.wrapper.RangedWrapper")) {
+            Object compose = readField(handler, "compose");
+            Integer minSlot = readIntField(handler, "minSlot");
+            if (compose != null && minSlot != null) {
+                return resolveItemHandlerInventoryIndex(compose, minSlot + slot, inventory);
+            }
+        }
+        return -1;
+    }
+
+    private static Object invokeNoArg(Object target, String methodName) {
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            return method.invoke(target);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private static Object readField(Object target, String name) {
+        Class<?> type = target.getClass();
+        while (type != null) {
+            try {
+                Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                return field.get(target);
+            } catch (NoSuchFieldException ignored) {
+                type = type.getSuperclass();
+            } catch (IllegalAccessException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Integer readIntField(Object target, String name) {
+        Object value = readField(target, name);
+        return value instanceof Integer integer ? integer : null;
     }
 
     private static boolean isBypassKeyHeld(Player player) {

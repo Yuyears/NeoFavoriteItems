@@ -13,6 +13,7 @@ import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeFavoriteNetworking;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import mycraft.yuyears.neofavoriteitems.neoforge.NeoFavoriteItemsNeoForge;
+import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeSlotResolver;
 import mycraft.yuyears.neofavoriteitems.render.OverlayRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -25,7 +26,6 @@ import net.neoforged.neoforge.client.event.ScreenEvent;
 import org.lwjgl.glfw.GLFW;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -274,40 +274,11 @@ public class NeoForgeOverlayRenderer extends OverlayRenderer {
     }
 
     private boolean isPlayerInventorySlot(Slot slot) {
-        var player = Minecraft.getInstance().player;
-        Slot resolvedSlot = unwrapSlot(slot);
-        return player != null && resolvedSlot != null && resolvedSlot.container == player.getInventory();
+        return NeoForgeSlotResolver.isPlayerInventorySlot(slot);
     }
 
     private boolean hasItem(Slot slot) {
-        Slot resolvedSlot = unwrapSlot(slot);
-        return resolvedSlot != null && resolvedSlot.hasItem();
-    }
-
-    private Slot unwrapSlot(Slot slot) {
-        if (slot == null) {
-            return null;
-        }
-
-        Class<?> type = slot.getClass();
-        while (type != null && type != Slot.class) {
-            for (Field field : type.getDeclaredFields()) {
-                if (!Slot.class.isAssignableFrom(field.getType())) {
-                    continue;
-                }
-
-                try {
-                    field.setAccessible(true);
-                    Slot wrappedSlot = (Slot) field.get(slot);
-                    if (wrappedSlot != null && wrappedSlot != slot) {
-                        return wrappedSlot;
-                    }
-                } catch (IllegalAccessException ignored) {
-                }
-            }
-            type = type.getSuperclass();
-        }
-        return slot;
+        return NeoForgeSlotResolver.hasItem(slot);
     }
 
     private void applyOverlayTint(int color, float opacity, float multiplier) {
@@ -324,23 +295,7 @@ public class NeoForgeOverlayRenderer extends OverlayRenderer {
     }
 
     private int getContainerSlotIndex(Slot slot) {
-        slot = unwrapSlot(slot);
-        if (slot == null) {
-            return -1;
-        }
-
-        Integer methodResult = invokeIntMethod(slot, "getContainerSlot");
-        if (methodResult != null) {
-            return methodResult;
-        }
-
-        Integer fieldResult = readIntField(slot, "slot");
-        if (fieldResult != null) {
-            return fieldResult;
-        }
-
-        fieldResult = readIntField(slot, "index");
-        return fieldResult == null ? -1 : fieldResult;
+        return NeoForgeSlotResolver.getPlayerInventoryIndex(slot);
     }
 
     private int getScreenLeft(AbstractContainerScreen<?> screen) {
@@ -351,15 +306,6 @@ public class NeoForgeOverlayRenderer extends OverlayRenderer {
     private int getScreenTop(AbstractContainerScreen<?> screen) {
         Integer value = readIntField(screen, "topPos");
         return value == null ? 0 : value;
-    }
-
-    private Integer invokeIntMethod(Object target, String name) {
-        try {
-            Method method = target.getClass().getMethod(name);
-            return (Integer) method.invoke(target);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
     }
 
     private Integer readIntField(Object target, String name) {

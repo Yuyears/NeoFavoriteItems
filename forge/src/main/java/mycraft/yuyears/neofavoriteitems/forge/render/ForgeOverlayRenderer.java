@@ -11,6 +11,7 @@ import mycraft.yuyears.neofavoriteitems.application.InteractionGuardService;
 import mycraft.yuyears.neofavoriteitems.domain.InteractionType;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.forge.ForgeFavoriteNetworking;
+import mycraft.yuyears.neofavoriteitems.forge.ForgeSlotResolver;
 import mycraft.yuyears.neofavoriteitems.forge.NeoFavoriteItemsForge;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import mycraft.yuyears.neofavoriteitems.render.OverlayRenderer;
@@ -26,7 +27,6 @@ import org.lwjgl.glfw.GLFW;
 
 import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
 
-import java.lang.reflect.Field;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -275,40 +275,11 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
     }
 
     private boolean isPlayerInventorySlot(Slot slot) {
-        var player = Minecraft.getInstance().player;
-        Slot resolvedSlot = unwrapSlot(slot);
-        return player != null && resolvedSlot != null && resolvedSlot.container == player.getInventory();
+        return ForgeSlotResolver.isPlayerInventorySlot(slot);
     }
 
     private boolean hasItem(Slot slot) {
-        Slot resolvedSlot = unwrapSlot(slot);
-        return resolvedSlot != null && resolvedSlot.hasItem();
-    }
-
-    private Slot unwrapSlot(Slot slot) {
-        if (slot == null) {
-            return null;
-        }
-
-        Class<?> type = slot.getClass();
-        while (type != null && type != Slot.class) {
-            for (Field field : type.getDeclaredFields()) {
-                if (!Slot.class.isAssignableFrom(field.getType())) {
-                    continue;
-                }
-
-                try {
-                    field.setAccessible(true);
-                    Slot wrappedSlot = (Slot) field.get(slot);
-                    if (wrappedSlot != null && wrappedSlot != slot) {
-                        return wrappedSlot;
-                    }
-                } catch (IllegalAccessException ignored) {
-                }
-            }
-            type = type.getSuperclass();
-        }
-        return slot;
+        return ForgeSlotResolver.hasItem(slot);
     }
 
     private void applyOverlayTint(int color, float opacity, float multiplier) {
@@ -325,23 +296,7 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
     }
 
     private int getContainerSlotIndex(Slot slot) {
-        slot = unwrapSlot(slot);
-        if (slot == null) {
-            return -1;
-        }
-
-        Integer methodResult = ReflectionHelper.invokeIntMethod(slot, "getContainerSlot");
-        if (methodResult != null) {
-            return methodResult;
-        }
-
-        Integer fieldResult = ReflectionHelper.readIntField(slot, "slot");
-        if (fieldResult != null) {
-            return fieldResult;
-        }
-
-        fieldResult = ReflectionHelper.readIntField(slot, "index");
-        return fieldResult == null ? -1 : fieldResult;
+        return ForgeSlotResolver.getPlayerInventoryIndex(slot);
     }
 
     private int getScreenLeft(AbstractContainerScreen<?> screen) {

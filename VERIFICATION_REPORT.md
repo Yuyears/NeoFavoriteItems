@@ -57,6 +57,8 @@ Date: 2026-04-26
 38. Gradle 构建结果复制任务现在使用惰性任务路径依赖，不再破坏 configure-on-demand 下聚焦执行的 common 模块测试。
 39. Forge/NeoForge `InvWrapper` and `RangedWrapper` guards no longer hide locked player inventory stacks from read APIs, fixing custom GUIs such as JustDireThings that rendered locked slots as empty.
 40. Forge/NeoForge 的 `InvWrapper` 与 `RangedWrapper` 守卫不再通过读取 API 隐藏锁定玩家背包物品，修复 JustDireThings 等自定义 GUI 中锁定槽显示为空的问题。
+41. Forge/NeoForge slot resolvers now recognize `SlotItemHandler` instances backed by player-inventory `InvWrapper` or `RangedWrapper`, so overlays and early click guards apply in JustDireThings-style GUIs.
+42. Forge/NeoForge 槽位解析器现在能识别由玩家背包 `InvWrapper` 或 `RangedWrapper` 支撑的 `SlotItemHandler`，因此 JustDireThings 风格 GUI 中也会渲染 Overlay 并提前拦截点击。
 
 ## Integration Validation Summary
 
@@ -108,6 +110,8 @@ Date: 2026-04-26
   - Forge/NeoForge 的 `InvWrapper` 与 `RangedWrapper` 会暴露真实物品和槽位上限读取，同时仍通过 `isItemValid`、`extractItem`、`insertItem` 与 `setStackInSlot` 执行锁定规则。
   - JustDireThings screens that add player slots through `InvWrapper(playerInventory)` should display locked slots normally instead of as empty.
   - JustDireThings 中通过 `InvWrapper(playerInventory)` 添加玩家槽位的界面应正常显示锁定槽，而不是显示为空。
+  - Overlay rendering, client-side lock toggling, client-side guarded click cancellation, and server-side menu click cancellation should all resolve those item-handler player slots to the same logical player inventory indices.
+  - Overlay 渲染、客户端锁定切换、客户端点击预拦截和服务端菜单点击拦截都应把这些 item-handler 玩家槽解析到同一套逻辑玩家背包索引。
 - AE2 terminal expectation:
 - AE2 终端预期：
   - Space-left-click region moves from locked player inventory slots are canceled at the AE2 shared quick-move entrypoint.
