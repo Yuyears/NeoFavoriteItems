@@ -32,6 +32,8 @@ gradle/
 build/
 **/run/
 **/build/
+logs/
+**/logs/
 
 # IDEs
 .idea/
