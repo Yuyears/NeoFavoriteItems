@@ -27,6 +27,7 @@ import java.lang.reflect.Method;
 public final class ServerFavoriteService {
     private static final Map<UUID, Long> revisionsByPlayer = new ConcurrentHashMap<>();
     private static final Map<UUID, Boolean> bypassStateByPlayer = new ConcurrentHashMap<>();
+    private static final ThreadLocal<Set<UUID>> inventoryGuardBypassPlayers = ThreadLocal.withInitial(java.util.HashSet::new);
 
     private ServerFavoriteService() {}
 
@@ -41,13 +42,13 @@ public final class ServerFavoriteService {
         FavoritesManager favoritesManager = FavoritesManager.getInstance();
         boolean isFavorite = favoritesManager.isSlotFavorite(logicalSlot.get());
         boolean hasItem = !player.getInventory().getItem(inventoryIndex).isEmpty();
-        if (!isFavorite && !hasItem && !ConfigManager.getInstance().getConfig().general.lockEmptySlots) {
+        if (!FavoriteLockRules.canToggleFavorite(isFavorite, hasItem, ConfigManager.getInstance().getConfig())) {
             DebugLogger.debug("Server rejected toggle: player={} inventoryIndex={} reason=empty_slot", player.getName().getString(), inventoryIndex);
             return ToggleResult.rejected();
         }
 
         favoritesManager.toggleSlotFavorite(logicalSlot.get());
-        DataPersistenceManager.getInstance().saveData(player.getUUID());
+        DataPersistenceManager.getInstance().cacheData(player.getUUID());
         boolean nowFavorite = favoritesManager.isSlotFavorite(logicalSlot.get());
         long revision = nextRevision(player);
         DebugLogger.debug(
@@ -82,6 +83,25 @@ public final class ServerFavoriteService {
     public static void clearPlayerState(Player player) {
         revisionsByPlayer.remove(player.getUUID());
         bypassStateByPlayer.remove(player.getUUID());
+    }
+
+    public static void runWithInventoryGuardsBypassed(Player player, Runnable action) {
+        if (player == null || action == null) {
+            return;
+        }
+
+        Set<UUID> bypassedPlayers = inventoryGuardBypassPlayers.get();
+        boolean added = bypassedPlayers.add(player.getUUID());
+        try {
+            action.run();
+        } finally {
+            if (added) {
+                bypassedPlayers.remove(player.getUUID());
+            }
+            if (bypassedPlayers.isEmpty()) {
+                inventoryGuardBypassPlayers.remove();
+            }
+        }
     }
 
     public static boolean shouldCancelMenuClick(AbstractContainerMenu menu, Player player, int slotId, int button, ClickType clickType) {
@@ -199,6 +219,9 @@ public final class ServerFavoriteService {
         }
 
         Player player = inventory.player;
+        if (isInventoryGuardBypassed(player)) {
+            return false;
+        }
         FavoritesManager.getInstance().setPlayer(player.getUUID());
         var decision = InteractionGuardService.getInstance().evaluate(
             inventoryIndex,
@@ -223,12 +246,16 @@ public final class ServerFavoriteService {
             return false;
         }
 
+        Player player = inventory.player;
+        if (isInventoryGuardBypassed(player)) {
+            return false;
+        }
+
         ItemStack currentStack = inventory.getItem(inventoryIndex);
         if (ItemStack.matches(currentStack, newStack) && currentStack.getCount() == newStack.getCount()) {
             return false;
         }
 
-        Player player = inventory.player;
         FavoritesManager.getInstance().setPlayer(player.getUUID());
         var decision = newStack.isEmpty()
             ? InteractionGuardService.getInstance().evaluate(
@@ -280,6 +307,9 @@ public final class ServerFavoriteService {
         }
 
         Player player = inventory.player;
+        if (isInventoryGuardBypassed(player)) {
+            return false;
+        }
         FavoritesManager.getInstance().setPlayer(player.getUUID());
         ItemStack currentStack = inventory.getItem(inventoryIndex);
         var decision = InteractionGuardService.getInstance().evaluate(
@@ -379,6 +409,10 @@ public final class ServerFavoriteService {
 
     private static boolean isBypassKeyHeld(Player player) {
         return bypassStateByPlayer.getOrDefault(player.getUUID(), false);
+    }
+
+    private static boolean isInventoryGuardBypassed(Player player) {
+        return player != null && inventoryGuardBypassPlayers.get().contains(player.getUUID());
     }
 
     private static InteractionDecision evaluateExistingItem(Player player, int inventoryIndex, InteractionType type, boolean hasItem) {

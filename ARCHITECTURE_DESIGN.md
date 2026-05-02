@@ -2,9 +2,9 @@
 
 # Neo Favorite Items 架构说明
 
-Last updated: 2026-04-26
+Last updated: 2026-05-03
 
-最后更新：2026-04-26
+最后更新：2026-05-03
 
 This document records the current project structure and implementation boundaries. It describes the repository as it exists now, not an older migration draft.
 
@@ -127,8 +127,17 @@ Location: `common/.../persistence`
 
 - `DataPersistenceManager`: saves and loads favorite data by player UUID.
 - `DataPersistenceManager`：按玩家 UUID 保存和加载收藏数据。
-- It supports client-local storage namespaces keyed by server address, world-save storage for integrated/dedicated servers, legacy client-path fallback, and cached full-save/full-load server flows.
-- 支持按服务器地址分命名空间的客户端本地存储、单人/专用服务端世界存档目录、旧客户端路径兼容回退，以及带缓存的服务端完整读写流程。
+- It supports client-local storage namespaces keyed by server address, world-save storage for integrated/dedicated servers, legacy client-path fallback, migration from the old game-directory server root, per-player login reads, cache-only in-play updates, and full-cache server-stop flushes.
+- 支持按服务器地址分命名空间的客户端本地存储、单人/专用服务端世界存档目录、旧客户端路径兼容回退、从旧游戏根目录服务端路径迁移、玩家登录按 UUID 读取、游戏过程仅更新缓存，以及关服完整缓存回写。
+
+### Config
+
+### 配置层
+
+- `ConfigManager` loads the current config into `NeoFavoriteItemsConfig`, records malformed lines, unknown entries, and invalid values, then rewrites the file when repair is needed.
+- `ConfigManager` 会把当前配置读取到 `NeoFavoriteItemsConfig`，记录格式错误行、未知配置项和非法值，并在需要修复时重写配置文件。
+- Readable values are preserved during repair; unreadable or missing entries are regenerated from defaults.
+- 修复配置时会保留能读取的值；无法读取或缺失的配置项按默认值重新生成。
 
 ### Render
 
@@ -204,12 +213,14 @@ Location: `common/.../render`
 4. 平台槽位解析把目标转换为 `LogicalSlotIndex`。
 5. If server support is available, the client sends a Toggle request.
 6. 有服务端支持时发送 Toggle 请求。
-7. `ServerFavoriteService` validates empty-slot rules, updates favorite state, saves data, and creates a revision.
-8. `ServerFavoriteService` 校验空槽配置、更新收藏状态、保存数据并生成修订号。
+7. `ServerFavoriteService` validates empty-slot rules through `FavoriteLockRules`, updates favorite state, caches data, and creates a revision.
+8. `ServerFavoriteService` 通过 `FavoriteLockRules` 校验空槽配置、更新收藏状态、缓存数据并生成修订号。
 9. The server sends a full or incremental sync.
 10. 服务端发送全量或增量同步。
 11. The client applies the sync through `ClientFavoriteSyncService` and refreshes local presentation.
 12. 客户端通过 `ClientFavoriteSyncService` 应用同步结果并刷新本地展示。
+13. Empty slots can only keep favorite locks when `lockEmptySlots=true` and `autoUnlockEmptySlots=false`; if automatic empty unlock is enabled, newly empty slots are cleared and new empty-slot locks are rejected.
+14. 只有 `lockEmptySlots=true` 且 `autoUnlockEmptySlots=false` 时，空槽才会保留收藏锁定；启用空槽自动解锁后，新变空的槽位会清除收藏，新的空槽锁定也会被拒绝。
 
 ### Interaction Guard
 
@@ -257,18 +268,33 @@ Location: `common/.../render`
 
 ### 持久化生命周期
 
-1. Server/world start initializes the persistence context and preloads cached player data from the active storage root.
-2. 服务端/世界启动时会初始化持久化上下文，并从当前存储根目录预载玩家数据缓存。
-3. Player login performs a partial load for only that player's UUID.
-4. 玩家进入世界时，只对该玩家 UUID 执行部分读取。
-5. Player logout performs an incremental save for only that player's current state.
-6. 玩家退出世界时，只对该玩家当前状态执行增量保存。
-7. Server/world stop flushes online-player state and then writes the full cache back to disk.
-8. 服务端/世界关闭时，会先收集在线玩家状态，再把完整缓存回写到磁盘。
-9. Client-only multiplayer uses `favoriteitems/<sanitized-server-address>/players/<uuid>.dat`; if the server list entry is not available yet, the client falls back to the active connection remote address before using the default namespace.
-10. 仅客户端联机模式使用 `favoriteitems/<净化后的服务器地址>/players/<uuid>.dat`；如果服务器列表条目暂不可用，客户端会先回退到当前连接远端地址，最后才使用默认命名空间。
-11. Dual-install singleplayer and dedicated-server modes use `<world>/data/neo_favorite_items/players/<uuid>.dat`.
-12. 双端安装下的单人与多人服务端模式统一使用 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`。
+1. Server/world start initializes the persistence context without preloading every player file.
+2. 服务端/世界启动时只初始化持久化上下文，不全量预载所有玩家文件。
+3. Player login loads only that player's UUID into the server cache and then sends a full sync.
+4. 玩家进入世界时，只读取该玩家 UUID 的数据到服务端缓存，然后发送全量同步。
+5. Favorite changes during play update the server cache without immediately writing the player file.
+6. 游戏过程中的收藏变更只更新服务端缓存，不立即写玩家文件。
+7. Player logout performs an incremental save for that player's current state while keeping the cache entry available.
+8. 玩家退出世界时，对该玩家当前状态执行增量保存，同时保留缓存项。
+9. Server/world stop flushes online-player state and then writes the full cache back to disk.
+10. 服务端/世界关闭时，会先收集在线玩家状态，再把完整缓存回写到磁盘。
+11. Client-only multiplayer uses `favoriteitems/<sanitized-server-address>/players/<uuid>.dat`; if the server list entry is not available yet, the client falls back to the active connection remote address before using the default namespace.
+12. 仅客户端联机模式使用 `favoriteitems/<净化后的服务器地址>/players/<uuid>.dat`；如果服务器列表条目暂不可用，客户端会先回退到当前连接远端地址，最后才使用默认命名空间。
+13. Dual-install singleplayer and dedicated-server modes use `<world>/data/neo_favorite_items/players/<uuid>.dat`.
+14. 双端安装下的单人与多人服务端模式统一使用 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`。
+15. If a previous build wrote server-authoritative data under `<game>/data/neo_favorite_items/players/<uuid>.dat`, the first successful per-player load migrates it to the active world directory and deletes the old file.
+16. 如果旧版本曾把服务端权威数据写入 `<游戏目录>/data/neo_favorite_items/players/<uuid>.dat`，首次成功按玩家读取时会迁移到当前世界目录并删除旧文件。
+
+### Death And Respawn
+
+### 死亡与重生
+
+1. Loader player-clone/copy events route death lifecycle handling into `PlatformFavoriteSupport`.
+2. 三个平台的玩家 clone/copy 事件会把死亡生命周期处理路由到 `PlatformFavoriteSupport`。
+3. When `keepInventory=true`, the new player inventory is restored from the old player inventory under a scoped server inventory-guard bypass. This prevents lock guards from treating vanilla respawn restoration as a user item move.
+4. `keepInventory=true` 时，新玩家背包会在有作用域的服务端背包守卫绕过上下文中从旧玩家背包恢复，避免锁槽守卫把原版重生恢复误判为玩家物品移动。
+5. When `keepInventory=false`, favorite state is cleared and saved for that player, because the locked items have left the player inventory through death drops.
+6. `keepInventory=false` 时，该玩家收藏状态会被清空并保存，因为锁定物品已经通过死亡掉落离开玩家背包。
 
 ### Hotbar Drop Guard
 

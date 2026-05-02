@@ -3,6 +3,7 @@ package mycraft.yuyears.neofavoriteitems.neoforge;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.FavoritesManager;
+import mycraft.yuyears.neofavoriteitems.application.FavoriteLockRules;
 import mycraft.yuyears.neofavoriteitems.application.InteractionGuardService;
 import mycraft.yuyears.neofavoriteitems.domain.InteractionType;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
@@ -29,7 +30,8 @@ public final class NeoForgeSlotInteractionHandler {
             );
             return true;
         }
-        if (!hasItem && !ConfigManager.getInstance().getConfig().general.lockEmptySlots) {
+        boolean isFavorite = FavoritesManager.getInstance().isSlotFavorite(logicalSlot.get());
+        if (!FavoriteLockRules.canToggleFavorite(isFavorite, hasItem, ConfigManager.getInstance().getConfig())) {
             DebugLogger.debug(
                 "NeoForge slot toggle ignored: inventoryIndex={} hasItem=false reason=empty_slot_disabled",
                 inventoryIndex

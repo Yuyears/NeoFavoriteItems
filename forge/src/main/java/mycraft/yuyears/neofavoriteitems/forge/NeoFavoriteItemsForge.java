@@ -13,6 +13,7 @@ import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraftforge.client.event.AddGuiOverlayLayersEvent;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.client.gui.overlay.ForgeLayeredDraw;
@@ -108,7 +109,10 @@ public class NeoFavoriteItemsForge {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-        PlatformFavoriteSupport.initializeServer(event.getServer().getServerDirectory());
+        PlatformFavoriteSupport.initializeServer(
+            event.getServer().getServerDirectory(),
+            event.getServer().getWorldPath(LevelResource.ROOT)
+        );
         NeoFavoriteItemsMod.getInstance().onServerInitialize();
     }
 
@@ -125,6 +129,16 @@ public class NeoFavoriteItemsForge {
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         PlatformFavoriteSupport.onPlayerLoggedOut(event.getEntity());
+    }
+
+    @SubscribeEvent
+    public void onPlayerClone(PlayerEvent.Clone event) {
+        PlatformFavoriteSupport.onPlayerCloned(
+            event.getOriginal(),
+            event.getEntity(),
+            event.isWasDeath(),
+            ForgeFavoriteNetworking::sendFullSync
+        );
     }
 
     @SubscribeEvent

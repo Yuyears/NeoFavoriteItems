@@ -7,6 +7,7 @@ import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -32,8 +33,12 @@ public final class PlatformFavoriteSupport {
     }
 
     public static void initializeServer(Path serverDirectory) {
-        DataPersistenceManager.getInstance().initialize(serverDirectory, serverDirectory, true);
-        DataPersistenceManager.getInstance().loadAllData();
+        initializeServer(serverDirectory, serverDirectory);
+    }
+
+    public static void initializeServer(Path gameDirectory, Path worldDirectory) {
+        DebugLogger.debug("Platform server persistence init: gameDirectory={} worldDirectory={}", gameDirectory, worldDirectory);
+        DataPersistenceManager.getInstance().initialize(gameDirectory, worldDirectory, true);
     }
 
     public static void onServerStopping(Iterable<? extends Player> players) {
@@ -49,11 +54,18 @@ public final class PlatformFavoriteSupport {
             return;
         }
 
+        DebugLogger.debug("Platform player login: name={} uuid={}", player.getName().getString(), player.getUUID());
         FavoritesManager.getStateService().setPlayer(player.getUUID());
         DataPersistenceManager.getInstance().loadData(player.getUUID());
 
         if (player instanceof ServerPlayer serverPlayer) {
             ServerFavoriteService.resetRevision(serverPlayer);
+            DebugLogger.debug(
+                "Platform player login full sync: name={} uuid={} slots={}",
+                player.getName().getString(),
+                player.getUUID(),
+                FavoritesManager.getStateService().getFavoriteSlots()
+            );
             fullSyncSender.accept(serverPlayer);
         }
     }
@@ -64,13 +76,46 @@ public final class PlatformFavoriteSupport {
         }
 
         FavoritesManager.getStateService().setPlayer(player.getUUID());
+        DebugLogger.debug(
+            "Platform player logout save: name={} uuid={} slots={}",
+            player.getName().getString(),
+            player.getUUID(),
+            FavoritesManager.getStateService().getFavoriteSlots()
+        );
         DataPersistenceManager.getInstance().saveData(player.getUUID());
         ServerFavoriteService.clearPlayerState(player);
         FavoritesManager.getStateService().removePlayer(player.getUUID());
         FavoritesManager.getStateService().clearPlayer();
     }
 
+    public static void onPlayerCloned(Player originalPlayer, Player newPlayer, boolean wasDeath, Consumer<ServerPlayer> fullSyncSender) {
+        if (!wasDeath || newPlayer == null || newPlayer.level().isClientSide()) {
+            return;
+        }
+
+        UUID playerUUID = newPlayer.getUUID();
+        FavoritesManager.getStateService().setPlayer(playerUUID);
+        boolean keepInventory = newPlayer.level().getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY);
+        if (keepInventory && originalPlayer != null) {
+            ServerFavoriteService.runWithInventoryGuardsBypassed(newPlayer, () ->
+                newPlayer.getInventory().replaceWith(originalPlayer.getInventory())
+            );
+            DataPersistenceManager.getInstance().cacheData(playerUUID);
+        } else {
+            FavoritesManager.getStateService().clearFavorites();
+            DataPersistenceManager.getInstance().cacheData(playerUUID);
+        }
+
+        if (newPlayer instanceof ServerPlayer serverPlayer) {
+            ServerFavoriteService.resetRevision(serverPlayer);
+            if (fullSyncSender != null) {
+                fullSyncSender.accept(serverPlayer);
+            }
+        }
+    }
+
     public static void synchronizeClientPersistence(Minecraft minecraft, boolean serverAuthoritative) {
+        boolean effectiveServerAuthoritative = isServerAuthoritative(serverAuthoritative, minecraft.getSingleplayerServer() != null);
         ClientStorageTarget storageTarget = resolveClientStorageTarget(minecraft);
         boolean storageChanged = !Objects.equals(activeClientWorldDirectory, storageTarget.worldDirectory())
             || !Objects.equals(activeClientStorageNamespace, storageTarget.namespace());
@@ -78,25 +123,37 @@ public final class PlatformFavoriteSupport {
         if (minecraft.player != null && minecraft.level != null) {
             UUID playerUUID = minecraft.player.getUUID();
             boolean worldChanged = !clientWorldActive || !playerUUID.equals(activeClientPlayerId);
-            boolean authorityChanged = clientServerAuthoritative != serverAuthoritative;
+            boolean authorityChanged = clientServerAuthoritative != effectiveServerAuthoritative;
 
             if (worldChanged || authorityChanged || storageChanged) {
+                DebugLogger.debug(
+                    "Client persistence context change: uuid={} serverChannel={} singleplayerServer={} effectiveServerAuthoritative={} storageWorld={} storageNamespace={} worldChanged={} authorityChanged={} storageChanged={}",
+                    playerUUID,
+                    serverAuthoritative,
+                    minecraft.getSingleplayerServer() != null,
+                    effectiveServerAuthoritative,
+                    storageTarget.worldDirectory(),
+                    storageTarget.namespace(),
+                    worldChanged,
+                    authorityChanged,
+                    storageChanged
+                );
                 if (clientWorldActive && activeClientPlayerId != null && !clientServerAuthoritative) {
                     DataPersistenceManager.getInstance().saveData(activeClientPlayerId);
                 }
 
-                applyClientStorageTarget(storageTarget);
-                ClientFavoriteSyncService.resetSession();
                 FavoritesManager.getStateService().setPlayer(playerUUID);
-                FavoritesManager.getStateService().clearFavorites();
 
-                if (!serverAuthoritative) {
+                if (usesClientLocalPersistence(effectiveServerAuthoritative)) {
+                    ClientFavoriteSyncService.resetSession();
+                    FavoritesManager.getStateService().clearFavorites();
+                    applyClientStorageTarget(storageTarget);
                     DataPersistenceManager.getInstance().loadData(playerUUID);
                 }
 
                 activeClientPlayerId = playerUUID;
                 clientWorldActive = true;
-                clientServerAuthoritative = serverAuthoritative;
+                clientServerAuthoritative = effectiveServerAuthoritative;
                 activeClientWorldDirectory = storageTarget.worldDirectory();
                 activeClientStorageNamespace = storageTarget.namespace();
             }
@@ -114,7 +171,9 @@ public final class PlatformFavoriteSupport {
 
         FavoritesManager.getStateService().clearPlayer();
         ClientFavoriteSyncService.resetSession();
-        applyClientStorageTarget(storageTarget);
+        if (usesClientLocalPersistence(clientServerAuthoritative)) {
+            applyClientStorageTarget(storageTarget);
+        }
         activeClientPlayerId = null;
         clientWorldActive = false;
         clientServerAuthoritative = false;
@@ -170,6 +229,14 @@ public final class PlatformFavoriteSupport {
         }
 
         return NeoFavoriteItemsConstants.DEFAULT_SERVER_DIRECTORY;
+    }
+
+    static boolean usesClientLocalPersistence(boolean serverAuthoritative) {
+        return !serverAuthoritative;
+    }
+
+    static boolean isServerAuthoritative(boolean serverChannelPresent, boolean singleplayerServerPresent) {
+        return serverChannelPresent || singleplayerServerPresent;
     }
 
     private static void applyClientStorageTarget(ClientStorageTarget storageTarget) {

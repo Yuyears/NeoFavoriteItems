@@ -11,6 +11,7 @@ import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
 import mycraft.yuyears.neofavoriteitems.neoforge.render.NeoForgeOverlayRenderer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -72,7 +73,10 @@ public class NeoFavoriteItemsNeoForge {
     public static class ServerEventHandler {
         @SubscribeEvent
         public void onServerStarting(ServerStartingEvent event) {
-            PlatformFavoriteSupport.initializeServer(event.getServer().getServerDirectory());
+            PlatformFavoriteSupport.initializeServer(
+                event.getServer().getServerDirectory(),
+                event.getServer().getWorldPath(LevelResource.ROOT)
+            );
             NeoFavoriteItemsMod.getInstance().onServerInitialize();
         }
 
@@ -89,6 +93,16 @@ public class NeoFavoriteItemsNeoForge {
         @SubscribeEvent
         public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
             PlatformFavoriteSupport.onPlayerLoggedOut(event.getEntity());
+        }
+
+        @SubscribeEvent
+        public void onPlayerClone(PlayerEvent.Clone event) {
+            PlatformFavoriteSupport.onPlayerCloned(
+                event.getOriginal(),
+                event.getEntity(),
+                event.isWasDeath(),
+                NeoForgeFavoriteNetworking::sendFullSync
+            );
         }
     }
 

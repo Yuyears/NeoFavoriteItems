@@ -7,7 +7,9 @@ import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import mycraft.yuyears.neofavoriteitems.PlatformFavoriteSupport;
+import net.minecraft.world.level.storage.LevelResource;
 
 public class NeoFavoriteItemsFabric implements ModInitializer {
 
@@ -21,7 +23,10 @@ public class NeoFavoriteItemsFabric implements ModInitializer {
 
     private void onInitializeServer() {
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
-            PlatformFavoriteSupport.initializeServer(server.getServerDirectory());
+            PlatformFavoriteSupport.initializeServer(
+                server.getServerDirectory(),
+                server.getWorldPath(LevelResource.ROOT)
+            );
             NeoFavoriteItemsMod.getInstance().onServerInitialize();
         });
         ServerLifecycleEvents.SERVER_STOPPING.register(server ->
@@ -39,6 +44,10 @@ public class NeoFavoriteItemsFabric implements ModInitializer {
             var player = handler.getPlayer();
             PlatformFavoriteSupport.onPlayerLoggedOut(player);
         });
+
+        ServerPlayerEvents.COPY_FROM.register((oldPlayer, newPlayer, alive) ->
+            PlatformFavoriteSupport.onPlayerCloned(oldPlayer, newPlayer, !alive, FabricFavoriteNetworking::sendFullSync)
+        );
     }
 
 }

@@ -86,4 +86,15 @@ class InteractionGuardServiceTest {
             .evaluateIncomingItem(38, InteractionType.QUICK_MOVE, false, false)
             .denied());
     }
+
+    @Test
+    void autoUnlockClearsLockedEmptySlotDuringInteractionEvaluation() {
+        ConfigManager.getInstance().getConfig().general.autoUnlockEmptySlots = true;
+        FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(9), true);
+
+        assertFalse(InteractionGuardService.getInstance()
+            .evaluate(9, InteractionType.CLICK, false, false)
+            .denied());
+        assertFalse(FavoritesManager.getStateService().isSlotFavorite(LogicalSlotIndex.of(9)));
+    }
 }

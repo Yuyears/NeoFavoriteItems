@@ -15,52 +15,54 @@ public class ConfigManager {
         # =====================================
         
         [general]
-        # Whether to allow locking empty slots
-        # 是否允许锁定空槽位
-        # Parent option for keeping empty slots locked after they become empty
-        # 是否允许空槽位保持收藏状态的父级配置
-        lockEmptySlots = true
-        
         # Whether to automatically unlock slots when they become empty
         # 当槽位变为空时是否自动解锁
-        # If true, allowItemsIntoLockedEmptySlots below has no effect because locked empty slots are removed
-        # 如果为 true，下方 allowItemsIntoLockedEmptySlots 不生效，因为空槽位会自动解除收藏
-        autoUnlockEmptySlots = false
+        # Parent option of lockEmptySlots and allowItemsIntoLockedEmptySlots
+        # lockEmptySlots 与 allowItemsIntoLockedEmptySlots 的父级配置
+        # If true, empty slots cannot keep a favorite lock
+        # 如果为 true，空槽位不会保留收藏锁定
+        autoUnlockEmptySlots = %s
+        
+        # Whether to allow locking empty slots
+        # 是否允许锁定空槽位
+        # Child option of autoUnlockEmptySlots=false
+        # autoUnlockEmptySlots=false 时的子级配置
+        lockEmptySlots = %s
         
         # Whether to allow items to be placed into locked empty slots
         # 是否允许物品放入已锁定的空槽位
-        # Child option of lockEmptySlots + autoUnlockEmptySlots=false
-        # lockEmptySlots 与 autoUnlockEmptySlots=false 的子级配置
-        allowItemsIntoLockedEmptySlots = false
+        # Child option of autoUnlockEmptySlots=false + lockEmptySlots=true
+        # autoUnlockEmptySlots=false 且 lockEmptySlots=true 时的子级配置
+        allowItemsIntoLockedEmptySlots = %s
         
         [lockBehavior]
         # Prevent clicking on locked slots
         # 阻止点击已锁定槽位
-        preventClick = true
+        preventClick = %s
         
         # Prevent dropping items from locked slots
         # 阻止从已锁定槽位丢弃物品
-        preventDrop = true
+        preventDrop = %s
         
         # Prevent quick moving items from locked slots
         # 阻止从已锁定槽位快速移动物品
-        preventQuickMove = true
+        preventQuickMove = %s
         
         # Prevent shift-clicking items from locked slots
         # 阻止 Shift 点击已锁定槽位
-        preventShiftClick = true
+        preventShiftClick = %s
         
         # Prevent dragging items over locked slots
         # 阻止拖拽物品经过已锁定槽位
-        preventDrag = true
+        preventDrag = %s
         
         # Prevent swapping items with locked slots
         # 阻止与已锁定槽位交换物品
-        preventSwap = true
+        preventSwap = %s
         
         # Allow bypassing lock by holding the bypass key
         # 是否允许按住旁路键临时绕过锁定限制
-        allowBypassWithKey = true
+        allowBypassWithKey = %s
         
         [slotBehavior]
         # What happens when a favorite item is moved
@@ -69,22 +71,22 @@ public class ConfigManager {
         # FOLLOW_ITEM：锁定状态跟随物品移动
         # STAY_AT_POSITION: The favorite status stays at the slot position
         # STAY_AT_POSITION：锁定状态固定在槽位位置
-        moveBehavior = "STAY_AT_POSITION"
+        moveBehavior = "%s"
         
         [overlay]
         # Overlay style for locked slots
         # 已锁定槽位的覆盖层样式
         # Options: BORDER, CLASSIC, FRAMEWORK, HIGHLIGHT, BRACKETS, LOCK, MARK, TAG, STAR, COLOR_OVERLAY
         # 可选值：BORDER, CLASSIC, FRAMEWORK, HIGHLIGHT, BRACKETS, LOCK, MARK, TAG, STAR, COLOR_OVERLAY
-        lockedStyle = "MARK"
+        lockedStyle = "%s"
         
         # Overlay style for locked slots when holding bypass key
         # 按住旁路键时已锁定槽位的覆盖层样式
-        holdingKeyLockedStyle = "MARK"
+        holdingKeyLockedStyle = "%s"
 
         # Overlay style shown on lockable slots while holding the lock operation key
         # 按住锁定操作键时，可锁定槽位上显示的提示覆盖层样式
-        highlightStyle = "BORDER"
+        highlightStyle = "%s"
 
         # Color for locked slot overlays when not holding the lock operation key
         # Supports "rgba(red, green, blue, alpha)", "rgb(red, green, blue)", "#RRGGBB", "#RRGGBBAA" or "luv(L, u, v, alpha)"
@@ -92,11 +94,11 @@ public class ConfigManager {
         # 未按住锁定操作键时，已锁定槽位覆盖层颜色
         # 支持 "rgba(红, 绿, 蓝, 透明度)"、"rgb(红, 绿, 蓝)"、"#RRGGBB"、"#RRGGBBAA" 或 "luv(L, u, v, alpha)"
         # 透明度支持 0.0 - 1.0 或 0 - 255
-        lockedOverlayColor = "rgba(255,65,60,250)"
+        lockedOverlayColor = "%s"
 
         # Opacity for locked slot overlays when not holding the lock operation key (0.0 - 1.0)
         # 未按住锁定操作键时，已锁定槽位覆盖层透明度，范围 0.0 - 1.0
-        lockedOverlayOpacity = 0.7
+        lockedOverlayOpacity = %s
 
         # Color for lockable slot highlight overlays while holding the lock operation key
         # Supports "rgba(red, green, blue, alpha)", "rgb(red, green, blue)", "#RRGGBB", "#RRGGBBAA" or "luv(L, u, v, alpha)"
@@ -104,11 +106,11 @@ public class ConfigManager {
         # 按住锁定操作键时，可收藏槽位提示覆盖层颜色
         # 支持 "rgba(红, 绿, 蓝, 透明度)"、"rgb(红, 绿, 蓝)"、"#RRGGBB"、"#RRGGBBAA" 或 "luv(L, u, v, alpha)"
         # 透明度支持 0.0 - 1.0 或 0 - 255
-        lockableHighlightColor = "rgba(35,230,0,200)"
+        lockableHighlightColor = "%s"
 
         # Opacity for lockable slot highlight overlays while holding the lock operation key (0.0 - 1.0)
         # 按住锁定操作键时，可收藏槽位提示覆盖层透明度，范围 0.0 - 1.0
-        lockableHighlightOpacity = 0.55
+        lockableHighlightOpacity = %s
 
         # Color for unlockable slot highlight overlays while holding the lock operation key
         # Supports "rgba(red, green, blue, alpha)", "rgb(red, green, blue)", "#RRGGBB", "#RRGGBBAA" or "luv(L, u, v, alpha)"
@@ -116,57 +118,57 @@ public class ConfigManager {
         # 按住锁定操作键时，可取消收藏槽位提示覆盖层颜色
         # 支持 "rgba(红, 绿, 蓝, 透明度)"、"rgb(红, 绿, 蓝)"、"#RRGGBB"、"#RRGGBBAA" 或 "luv(L, u, v, alpha)"
         # 透明度支持 0.0 - 1.0 或 0 - 255
-        unlockableHighlightColor = "rgba(255, 195, 53, 180)"
+        unlockableHighlightColor = "%s"
 
         # Opacity for unlockable slot highlight overlays while holding the lock operation key (0.0 - 1.0)
         # 按住锁定操作键时，可取消收藏槽位提示覆盖层透明度，范围 0.0 - 1.0
-        unlockableHighlightOpacity = 0.65
+        unlockableHighlightOpacity = %s
 
         # Default opacity used by COLOR_OVERLAY pure-color style (0.0 - 1.0)
         # COLOR_OVERLAY 纯色覆盖层默认透明度，范围 0.0 - 1.0
-        colorOverlayOpacity = 0.35
+        colorOverlayOpacity = %s
 
         # Opacity multiplier for locked overlays while holding the bypass key (0.0 - 1.0)
         # 按住旁路键时，已锁定覆盖层透明度乘数，范围 0.0 - 1.0
-        bypassOverlayOpacityMultiplier = 0.35
+        bypassOverlayOpacityMultiplier = %s
 
         # Render locked overlays in front of item icons
         # 是否将已锁定槽位覆盖层渲染在物品图标前方
-        renderLockedOverlayInFront = true
+        renderLockedOverlayInFront = %s
 
         # Render lockable highlight overlays in front of item icons
         # 是否将可收藏提示覆盖层渲染在物品图标前方
-        renderLockableHighlightInFront = true
+        renderLockableHighlightInFront = %s
 
         # Render unlockable highlight overlays in front of item icons
         # 是否将可取消收藏提示覆盖层渲染在物品图标前方
-        renderUnlockableHighlightInFront = true
+        renderUnlockableHighlightInFront = %s
         
         [feedback]
         # Show visual feedback when trying to interact with locked slots
         # 尝试操作已锁定槽位时是否显示视觉反馈
-        showVisualFeedback = true
+        showVisualFeedback = %s
         
         # Play sound feedback when trying to interact with locked slots
         # 尝试操作已锁定槽位时是否播放声音反馈
-        playSoundFeedback = true
+        playSoundFeedback = %s
         
         # Sound to play for feedback
         # 声音反馈使用的音效
-        feedbackSound = "minecraft:block.note_block.hat"
+        feedbackSound = "%s"
         
         # Volume for feedback sound
         # 声音反馈音量
-        feedbackVolume = 0.5
+        feedbackVolume = %s
         
         # Pitch for feedback sound
         # 声音反馈音高
-        feedbackPitch = 1.0
+        feedbackPitch = %s
 
         [debug]
         # Enable extra diagnostic logs for key states, slot clicks, overlays and guard decisions
         # 是否启用额外诊断日志，用于排查按键状态、槽位点击、覆盖层渲染和交互拦截
-        enabled = false
+        enabled = %s
         
         """;
 
@@ -206,14 +208,17 @@ public class ConfigManager {
         if (Files.exists(configPath)) {
             try {
                 String content = Files.readString(configPath, StandardCharsets.UTF_8);
+                int issuesBeforeParse = loadIssues.size();
                 parseConfig(content);
-                appendMissingConfigEntries(content);
+                if (loadIssues.size() > issuesBeforeParse || hasMissingConfigEntries(content)) {
+                    saveConfig();
+                }
             } catch (IOException e) {
-                recordLoadIssue("Failed to read config file " + configPath + "; regenerated defaults", e);
-                saveDefaultConfig();
+                recordLoadIssue("Failed to read config file " + configPath + "; regenerated readable defaults", e);
+                saveConfig();
             }
         } else {
-            saveDefaultConfig();
+            saveConfig();
         }
 
         if (!loadIssues.isEmpty()) {
@@ -232,7 +237,14 @@ public class ConfigManager {
             }
             
             if (line.startsWith("[")) {
+                if (!line.endsWith("]")) {
+                    recordLoadIssue("Malformed config section header: " + line, new IllegalArgumentException(line));
+                    continue;
+                }
                 currentSection = line.substring(1, line.length() - 1);
+                if (!isKnownSection(currentSection)) {
+                    recordLoadIssue("Unknown config section: " + currentSection, new IllegalArgumentException(currentSection));
+                }
                 continue;
             }
             
@@ -241,75 +253,21 @@ public class ConfigManager {
                 String key = parts[0].trim();
                 String value = parts[1].trim();
                 setConfigValue(currentSection, key, value);
+            } else {
+                recordLoadIssue("Malformed config entry: " + line, new IllegalArgumentException(line));
             }
-        }
-    }
-
-    private void appendMissingConfigEntries(String content) throws IOException {
-        StringBuilder additions = new StringBuilder();
-        if (!content.contains("[debug]")) {
-            additions.append(System.lineSeparator())
-                .append("[debug]").append(System.lineSeparator())
-                .append("# Enable extra diagnostic logs for key states, slot clicks, overlays and guard decisions").append(System.lineSeparator())
-                .append("# 是否启用额外诊断日志，用于排查按键状态、槽位点击、覆盖层渲染和交互拦截").append(System.lineSeparator())
-                .append("enabled = false").append(System.lineSeparator());
-        }
-        if (content.contains("[overlay]") && !content.contains("lockedOverlayColor")) {
-            additions.append(System.lineSeparator())
-                .append("[overlay]").append(System.lineSeparator())
-                .append("# Additional overlay color controls added in 0.0.1-alpha").append(System.lineSeparator())
-                .append("# 0.0.1-alpha 新增的覆盖层颜色控制项").append(System.lineSeparator())
-                .append("# lockedOverlayColor / lockedOverlayOpacity apply to locked slots when not holding the lock operation key").append(System.lineSeparator())
-                .append("# lockedOverlayColor / lockedOverlayOpacity 用于未按住锁定操作键时的已锁定槽位").append(System.lineSeparator())
-                .append("lockedOverlayColor = \"rgba(255,65,60,250)\"").append(System.lineSeparator())
-                .append("lockedOverlayOpacity = 0.7").append(System.lineSeparator())
-                .append("# lockableHighlightColor applies to non-favorite player inventory slots with items while holding the lock operation key").append(System.lineSeparator())
-                .append("# lockableHighlightColor 用于按住锁定操作键时，带有物品且尚未收藏的玩家背包槽位").append(System.lineSeparator())
-                .append("lockableHighlightColor = \"rgba(35,230,0,200)\"").append(System.lineSeparator())
-                .append("lockableHighlightOpacity = 0.55").append(System.lineSeparator())
-                .append("# unlockableHighlightColor applies to favorite slots while holding the lock operation key").append(System.lineSeparator())
-                .append("# unlockableHighlightColor 用于按住锁定操作键时，已收藏且可取消收藏的槽位").append(System.lineSeparator())
-                .append("unlockableHighlightColor = \"rgba(255, 195, 53, 180)\"").append(System.lineSeparator())
-                .append("unlockableHighlightOpacity = 0.65").append(System.lineSeparator())
-                .append("# colorOverlayOpacity controls the base opacity of the COLOR_OVERLAY pure-color style").append(System.lineSeparator())
-                .append("# colorOverlayOpacity 控制 COLOR_OVERLAY 纯色覆盖层样式的基础透明度").append(System.lineSeparator())
-                .append("colorOverlayOpacity = 0.35").append(System.lineSeparator())
-                .append("# bypassOverlayOpacityMultiplier fades locked overlays while holding the bypass key").append(System.lineSeparator())
-                .append("# bypassOverlayOpacityMultiplier 用于按住旁路键时淡化已锁定槽位覆盖层").append(System.lineSeparator())
-                .append("bypassOverlayOpacityMultiplier = 0.35").append(System.lineSeparator())
-                .append("# Render overlay layers in front of item icons").append(System.lineSeparator())
-                .append("# 是否将各类覆盖层渲染在物品图标前方").append(System.lineSeparator())
-                .append("renderLockedOverlayInFront = true").append(System.lineSeparator())
-                .append("renderLockableHighlightInFront = true").append(System.lineSeparator())
-                .append("renderUnlockableHighlightInFront = true").append(System.lineSeparator());
-        } else if (content.contains("[overlay]") && !content.contains("renderLockedOverlayInFront")) {
-            additions.append(System.lineSeparator())
-                .append("[overlay]").append(System.lineSeparator())
-                .append("# Render locked overlays in front of item icons").append(System.lineSeparator())
-                .append("# 是否将已锁定槽位覆盖层渲染在物品图标前方").append(System.lineSeparator())
-                .append("renderLockedOverlayInFront = true").append(System.lineSeparator())
-                .append("# Render lockable highlight overlays in front of item icons").append(System.lineSeparator())
-                .append("# 是否将可收藏提示覆盖层渲染在物品图标前方").append(System.lineSeparator())
-                .append("renderLockableHighlightInFront = true").append(System.lineSeparator())
-                .append("# Render unlockable highlight overlays in front of item icons").append(System.lineSeparator())
-                .append("# 是否将可取消收藏提示覆盖层渲染在物品图标前方").append(System.lineSeparator())
-                .append("renderUnlockableHighlightInFront = true").append(System.lineSeparator());
-        }
-        if (content.contains("[overlay]") && !content.contains("colorOverlayOpacity") && additions.indexOf("colorOverlayOpacity") < 0) {
-            additions.append(System.lineSeparator())
-                .append("[overlay]").append(System.lineSeparator())
-                .append("# Default opacity used by COLOR_OVERLAY pure-color style (0.0 - 1.0)").append(System.lineSeparator())
-                .append("# COLOR_OVERLAY 纯色覆盖层默认透明度，范围 0.0 - 1.0").append(System.lineSeparator())
-                .append("colorOverlayOpacity = 0.35").append(System.lineSeparator());
-        }
-
-        if (!additions.isEmpty()) {
-            Files.writeString(configPath, content.stripTrailing() + System.lineSeparator() + additions, StandardCharsets.UTF_8);
         }
     }
 
     private void setConfigValue(String section, String key, String value) {
         try {
+            if (!isKnownConfigValue(section, key)) {
+                recordLoadIssue(
+                    "Unknown config value [" + section + "] " + key + "; rewriting config without it",
+                    new IllegalArgumentException(key)
+                );
+                return;
+            }
             switch (section) {
                 case "general" -> setGeneralValue(key, value);
                 case "lockBehavior" -> setLockBehaviorValue(key, value);
@@ -329,21 +287,21 @@ public class ConfigManager {
 
     private void setGeneralValue(String key, String value) {
         switch (key) {
-            case "lockEmptySlots" -> config.general.lockEmptySlots = Boolean.parseBoolean(value);
-            case "autoUnlockEmptySlots" -> config.general.autoUnlockEmptySlots = Boolean.parseBoolean(value);
-            case "allowItemsIntoLockedEmptySlots" -> config.general.allowItemsIntoLockedEmptySlots = Boolean.parseBoolean(value);
+            case "lockEmptySlots" -> config.general.lockEmptySlots = parseBoolean(value);
+            case "autoUnlockEmptySlots" -> config.general.autoUnlockEmptySlots = parseBoolean(value);
+            case "allowItemsIntoLockedEmptySlots" -> config.general.allowItemsIntoLockedEmptySlots = parseBoolean(value);
         }
     }
 
     private void setLockBehaviorValue(String key, String value) {
         switch (key) {
-            case "preventClick" -> config.lockBehavior.preventClick = Boolean.parseBoolean(value);
-            case "preventDrop" -> config.lockBehavior.preventDrop = Boolean.parseBoolean(value);
-            case "preventQuickMove" -> config.lockBehavior.preventQuickMove = Boolean.parseBoolean(value);
-            case "preventShiftClick" -> config.lockBehavior.preventShiftClick = Boolean.parseBoolean(value);
-            case "preventDrag" -> config.lockBehavior.preventDrag = Boolean.parseBoolean(value);
-            case "preventSwap" -> config.lockBehavior.preventSwap = Boolean.parseBoolean(value);
-            case "allowBypassWithKey" -> config.lockBehavior.allowBypassWithKey = Boolean.parseBoolean(value);
+            case "preventClick" -> config.lockBehavior.preventClick = parseBoolean(value);
+            case "preventDrop" -> config.lockBehavior.preventDrop = parseBoolean(value);
+            case "preventQuickMove" -> config.lockBehavior.preventQuickMove = parseBoolean(value);
+            case "preventShiftClick" -> config.lockBehavior.preventShiftClick = parseBoolean(value);
+            case "preventDrag" -> config.lockBehavior.preventDrag = parseBoolean(value);
+            case "preventSwap" -> config.lockBehavior.preventSwap = parseBoolean(value);
+            case "allowBypassWithKey" -> config.lockBehavior.allowBypassWithKey = parseBoolean(value);
         }
     }
 
@@ -373,9 +331,9 @@ public class ConfigManager {
             case "unlockableHighlightOpacity" -> config.overlay.unlockableHighlightOpacity = Float.parseFloat(value);
             case "colorOverlayOpacity" -> config.overlay.colorOverlayOpacity = Float.parseFloat(value);
             case "bypassOverlayOpacityMultiplier" -> config.overlay.bypassOverlayOpacityMultiplier = Float.parseFloat(value);
-            case "renderLockedOverlayInFront" -> config.overlay.renderLockedOverlayInFront = Boolean.parseBoolean(value);
-            case "renderLockableHighlightInFront" -> config.overlay.renderLockableHighlightInFront = Boolean.parseBoolean(value);
-            case "renderUnlockableHighlightInFront" -> config.overlay.renderUnlockableHighlightInFront = Boolean.parseBoolean(value);
+            case "renderLockedOverlayInFront" -> config.overlay.renderLockedOverlayInFront = parseBoolean(value);
+            case "renderLockableHighlightInFront" -> config.overlay.renderLockableHighlightInFront = parseBoolean(value);
+            case "renderUnlockableHighlightInFront" -> config.overlay.renderUnlockableHighlightInFront = parseBoolean(value);
         }
     }
 
@@ -456,6 +414,17 @@ public class ConfigManager {
 
     private double parseDouble(String value) {
         return Double.parseDouble(value.trim());
+    }
+
+    private boolean parseBoolean(String value) {
+        String cleanValue = value.trim();
+        if ("true".equalsIgnoreCase(cleanValue)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(cleanValue)) {
+            return false;
+        }
+        throw new IllegalArgumentException("Boolean value must be true or false: " + value);
     }
 
     private double parseColorComponent(String value) {
@@ -571,8 +540,8 @@ public class ConfigManager {
 
     private void setFeedbackValue(String key, String value) {
         switch (key) {
-            case "showVisualFeedback" -> config.feedback.showVisualFeedback = Boolean.parseBoolean(value);
-            case "playSoundFeedback" -> config.feedback.playSoundFeedback = Boolean.parseBoolean(value);
+            case "showVisualFeedback" -> config.feedback.showVisualFeedback = parseBoolean(value);
+            case "playSoundFeedback" -> config.feedback.playSoundFeedback = parseBoolean(value);
             case "feedbackSound" -> config.feedback.feedbackSound = value.replace("\"", "");
             case "feedbackVolume" -> config.feedback.feedbackVolume = Float.parseFloat(value);
             case "feedbackPitch" -> config.feedback.feedbackPitch = Float.parseFloat(value);
@@ -581,7 +550,7 @@ public class ConfigManager {
 
     private void setDebugValue(String key, String value) {
         if ("enabled".equals(key)) {
-            config.debug.enabled = Boolean.parseBoolean(value);
+            config.debug.enabled = parseBoolean(value);
         }
     }
 
@@ -590,21 +559,151 @@ public class ConfigManager {
     }
 
     public void saveDefaultConfig() {
-        try {
-            Files.createDirectories(configPath.getParent());
-            Files.writeString(configPath, CONFIG_COMMENTS, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            DebugLogger.error("Failed to write default config file: {}", configPath);
-            DebugLogger.error("Default config write failure", e);
-        }
+        saveConfig();
     }
 
     public void saveConfig() {
-        saveDefaultConfig();
+        try {
+            Files.createDirectories(configPath.getParent());
+            Files.writeString(configPath, renderConfig(config), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            DebugLogger.error("Failed to write config file: {}", configPath);
+            DebugLogger.error("Config write failure", e);
+        }
     }
 
     private void recordLoadIssue(String message, Exception exception) {
         loadIssues.add(message);
         DebugLogger.warn("{} ({})", message, exception.toString());
+    }
+
+    private boolean hasMissingConfigEntries(String content) {
+        return !content.contains("autoUnlockEmptySlots")
+            || !content.contains("lockEmptySlots")
+            || !content.contains("allowItemsIntoLockedEmptySlots")
+            || !content.contains("preventClick")
+            || !content.contains("preventDrop")
+            || !content.contains("preventQuickMove")
+            || !content.contains("preventShiftClick")
+            || !content.contains("preventDrag")
+            || !content.contains("preventSwap")
+            || !content.contains("allowBypassWithKey")
+            || !content.contains("moveBehavior")
+            || !content.contains("lockedStyle")
+            || !content.contains("holdingKeyLockedStyle")
+            || !content.contains("highlightStyle")
+            || !(content.contains("lockedOverlayColor") || content.contains("overlayColor"))
+            || !(content.contains("lockedOverlayOpacity") || content.contains("overlayOpacity"))
+            || !content.contains("lockableHighlightColor")
+            || !content.contains("lockableHighlightOpacity")
+            || !content.contains("unlockableHighlightColor")
+            || !content.contains("unlockableHighlightOpacity")
+            || !content.contains("colorOverlayOpacity")
+            || !content.contains("bypassOverlayOpacityMultiplier")
+            || !content.contains("renderLockedOverlayInFront")
+            || !content.contains("renderLockableHighlightInFront")
+            || !content.contains("renderUnlockableHighlightInFront")
+            || !content.contains("showVisualFeedback")
+            || !content.contains("playSoundFeedback")
+            || !content.contains("feedbackSound")
+            || !content.contains("feedbackVolume")
+            || !content.contains("feedbackPitch")
+            || !content.contains("[debug]")
+            || !content.contains("enabled");
+    }
+
+    private boolean isKnownSection(String section) {
+        return switch (section) {
+            case "general", "lockBehavior", "slotBehavior", "overlay", "feedback", "debug", "keybindings" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isKnownConfigValue(String section, String key) {
+        return switch (section) {
+            case "general" -> switch (key) {
+                case "lockEmptySlots", "autoUnlockEmptySlots", "allowItemsIntoLockedEmptySlots" -> true;
+                default -> false;
+            };
+            case "lockBehavior" -> switch (key) {
+                case "preventClick", "preventDrop", "preventQuickMove", "preventShiftClick",
+                     "preventDrag", "preventSwap", "allowBypassWithKey" -> true;
+                default -> false;
+            };
+            case "slotBehavior" -> "moveBehavior".equals(key);
+            case "overlay" -> switch (key) {
+                case "lockedStyle", "holdingKeyLockedStyle", "highlightStyle",
+                     "overlayColor", "overlayOpacity", "lockedOverlayColor", "lockedOverlayOpacity",
+                     "lockableHighlightColor", "lockableHighlightOpacity",
+                     "unlockableHighlightColor", "unlockableHighlightOpacity",
+                     "colorOverlayOpacity", "bypassOverlayOpacityMultiplier",
+                     "renderLockedOverlayInFront", "renderLockableHighlightInFront",
+                     "renderUnlockableHighlightInFront" -> true;
+                default -> false;
+            };
+            case "feedback" -> switch (key) {
+                case "showVisualFeedback", "playSoundFeedback", "feedbackSound", "feedbackVolume", "feedbackPitch" -> true;
+                default -> false;
+            };
+            case "debug" -> "enabled".equals(key);
+            case "keybindings" -> true;
+            default -> false;
+        };
+    }
+
+    private String renderConfig(NeoFavoriteItemsConfig config) {
+        return CONFIG_COMMENTS.formatted(
+            config.general.autoUnlockEmptySlots,
+            config.general.lockEmptySlots,
+            config.general.allowItemsIntoLockedEmptySlots,
+            config.lockBehavior.preventClick,
+            config.lockBehavior.preventDrop,
+            config.lockBehavior.preventQuickMove,
+            config.lockBehavior.preventShiftClick,
+            config.lockBehavior.preventDrag,
+            config.lockBehavior.preventSwap,
+            config.lockBehavior.allowBypassWithKey,
+            config.slotBehavior.moveBehavior.name(),
+            config.overlay.lockedStyle.name(),
+            config.overlay.holdingKeyLockedStyle.name(),
+            config.overlay.highlightStyle.name(),
+            colorToRgba(config.overlay.lockedOverlayColor),
+            floatToConfig(config.overlay.lockedOverlayOpacity),
+            colorToRgba(config.overlay.lockableHighlightColor),
+            floatToConfig(config.overlay.lockableHighlightOpacity),
+            colorToRgba(config.overlay.unlockableHighlightColor),
+            floatToConfig(config.overlay.unlockableHighlightOpacity),
+            floatToConfig(config.overlay.colorOverlayOpacity),
+            floatToConfig(config.overlay.bypassOverlayOpacityMultiplier),
+            config.overlay.renderLockedOverlayInFront,
+            config.overlay.renderLockableHighlightInFront,
+            config.overlay.renderUnlockableHighlightInFront,
+            config.feedback.showVisualFeedback,
+            config.feedback.playSoundFeedback,
+            escapeConfigString(config.feedback.feedbackSound),
+            floatToConfig(config.feedback.feedbackVolume),
+            floatToConfig(config.feedback.feedbackPitch),
+            config.debug.enabled
+        );
+    }
+
+    private String colorToRgba(int color) {
+        return "rgba("
+            + ((color >> 16) & 0xFF)
+            + ","
+            + ((color >> 8) & 0xFF)
+            + ","
+            + (color & 0xFF)
+            + ","
+            + ((color >>> 24) & 0xFF)
+            + ")";
+    }
+
+    private String floatToConfig(float value) {
+        return Float.toString(value);
+    }
+
+    private String escapeConfigString(String value) {
+        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

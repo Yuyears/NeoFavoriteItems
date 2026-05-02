@@ -73,6 +73,10 @@ Last updated: 2026-04-25
 - NeoForge 交互实机验证已覆盖：普通丢弃、按住旁路键丢弃、GUI 内外副手交换（覆盖锁定空副手槽和锁定非空副手槽）、锁定空护甲槽 Shift 点击可装备护甲，以及 AE2 终端空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出。
 - Gradle result-copy task no longer breaks focused `:common:test` runs under configuration-on-demand.
 - Gradle 构建结果复制任务不再破坏 configure-on-demand 下聚焦执行的 `:common:test`。
+- Death lifecycle handling now preserves locked slot contents through `keepInventory=true` respawns and clears favorite state after `keepInventory=false` death drops.
+- 死亡生命周期处理现在会在 `keepInventory=true` 重生时保留锁定槽内容，并在 `keepInventory=false` 死亡掉落后清空收藏状态。
+- Server-authoritative persistence now resolves to the active world directory and migrates then deletes old files from the previous game-directory `data/neo_favorite_items` root.
+- 服务端权威持久化现在解析到当前世界目录，并会迁移随后删除旧游戏根目录 `data/neo_favorite_items` 下的文件。
 
 ## Priority Roadmap
 

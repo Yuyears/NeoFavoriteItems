@@ -4,6 +4,7 @@ package mycraft.yuyears.neofavoriteitems.render;
 import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.FavoritesManager;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConfig;
+import mycraft.yuyears.neofavoriteitems.application.FavoriteLockRules;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 
 public abstract class OverlayRenderer {
@@ -101,7 +102,7 @@ public abstract class OverlayRenderer {
     }
 
     protected boolean isLockableSlot(LogicalSlotIndex slotIndex, boolean hasItem) {
-        return hasItem || configManager.getConfig().general.lockEmptySlots;
+        return hasItem || FavoriteLockRules.canKeepEmptySlotLocked(configManager.getConfig());
     }
 
     private float clamp01(float value) {

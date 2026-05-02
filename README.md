@@ -71,18 +71,28 @@
   - 仅客户端联机时，数据保存在客户端根目录 `favoriteitems/<服务器地址>/players/<uuid>.dat`；如果服务器列表条目暂不可用，会回退使用当前连接远端地址。
   - Dual-install singleplayer and dedicated-server play store data under `<world>/data/neo_favorite_items/players/<uuid>.dat`.
   - 双端安装时，无论单人还是多人服务器，数据都保存在 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`。
+  - Server-authoritative data that older builds accidentally wrote under the game directory `data/neo_favorite_items/players/<uuid>.dat` is migrated to the active world directory on first successful read, then the old file is removed.
+  - 旧版本若曾把服务端权威数据误写到游戏根目录 `data/neo_favorite_items/players/<uuid>.dat`，首次成功读取后会迁移到当前世界目录，并删除旧文件。
   - Legacy `itemfavorites/...` client data is migrated to the new directory on first successful read, then the old file is removed.
   - 为兼容旧版本，首次成功读取旧的 `itemfavorites/...` 客户端数据后，会迁移到新目录并删除旧文件。
 - Persistence triggers are split by lifecycle:
 - 持久化触发时机按生命周期拆分：
-  - World/server start: initialize context and preload stored favorite files.
-  - 世界/服务端启动：初始化持久化上下文并预载已有收藏数据文件。
-  - Player join: load only that player's favorite data.
-  - 玩家进入世界：只读取该玩家数据。
-  - Player leave: save that player's current state incrementally.
-  - 玩家退出世界：增量保存该玩家当前状态。
-  - World/server stop: perform a full save flush for cached player data.
-  - 世界/服务端关闭：对缓存中的玩家数据执行一次完整保存收尾。
+  - World/server start: initialize the persistence context without preloading every player file.
+  - 世界/服务端启动：只初始化持久化上下文，不全量预载所有玩家文件。
+  - Player join: load that player's favorite data into the server cache and send a full sync.
+  - 玩家进入世界：读取该玩家数据到服务端缓存，并发送全量同步。
+  - During play: server-side favorite changes update the cache without immediately writing the player file.
+  - 游戏过程中：服务端收藏变更只更新缓存，不立即写玩家文件。
+  - Player leave: save that player's current state while keeping the cached entry available for the final server-stop flush.
+  - 玩家退出世界：保存该玩家当前状态，同时保留缓存项供关服最终统一保存。
+  - World/server stop: perform a final save flush for cached player data.
+  - 世界/服务端关闭：对缓存玩家数据执行一次最终保存收尾。
+- Death handling follows vanilla inventory semantics:
+- 死亡处理遵循原版背包语义：
+  - When `keepInventory=true`, the server copies the old player inventory into the respawned player while bypassing lock guards for that lifecycle copy.
+  - `keepInventory=true` 时，服务端会在该生命周期复制中绕过锁槽守卫，把旧玩家背包复制到重生后的玩家。
+  - When `keepInventory=false`, favorite slots are cleared and saved because the items left the player inventory through death drops.
+  - `keepInventory=false` 时，由于物品通过死亡掉落离开玩家背包，收藏槽位会被清空并保存。
 - Server-only installation keeps login compatible with unmodded clients by checking the target player's advertised payload/channel support before sending sync packets.
 - 仅服务端安装时，服务端会在发送同步包前检查目标玩家连接声明的 payload/channel 支持，从而保持未安装客户端的登录兼容性。
 - Config files and in-game text provide English and Simplified Chinese resources.
@@ -194,6 +204,10 @@ Main configuration groups:
 
 - `general`: empty-slot locking, automatic empty-slot unlock, whether items may enter locked empty slots
 - `general`：空槽锁定、空槽自动解锁、是否允许物品进入锁定空槽
+  - `autoUnlockEmptySlots=true` prevents empty slots from keeping favorite locks; `lockEmptySlots` only allows empty-slot locks when automatic empty unlock is disabled.
+  - `autoUnlockEmptySlots=true` 时空槽不会保留收藏锁定；`lockEmptySlots` 只在关闭自动空槽解锁时才允许锁空槽。
+  - `allowItemsIntoLockedEmptySlots` only applies when empty-slot locks are actually kept.
+  - `allowItemsIntoLockedEmptySlots` 只在空槽锁定确实会被保留时生效。
 - `lockBehavior`: guard rules for interaction types and bypass-key behavior
 - `lockBehavior`：不同交互类型的拦截策略和旁路键行为
 - `slotBehavior`: whether favorite state follows items or stays at slot positions
@@ -204,6 +218,10 @@ Main configuration groups:
 - `feedback`：文本、音效等反馈设置
 - `debug`: diagnostic logging switch
 - `debug`：诊断日志开关
+
+When the config file is missing, the mod generates a complete default file. When an existing config has malformed lines, unknown keys, invalid values, or missing entries, readable values are kept in memory and the file is regenerated with those values plus defaults for unreadable or missing entries.
+
+当配置文件不存在时，模组会生成完整默认配置。若已有配置存在格式错误、未知配置项、非法值或缺失项，能读取的值会先保留，随后用这些值加上未读取项的默认值重新生成配置文件。
 
 Key bindings are managed through Minecraft Controls and are not written to the mod config file.
 

@@ -2,9 +2,9 @@
 
 # 测试报告
 
-Date: 2026-04-26
+Date: 2026-05-03
 
-日期：2026-04-26
+日期：2026-05-03
 
 ## Purpose
 
@@ -63,10 +63,14 @@ Date: 2026-04-26
   - 双端安装时的世界存档路径选择
   - legacy `itemfavorites` fallback loading and migration cleanup
   - 旧 `itemfavorites` 数据的回退读取与迁移清理
-  - cached preload/full-save round trip
-  - 缓存预载与完整保存回路
+  - per-player cache update without immediate file writes, plus final full-save flush
+  - 按玩家更新缓存但不立即写文件，以及最终完整保存回路
   - client storage namespace selection from server-list address, remote connection address, and default fallback
   - 客户端存储命名空间按服务器列表地址、远端连接地址和默认回退的选择逻辑
+  - migration of server-authoritative files from the old game-directory `data/neo_favorite_items` root into the active world directory, including removal of the old file after successful migration
+  - 将旧游戏根目录 `data/neo_favorite_items` 下的服务端权威文件迁移到当前世界目录，并验证成功迁移后删除旧文件
+  - clearing server data also removes old game-directory server files to avoid future duplicate reads
+  - 清理服务端数据时也会删除旧游戏根目录服务端文件，避免后续重复读取
 
 ## Coverage
 
@@ -93,6 +97,15 @@ Date: 2026-04-26
 
 ## 构建验证
 
+- Latest local verification:
+- 最新本地验证：
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：通过
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：通过
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：通过
+
 - Command: `.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
 - 命令：`.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
 - Result: passed
@@ -116,8 +129,8 @@ Date: 2026-04-26
 - 已验证双端安装存储路径为 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`
 - Verified that legacy `itemfavorites/...` data is migrated into the new directory and the old file is removed after a successful read
 - 已验证旧 `itemfavorites/...` 数据在成功读取后会迁移到新目录，并删除旧文件
-- Verified that preload plus full-save cache flow preserves player favorite sets
-- 已验证预载加完整保存的缓存流程能够保持玩家收藏状态
+- Verified that player-login loads populate the cache, in-play cache updates avoid immediate file writes, and full-save flush preserves player favorite sets
+- 已验证玩家登录读取会填充缓存，游戏过程缓存更新不会立即写文件，完整保存回路能够保持玩家收藏状态
 
 ## Manual Runtime Validation
 

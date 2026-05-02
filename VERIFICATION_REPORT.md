@@ -2,9 +2,9 @@
 
 # 修复验证报告
 
-Date: 2026-04-26
+Date: 2026-05-03
 
-日期：2026-04-26
+日期：2026-05-03
 
 ## Purpose
 
@@ -33,8 +33,8 @@ Date: 2026-04-26
 14. Forge/NeoForge 网络通道现在是可选的，支持仅客户端安装和仅服务端安装。
 15. Persistence now splits correctly between client-only server-address directories and server-authoritative world-save directories.
 16. 持久化现在已正确区分单端客户端按服务器地址存储，以及服务端权威模式按世界存档目录存储。
-17. Persistence lifecycle now follows world start full read, player join partial read, player leave incremental save, and world stop full save.
-18. 持久化生命周期现在遵循“世界启动完整读取、玩家进入部分读取、玩家退出增量保存、世界关闭完整保存”。
+17. Persistence lifecycle now follows world start context initialization, player join per-player read into cache, in-play cache updates, player leave incremental save, and world stop full-cache save.
+18. 持久化生命周期现在遵循“世界启动初始化上下文、玩家进入按玩家读取到缓存、游戏过程更新缓存、玩家退出增量保存、世界关闭完整缓存保存”。
 19. Legacy `itemfavorites/...` client data is now migrated into the new path on first successful read, and the old file is removed afterward.
 20. 旧 `itemfavorites/...` 客户端数据现在会在首次成功读取后迁移到新路径，并删除旧文件。
 21. Server-side full and incremental sync sends now check whether each player connection advertises the mod payload/channel before sending, preventing login failure for clients without the mod.
@@ -59,6 +59,10 @@ Date: 2026-04-26
 40. Forge/NeoForge 的 `InvWrapper` 与 `RangedWrapper` 守卫不再通过读取 API 隐藏锁定玩家背包物品，修复 JustDireThings 等自定义 GUI 中锁定槽显示为空的问题。
 41. Forge/NeoForge slot resolvers now recognize `SlotItemHandler` instances backed by player-inventory `InvWrapper` or `RangedWrapper`, so overlays and early click guards apply in JustDireThings-style GUIs.
 42. Forge/NeoForge 槽位解析器现在能识别由玩家背包 `InvWrapper` 或 `RangedWrapper` 支撑的 `SlotItemHandler`，因此 JustDireThings 风格 GUI 中也会渲染 Overlay 并提前拦截点击。
+43. Death respawn handling now distinguishes vanilla lifecycle copies from player item movement: `keepInventory=true` restores the old inventory under a scoped guard bypass, while `keepInventory=false` clears and saves favorite state.
+44. 死亡重生处理现在会区分原版生命周期复制和玩家物品移动：`keepInventory=true` 时在有作用域的守卫绕过中恢复旧背包，`keepInventory=false` 时清空并保存收藏状态。
+45. Server-authoritative persistence now uses the active world directory instead of the game directory, and legacy files under `<game>/data/neo_favorite_items` are migrated once then deleted after successful read.
+46. 服务端权威持久化现在使用当前世界目录而不是游戏目录；旧 `<游戏目录>/data/neo_favorite_items` 文件会在首次成功读取后迁移并删除。
 
 ## Integration Validation Summary
 
@@ -118,6 +122,18 @@ Date: 2026-04-26
   - 从锁定玩家背包槽出发的空格+左键区域转移会在 AE2 公共快速移动入口被取消。
   - Space-left-click region moves from the AE2 network into locked player inventory slots are canceled before AE2 starts moving repeated stacks.
   - 从 AE2 网络向锁定玩家背包槽批量放入的空格+左键区域转移会在 AE2 开始重复搬运前被取消。
+- Death lifecycle expectation:
+- 死亡生命周期预期：
+  - `keepInventory=true` keeps locked slot contents through respawn because vanilla inventory restoration is not blocked by lock guards.
+  - `keepInventory=true` 时锁定槽内容会随重生保留，因为原版背包恢复不会再被锁槽守卫拦截。
+  - `keepInventory=false` clears favorite state after death drops so empty/changed slots are not left locked unexpectedly.
+  - `keepInventory=false` 时死亡掉落后会清空收藏状态，避免空槽或变化后的槽位继续意外锁定。
+- Persistence expectation:
+- 持久化预期：
+  - Dual-install singleplayer and dedicated-server saves are stored in `<world>/data/neo_favorite_items/players/<uuid>.dat`.
+  - 双端单人与专用服务端存储在 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`。
+  - Existing files from the old wrong root `<game>/data/neo_favorite_items/players/<uuid>.dat` are migrated to the world path and then removed.
+  - 旧错误根目录 `<游戏目录>/data/neo_favorite_items/players/<uuid>.dat` 中的既有文件会迁移到世界路径并随后删除。
 
 ## Manual Validation Completed
 

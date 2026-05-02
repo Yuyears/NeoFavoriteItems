@@ -26,6 +26,7 @@ public class DataPersistenceManager {
     private final Map<UUID, byte[]> cachedPlayerData = new ConcurrentHashMap<>();
     private Path saveDirectory;
     private Path legacySaveDirectory;
+    private Path legacyServerStorageRoot;
     private Path worldSaveDirectory;
     private boolean isServerSide;
     private String clientStorageNamespace = NeoFavoriteItemsConstants.DEFAULT_SERVER_DIRECTORY;
@@ -43,10 +44,22 @@ public class DataPersistenceManager {
     public synchronized void initialize(Path gameDirectory, Path worldDirectory, boolean isServerSide) {
         this.saveDirectory = gameDirectory.resolve(NeoFavoriteItemsConstants.CLIENT_SAVE_DIRECTORY);
         this.legacySaveDirectory = gameDirectory.resolve(NeoFavoriteItemsConstants.LEGACY_CLIENT_SAVE_DIRECTORY);
+        this.legacyServerStorageRoot = isServerSide && worldDirectory != null
+            ? gameDirectory.resolve("data").resolve(NeoFavoriteItemsMod.MOD_ID)
+            : null;
         this.worldSaveDirectory = worldDirectory;
         this.isServerSide = isServerSide;
         this.clientStorageNamespace = NeoFavoriteItemsConstants.DEFAULT_SERVER_DIRECTORY;
         resetStorageContext();
+
+        DebugLogger.debug(
+            "Persistence initialized: side={} gameDirectory={} worldDirectory={} storageRoot={} legacyServerRoot={}",
+            isServerSide ? "server" : "client",
+            gameDirectory,
+            worldDirectory,
+            resolveStorageRoot(),
+            legacyServerStorageRoot
+        );
 
         try {
             Files.createDirectories(saveDirectory);
@@ -61,7 +74,9 @@ public class DataPersistenceManager {
         cachedPlayerData.clear();
 
         Path playerDirectory = getPlayerDirectory();
+        DebugLogger.debug("Persistence preload started: playerDirectory={}", playerDirectory);
         if (!Files.isDirectory(playerDirectory)) {
+            DebugLogger.debug("Persistence preload skipped: playerDirectory_missing path={}", playerDirectory);
             return;
         }
 
@@ -82,7 +97,7 @@ public class DataPersistenceManager {
         }
     }
 
-    public synchronized void saveData(UUID playerUUID) {
+    public synchronized void cacheData(UUID playerUUID) {
         if (playerUUID == null) {
             return;
         }
@@ -90,7 +105,24 @@ public class DataPersistenceManager {
         refreshStorageContext();
         byte[] data = FavoritesManager.getCodec().serialize();
         cachedPlayerData.put(playerUUID, data);
-        writeData(getSavePath(playerUUID), data);
+        DebugLogger.debug(
+            "Persistence cache player: uuid={} slots={} payloadLength={}",
+            playerUUID,
+            describePayload(data),
+            data.length
+        );
+    }
+
+    public synchronized void saveData(UUID playerUUID) {
+        if (playerUUID == null) {
+            return;
+        }
+
+        refreshStorageContext();
+        byte[] data = cacheCurrentData(playerUUID);
+        Path savePath = getSavePath(playerUUID);
+        logSave(playerUUID, savePath, data);
+        writeData(savePath, data);
     }
 
     public synchronized void loadData(UUID playerUUID) {
@@ -102,13 +134,40 @@ public class DataPersistenceManager {
         byte[] data = cachedPlayerData.get(playerUUID);
         if (data == null) {
             Path currentSavePath = getSavePath(playerUUID);
+            DebugLogger.debug("Persistence load player: uuid={} currentPath={}", playerUUID, currentSavePath);
             data = readData(currentSavePath);
+            if (isServerSide && legacyServerStorageRoot != null) {
+                Path legacyServerSavePath = getLegacyServerSavePath(playerUUID);
+                byte[] legacyServerData = readData(legacyServerSavePath);
+                if (legacyServerData != null) {
+                    if (data == null || (isEmptyFavoriteData(data) && !isEmptyFavoriteData(legacyServerData))) {
+                        data = legacyServerData;
+                        writeData(currentSavePath, data);
+                        DebugLogger.debug(
+                            "Persistence migrated legacy server data: uuid={} legacyPath={} currentPath={} slots={}",
+                            playerUUID,
+                            legacyServerSavePath,
+                            currentSavePath,
+                            describePayload(data)
+                        );
+                    }
+                    deleteIfExists(legacyServerSavePath);
+                    DebugLogger.debug("Persistence removed legacy server data: uuid={} legacyPath={}", playerUUID, legacyServerSavePath);
+                }
+            }
             if (data == null && worldSaveDirectory == null) {
                 Path legacySavePath = getLegacyClientSavePath(playerUUID);
                 data = readData(legacySavePath);
                 if (data != null) {
                     writeData(currentSavePath, data);
                     deleteIfExists(legacySavePath);
+                    DebugLogger.debug(
+                        "Persistence migrated legacy client data: uuid={} legacyPath={} currentPath={} slots={}",
+                        playerUUID,
+                        legacySavePath,
+                        currentSavePath,
+                        describePayload(data)
+                    );
                 }
             }
             if (data != null) {
@@ -118,6 +177,14 @@ public class DataPersistenceManager {
 
         if (data != null) {
             FavoritesManager.getCodec().deserialize(data);
+            DebugLogger.debug(
+                "Persistence loaded player: uuid={} slots={} payloadLength={}",
+                playerUUID,
+                FavoritesManager.getStateService().getFavoriteSlots(),
+                data.length
+            );
+        } else {
+            DebugLogger.debug("Persistence load missed: uuid={} storageRoot={}", playerUUID, resolveStorageRoot());
         }
     }
 
@@ -131,6 +198,8 @@ public class DataPersistenceManager {
         deleteIfExists(getSavePath(playerUUID));
         if (worldSaveDirectory == null) {
             deleteIfExists(getLegacyClientSavePath(playerUUID));
+        } else if (isServerSide && legacyServerStorageRoot != null) {
+            deleteIfExists(getLegacyServerSavePath(playerUUID));
         }
     }
 
@@ -142,6 +211,7 @@ public class DataPersistenceManager {
         refreshStorageContext();
         return cachedPlayerData.containsKey(playerUUID)
             || Files.exists(getSavePath(playerUUID))
+            || (isServerSide && legacyServerStorageRoot != null && Files.exists(getLegacyServerSavePath(playerUUID)))
             || (worldSaveDirectory == null && Files.exists(getLegacyClientSavePath(playerUUID)));
     }
 
@@ -172,13 +242,30 @@ public class DataPersistenceManager {
             byte[] data = readData(savePath);
             if (data != null) {
                 cachedPlayerData.put(playerUUID, data);
+                DebugLogger.debug("Persistence preloaded cached player: uuid={} path={} slots={}", playerUUID, savePath, describePayload(data));
             }
         } catch (IllegalArgumentException exception) {
             DebugLogger.warn("Ignored favorite data file with invalid UUID name: {}", savePath);
         }
     }
 
-    private void writeData(Path savePath, byte[] data) {
+    private byte[] cacheCurrentData(UUID playerUUID) {
+        byte[] data = FavoritesManager.getCodec().serialize();
+        cachedPlayerData.put(playerUUID, data);
+        return data;
+    }
+
+    private void logSave(UUID playerUUID, Path savePath, byte[] data) {
+        DebugLogger.debug(
+            "Persistence save player: uuid={} path={} slots={} payloadLength={}",
+            playerUUID,
+            savePath,
+            describePayload(data),
+            data.length
+        );
+    }
+
+    private boolean writeData(Path savePath, byte[] data) {
         try {
             Files.createDirectories(savePath.getParent());
 
@@ -201,9 +288,11 @@ public class DataPersistenceManager {
                 Files.move(tempPath, savePath, StandardCopyOption.REPLACE_EXISTING);
                 DebugLogger.warn("Atomic move unavailable for favorite data file: {}", savePath);
             }
+            return true;
         } catch (IOException e) {
             DebugLogger.error("Failed to save favorite data: {}", savePath);
             DebugLogger.error("Favorite data save failure", e);
+            return false;
         }
     }
 
@@ -232,6 +321,17 @@ public class DataPersistenceManager {
         }
     }
 
+    private boolean isEmptyFavoriteData(byte[] data) {
+        return data == null || data.length == 0;
+    }
+
+    private String describePayload(byte[] data) {
+        if (data == null || data.length == 0) {
+            return "[]";
+        }
+        return new String(data, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     private void deleteIfExists(Path savePath) {
         try {
             if (Files.exists(savePath)) {
@@ -250,6 +350,12 @@ public class DataPersistenceManager {
     private Path getLegacyClientSavePath(UUID playerUUID) {
         String namespace = sanitizeClientStorageNamespace(clientStorageNamespace);
         return legacySaveDirectory.resolve(namespace)
+            .resolve(NeoFavoriteItemsConstants.PLAYER_DATA_DIRECTORY)
+            .resolve(playerUUID.toString() + ".dat");
+    }
+
+    private Path getLegacyServerSavePath(UUID playerUUID) {
+        return legacyServerStorageRoot
             .resolve(NeoFavoriteItemsConstants.PLAYER_DATA_DIRECTORY)
             .resolve(playerUUID.toString() + ".dat");
     }
