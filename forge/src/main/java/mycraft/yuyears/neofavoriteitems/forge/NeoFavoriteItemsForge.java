@@ -24,7 +24,6 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.IExtensionPoint;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -50,7 +49,7 @@ public class NeoFavoriteItemsForge {
 
     public NeoFavoriteItemsForge(net.minecraftforge.eventbus.api.IEventBus modEventBus) {
         NeoFavoriteItemsMod.getInstance().initialize();
-        ModLoadingContext.get().registerExtensionPoint(IExtensionPoint.DisplayTest.class, IExtensionPoint.DisplayTest.IGNORE_SERVER_VERSION);
+        modEventBus.register(IExtensionPoint.DisplayTest.IGNORE_SERVER_VERSION);
         
         var modBus = modEventBus;
         modBus.addListener(this::setup);
