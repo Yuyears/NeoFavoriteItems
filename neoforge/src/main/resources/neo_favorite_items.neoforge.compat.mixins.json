@@ -6,7 +6,8 @@
   "plugin": "mycraft.yuyears.neofavoriteitems.neoforge.mixin.NeoForgeCompatMixinPlugin",
   "mixins": [
     "AppEngMenuMixin",
-    "AppEngStorageMenuMixin"
+    "AppEngStorageMenuMixin",
+    "QuarkSortingHandlerMixin"
   ],
   "client": [],
   "server": [],

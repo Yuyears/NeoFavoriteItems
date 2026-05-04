@@ -2,9 +2,9 @@
 
 # 修复验证报告
 
-Date: 2026-05-03
+Date: 2026-05-05
 
-日期：2026-05-03
+日期：2026-05-05
 
 ## Purpose
 
@@ -63,6 +63,8 @@ Date: 2026-05-03
 44. 死亡重生处理现在会区分原版生命周期复制和玩家物品移动：`keepInventory=true` 时在有作用域的守卫绕过中恢复旧背包，`keepInventory=false` 时清空并保存收藏状态。
 45. Server-authoritative persistence now uses the active world directory instead of the game directory, and legacy files under `<game>/data/neo_favorite_items` are migrated once then deleted after successful read.
 46. 服务端权威持久化现在使用当前世界目录而不是游戏目录；旧 `<游戏目录>/data/neo_favorite_items` 文件会在首次成功读取后迁移并删除。
+47. NeoForge Quark sorting compatibility now augments Quark's sorting-locked slot list with favorite player-inventory slots before Quark clears and rewrites the sorted range.
+48. NeoForge Quark 排序兼容现在会在 Quark 清空并重写排序范围前，把已收藏玩家背包槽补入 Quark 的排序锁定槽列表。
 
 ## Integration Validation Summary
 
@@ -122,6 +124,12 @@ Date: 2026-05-03
   - 从锁定玩家背包槽出发的空格+左键区域转移会在 AE2 公共快速移动入口被取消。
   - Space-left-click region moves from the AE2 network into locked player inventory slots are canceled before AE2 starts moving repeated stacks.
   - 从 AE2 网络向锁定玩家背包槽批量放入的空格+左键区域转移会在 AE2 开始重复搬运前被取消。
+- Quark sorting expectation:
+- Quark 排序预期：
+  - On NeoForge, Quark main-inventory sorting skips favorite player-inventory slots by treating them as Quark sorting-locked slots.
+  - 在 NeoForge 上，Quark 主背包排序会把已收藏玩家背包槽视作 Quark 排序锁定槽并跳过这些槽。
+  - Existing Quark-provided locked slots are preserved and merged with favorite slots instead of being replaced.
+  - 菜单自身提供的 Quark 锁定槽会被保留，并与收藏槽合并，而不是被覆盖。
 - Death lifecycle expectation:
 - 死亡生命周期预期：
   - `keepInventory=true` keeps locked slot contents through respawn because vanilla inventory restoration is not blocked by lock guards.
@@ -190,6 +198,8 @@ Date: 2026-05-03
   - Shift 点击可装备护甲进入锁定空护甲槽
   - AE2 terminal space-left-click MOVE_REGION into and out of locked player inventory slots
   - AE2 终端空格+左键 MOVE_REGION 对锁定玩家背包槽的放入与取出
+- NeoForge in-game validation of Quark sorting with locked player main-inventory slots.
+- NeoForge 仍需实机验证 Quark 排序遇到已锁玩家主背包槽时的行为。
 - Manual matrix validation for persistence paths and lifecycle timing:
 - 持久化路径与生命周期时机的手工矩阵验证：
   - client-only join to unmodded server

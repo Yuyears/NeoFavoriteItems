@@ -1,8 +1,8 @@
 # Neo Favorite Items TODO
 
-Last updated: 2026-04-25
+Last updated: 2026-05-05
 
-最后更新：2026-04-25
+最后更新：2026-05-05
 
 ## Checklist Summary
 
@@ -12,6 +12,8 @@ Last updated: 2026-04-25
 - [ ] P0：实机验证 Fabric、Forge、NeoForge 的 Mouse Tweaks 拖动点击切换锁定。
 - [ ] P0: Validate behavior consistency in creative mode, normal containers, hotbar swaps, dragging, and external item transfers.
 - [ ] P0：实测创造模式、普通容器、快捷栏交换、拖拽和外部物品转移的一致性。
+- [ ] P0: Runtime validate NeoForge Quark inventory sorting with locked main-inventory slots.
+- [ ] P0：实机验证 NeoForge + Quark 背包排序遇到已锁主背包槽时会跳过锁槽。
 - [ ] P0: Validate multiplayer installation modes: client-only, server-only, and both-sides-installed.
 - [ ] P0：验证多人安装模式：仅客户端、仅服务端、双端均安装。
 - [ ] P1: Add automated tests for slot mapping, config parsing, serialization compatibility, interaction decisions, and sync revisions.
@@ -77,6 +79,8 @@ Last updated: 2026-04-25
 - 死亡生命周期处理现在会在 `keepInventory=true` 重生时保留锁定槽内容，并在 `keepInventory=false` 死亡掉落后清空收藏状态。
 - Server-authoritative persistence now resolves to the active world directory and migrates then deletes old files from the previous game-directory `data/neo_favorite_items` root.
 - 服务端权威持久化现在解析到当前世界目录，并会迁移随后删除旧游戏根目录 `data/neo_favorite_items` 下的文件。
+- NeoForge Quark sorting compatibility now augments Quark's sorting-locked slot list with favorite player-inventory slots.
+- NeoForge Quark 排序兼容现在会把已收藏玩家背包槽补入 Quark 的排序锁定槽列表。
 
 ## Priority Roadmap
 
@@ -92,6 +96,8 @@ Last updated: 2026-04-25
 - 继续实测 Fabric、Forge 在创造模式、普通容器、快捷栏交换、拖拽和外部物品转移中的一致性。NeoForge 已验证上方列出的高风险丢弃、副手、护甲快速移动和 AE2 `MOVE_REGION` 路径。
 - Re-test AE2 terminal space-left-click MOVE_REGION behavior against the shared-menu compatibility hook on Fabric/Forge when available.
 - 后续在 Fabric/Forge 上复测 AE2 终端空格+左键 MOVE_REGION 是否已被公共菜单层兼容钩子覆盖。
+- Runtime-test Quark sorting on NeoForge with locked player main-inventory slots, including existing Quark locked slots if a menu supplies them.
+- 在 NeoForge 实机复测 Quark 排序遇到已锁玩家主背包槽时的行为，并覆盖菜单自身提供 Quark 锁定槽的情况。
 - Validate multiplayer installation modes on Fabric and Forge: client-only, server-only, and both-sides-installed. NeoForge is validated.
 - 验证 Fabric、Forge 多人安装模式：仅客户端、仅服务端、双端均安装。NeoForge 已验证。
 

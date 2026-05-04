@@ -2,9 +2,9 @@
 
 # 测试报告
 
-Date: 2026-05-03
+Date: 2026-05-05
 
-日期：2026-05-03
+日期：2026-05-05
 
 ## Purpose
 
@@ -31,6 +31,7 @@ Date: 2026-05-03
   - `DataPersistenceManagerTest`
   - `ReflectionHelperTest`
   - `PlatformFavoriteSupportTest`
+  - `QuarkSortingCompatServiceTest`
 - Interaction coverage additions in this round:
 - 本轮新增的交互覆盖点：
   - locked empty offhand rejects incoming GUI/GUI-outside swap targets
@@ -55,6 +56,12 @@ Date: 2026-05-03
   - Forge/NeoForge 槽位解析器现在会识别玩家背包 `SlotItemHandler(InvWrapper/RangedWrapper)` 槽位，以支持 Overlay 渲染和提前点击拦截。
   - These paths are compile-verified; in-game JDT screen validation is still recommended.
   - 这些路径已通过编译验证，仍建议进行 JDT 界面实机复测。
+- Quark compatibility note:
+- Quark 兼容说明：
+  - NeoForge Quark sorting compatibility is compile-verified and the common locked-slot merge helper is covered by `QuarkSortingCompatServiceTest`.
+  - NeoForge Quark 排序兼容已通过编译验证，common 锁槽合并 helper 已由 `QuarkSortingCompatServiceTest` 覆盖。
+  - In-game NeoForge + Quark sorting validation is still recommended because the optional Quark runtime dependency is not part of common unit tests.
+  - 仍建议进行 NeoForge + Quark 实机排序验证，因为可选 Quark 运行时依赖不属于 common 单元测试范围。
 - Existing persistence coverage:
 - 既有持久化覆盖点：
   - client-only storage namespace by server address
@@ -101,6 +108,8 @@ Date: 2026-05-03
 - 最新本地验证：
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：通过
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`: passed
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`：通过
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：通过
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed

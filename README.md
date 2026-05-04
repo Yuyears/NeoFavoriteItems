@@ -57,6 +57,8 @@
 - Forge/NeoForge 的槽位解析也能识别以 `SlotItemHandler(InvWrapper/RangedWrapper)` 暴露的玩家槽位，因此基于 item handler 的 GUI 中也会渲染 Overlay 并提前拦截点击。
 - AE2 terminal `MOVE_REGION` is handled through AE2's shared menu abstractions when AE2 is present, covering space-left-click transfers without adapting each terminal screen separately.
 - 安装 AE2 时，AE2 终端的 `MOVE_REGION` 会通过 AE2 公共菜单抽象层处理，覆盖空格+左键转移，而不需要逐个终端界面适配。
+- NeoForge Quark inventory sorting is integrated with the favorite state: Quark receives favorite player-inventory slots as sorting-locked slots so sorting skips them instead of clearing or reordering them.
+- NeoForge 的 Quark 背包排序已接入收藏状态：排序前会把已收藏玩家背包槽补入 Quark 的排序锁定槽列表，使排序跳过这些槽位，而不是清空或重排它们。
 - Mouse Tweaks-style drag clicks are supported on all three loaders: holding the lock-operation key and dragging across player inventory slots toggles each slot reached by the simulated click flow.
 - 三个平台均支持 Mouse Tweaks 风格的拖动点击：按住锁定操作键拖过玩家物品栏槽位时，会按模拟点击流程切换经过的每个槽位。
 - When the mod is installed on the server, favorite state and sync are server-authoritative while the client remains responsive locally.
@@ -124,8 +126,8 @@ Common source code lives under `common/src/main/java/mycraft/yuyears/neofavorite
 
 - `domain`: `LogicalSlotIndex`, `InteractionType`, `InteractionDecision`
 - `domain`：`LogicalSlotIndex`、`InteractionType`、`InteractionDecision`
-- `application`: `InteractionGuardService`, `ServerFavoriteService`, `ClientFavoriteSyncService`
-- `application`：`InteractionGuardService`、`ServerFavoriteService`、`ClientFavoriteSyncService`
+- `application`: `InteractionGuardService`, `ServerFavoriteService`, `ClientFavoriteSyncService`, `QuarkSortingCompatService`
+- `application`：`InteractionGuardService`、`ServerFavoriteService`、`ClientFavoriteSyncService`、`QuarkSortingCompatService`
 - `integration`: `SlotMappingService`
 - `integration`：`SlotMappingService`
 - `persistence`: `DataPersistenceManager`
