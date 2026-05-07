@@ -59,8 +59,14 @@
 - 安装 AE2 时，AE2 终端的 `MOVE_REGION` 会通过 AE2 公共菜单抽象层处理，覆盖空格+左键转移，而不需要逐个终端界面适配。
 - NeoForge Quark inventory sorting is integrated with the favorite state: Quark receives favorite player-inventory slots as sorting-locked slots so sorting skips them instead of clearing or reordering them.
 - NeoForge 的 Quark 背包排序已接入收藏状态：排序前会把已收藏玩家背包槽补入 Quark 的排序锁定槽列表，使排序跳过这些槽位，而不是清空或重排它们。
-- Mouse Tweaks-style drag clicks are supported on all three loaders: holding the lock-operation key and dragging across player inventory slots toggles each slot reached by the simulated click flow.
-- 三个平台均支持 Mouse Tweaks 风格的拖动点击：按住锁定操作键拖过玩家物品栏槽位时，会按模拟点击流程切换经过的每个槽位。
+- NeoForge Quark hotbar changer swaps are handled separately from sorting: when Quark's `Z` hotbar switch exchanges hotbar slots with main-inventory rows, the item exchange bypasses the generic lock guard and the favorite state moves with the exchanged stack.
+- NeoForge 的 Quark 快捷栏切换会与排序分开处理：当 Quark 的 `Z` 键快捷栏切换在快捷栏与主背包行之间交换物品时，该物品交换会绕过通用锁槽守卫，并让收藏状态跟随被交换的物品移动。
+- Mouse Tweaks-style drag clicks are supported on all three loaders. The compatibility layer borrows Mouse Tweaks' slot-enter detection, then routes newly entered player-inventory slots to NeoFavoriteItems' own lock toggle path instead of Mouse Tweaks' click semantics.
+- 三个平台均支持 Mouse Tweaks 风格的拖动点击。兼容层只借用 Mouse Tweaks 的槽位进入检测，然后把新进入的玩家背包槽交给 NeoFavoriteItems 自己的锁定切换路径，而不是执行 Mouse Tweaks 的点击语义。
+- On NeoForge, the normal `AbstractContainerScreen` fallback for Mouse Tweaks simulated clicks remains active alongside the dedicated Sophisticated screen path. Both paths now reuse slot-location helpers rather than Mouse Tweaks' event flow, which preserves vanilla GUI drag-lock toggling while keeping the Sophisticated empty-slot fix.
+- 在 NeoForge 上，普通 `AbstractContainerScreen` 的 Mouse Tweaks 模拟点击 fallback 会与 Sophisticated 专用路径同时保留：两条路径现在都只复用槽位定位 helper，而不依赖 Mouse Tweaks 的事件流，这样既能维持原版 GUI 的拖拽锁定切换，也不会回退 Sophisticated 空槽修复。
+- NeoForge modpacks that suppress Sophisticated empty-slot screen events are handled by a low-level press entry. With Mouse Tweaks installed, that entry does not cancel the raw press, so normal Mouse Tweaks drag detection remains available; Sophisticated empty-slot drag marking still depends on Mouse Tweaks exposing drag-enter samples for those empty slots.
+- NeoForge 整合包中若 Sophisticated 空槽屏幕事件被压掉，会由低层按下入口补偿。安装 Mouse Tweaks 时，该入口不会取消原始按下，因此普通 Mouse Tweaks 拖动检测仍可工作；Sophisticated 空槽拖动标记仍取决于 Mouse Tweaks 是否为这些空槽暴露拖动进入采样。
 - When the mod is installed on the server, favorite state and sync are server-authoritative while the client remains responsive locally.
 - 服务端安装本模组时，收藏状态与同步由服务端权威处理，同时客户端仍保持本地响应。
 - Outside GUI screens, dropping a locked selected hotbar stack is blocked on the client before the drop animation is played.

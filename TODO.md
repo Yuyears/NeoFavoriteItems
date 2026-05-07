@@ -10,10 +10,16 @@ Last updated: 2026-05-05
 
 - [ ] P0: Validate Mouse Tweaks drag-click lock toggling on Fabric, Forge, and NeoForge.
 - [ ] P0：实机验证 Fabric、Forge、NeoForge 的 Mouse Tweaks 拖动点击切换锁定。
+- [ ] P0: Re-validate NeoForge vanilla GUI Mouse Tweaks drag-lock toggling after restoring the normal-container fallback that was regressed by the Sophisticated empty-slot fix.
+- [ ] P0：在恢复普通容器 fallback 后，重新验证 NeoForge 原版 GUI 的 Mouse Tweaks 拖拽锁定；该路径此前曾被 Sophisticated 空槽修复误伤。
 - [ ] P0: Validate behavior consistency in creative mode, normal containers, hotbar swaps, dragging, and external item transfers.
 - [ ] P0：实测创造模式、普通容器、快捷栏交换、拖拽和外部物品转移的一致性。
 - [ ] P0: Runtime validate NeoForge Quark inventory sorting with locked main-inventory slots.
 - [ ] P0：实机验证 NeoForge + Quark 背包排序遇到已锁主背包槽时会跳过锁槽。
+- [ ] P0: Runtime validate NeoForge Quark hotbar changer (`Z`) swaps with locked hotbar and main-inventory slots.
+- [ ] P0：实机验证 NeoForge + Quark 快捷栏切换（`Z`）在锁定快捷栏和主背包槽时的交换行为。
+- [ ] P0: Runtime validate NeoForge Sophisticated Backpacks Alt-left-click lock toggling after the `QUICK_MOVE` click-path fix.
+- [ ] P0：实机验证 NeoForge + Sophisticated Backpacks 在修复 `QUICK_MOVE` 点击路径后的 Alt+左键锁定切换。
 - [ ] P0: Validate multiplayer installation modes: client-only, server-only, and both-sides-installed.
 - [ ] P0：验证多人安装模式：仅客户端、仅服务端、双端均安装。
 - [ ] P1: Add automated tests for slot mapping, config parsing, serialization compatibility, interaction decisions, and sync revisions.
@@ -59,8 +65,8 @@ Last updated: 2026-05-05
 - 服务端收藏切换、修订号、全量/增量同步和旁路键状态同步
 - Player login/logout load-save flow for all three loaders
 - 三个平台玩家登录/登出加载保存流程
-- Mouse Tweaks-style drag-click lock toggling through client `slotClicked` handling on Fabric, Forge, and NeoForge
-- 通过 Fabric、Forge、NeoForge 客户端 `slotClicked` 处理支持 Mouse Tweaks 风格拖动点击切换锁定
+- Mouse Tweaks-style drag-click lock toggling now uses the same optional compatibility pattern on Fabric, Forge, and NeoForge: Mouse Tweaks' slot-enter detection is reused, newly entered slots are forwarded to this mod's toggle path, and `slotClicked` hooks only cancel leaked inventory clicks while the lock-operation key is held.
+- Fabric、Forge、NeoForge 的 Mouse Tweaks 风格拖动点击切换锁定现在使用同一套可选兼容模式：复用 Mouse Tweaks 的槽位进入检测，把新进入的槽位转发到本模组的切换路径，`slotClicked` 钩子只取消按住锁定操作键时漏进来的库存点击。
 - Composite-move guards for offhand swaps and quick-moving equipment into locked armor/offhand targets
 - 针对副手交换和 Shift 点击装备进入锁定护甲/副手目标槽的复合移动保护
 - Automated interaction-decision tests for locked incoming offhand and armor targets
@@ -81,6 +87,14 @@ Last updated: 2026-05-05
 - 服务端权威持久化现在解析到当前世界目录，并会迁移随后删除旧游戏根目录 `data/neo_favorite_items` 下的文件。
 - NeoForge Quark sorting compatibility now augments Quark's sorting-locked slot list with favorite player-inventory slots.
 - NeoForge Quark 排序兼容现在会把已收藏玩家背包槽补入 Quark 的排序锁定槽列表。
+- NeoForge Quark hotbar changer compatibility now swaps hotbar row items under a scoped guard bypass, moves favorite state with the exchanged stack, and syncs the updated favorite state back to the client.
+- NeoForge Quark 快捷栏切换兼容现在会在有作用域的守卫旁路下交换快捷栏行物品，让收藏状态跟随被交换物品移动，并把更新后的收藏状态同步回客户端。
+- Lock-operation left-click now uses a unified container mouse state machine on all three loaders. The physical Alt-left-click toggles once at `mouseClicked`, `mouseDragged` only consumes leaked vanilla drag while active, and Mouse Tweaks compatibility is the only drag-slot toggle source when Mouse Tweaks is present. NeoForge additionally resolves Sophisticated screens through its dedicated screen state machine and pure slot-location helpers.
+- 三个平台的锁定操作左键现在统一走容器鼠标状态机。物理 Alt+左键在 `mouseClicked` 切换一次，`mouseDragged` 只在 active 时消费漏进来的原版拖动；存在 Mouse Tweaks 时，拖动槽位切换只来自 Mouse Tweaks 兼容层。NeoForge 额外通过专用界面状态机与纯槽位定位 helper 兼容 Sophisticated 系列界面。
+- NeoForge lock-operation state machine cleanup clarified the exits: `beginPress` toggles the physical press target, `toggleEnteredSlot` handles Mouse Tweaks slot-enter drag targets, `toggleLeakedSlotClick` handles Sophisticated leaked click actions, and `consumeActiveDrag` only suppresses leaked vanilla drag without sampling.
+- NeoForge 锁定操作状态机整理后明确了出口职责：`beginPress` 切换物理按下目标，`toggleEnteredSlot` 处理 Mouse Tweaks 槽位进入拖动目标，`toggleLeakedSlotClick` 处理 Sophisticated 漏出的点击动作，`consumeActiveDrag` 只吞掉漏出的原版拖动而不采样。
+- Overlay rendering now uses a common `OverlayRenderDescriptor` for style/tint/foreground decisions. The attempted low-alpha contrast backing for ModernUI tooltip blur was removed because ModernUI draws tooltip shadow in the tooltip render state above slot overlays.
+- Overlay 渲染现在使用 common `OverlayRenderDescriptor` 统一描述样式、染色和前景决策。此前尝试的 ModernUI tooltip 低透明度对比底已撤回，因为 ModernUI 会在槽位 Overlay 上方的 tooltip 渲染状态中绘制阴影。
 
 ## Priority Roadmap
 
@@ -98,6 +112,10 @@ Last updated: 2026-05-05
 - 后续在 Fabric/Forge 上复测 AE2 终端空格+左键 MOVE_REGION 是否已被公共菜单层兼容钩子覆盖。
 - Runtime-test Quark sorting on NeoForge with locked player main-inventory slots, including existing Quark locked slots if a menu supplies them.
 - 在 NeoForge 实机复测 Quark 排序遇到已锁玩家主背包槽时的行为，并覆盖菜单自身提供 Quark 锁定槽的情况。
+- Runtime-test Quark hotbar changer on NeoForge by locking hotbar slot `0`, swapping with main-inventory rows `9`, `18`, or `27`, and confirming both item stacks and favorite state exchange cleanly without ghost items.
+- 在 NeoForge 实机复测 Quark 快捷栏切换：锁定快捷栏 `0` 号槽，与主背包行 `9`、`18` 或 `27` 交换，确认两边物品与收藏状态都能干净交换且不留下幽灵物品。
+- Runtime-test Sophisticated Backpacks on NeoForge by opening a backpack, holding Alt, left-clicking player inventory slots, and confirming the favorite lock toggles without quick-moving the stack.
+- 在 NeoForge 实机复测 Sophisticated Backpacks：打开背包，按住 Alt 左键玩家背包槽，确认收藏锁定会切换且物品不会被快速移动。
 - Validate multiplayer installation modes on Fabric and Forge: client-only, server-only, and both-sides-installed. NeoForge is validated.
 - 验证 Fabric、Forge 多人安装模式：仅客户端、仅服务端、双端均安装。NeoForge 已验证。
 
@@ -138,8 +156,8 @@ Last updated: 2026-05-05
 
 - Gradually modernize the overlay rendering pipeline during related updates instead of doing one large rewrite.
 - 在后续相关更新中渐进式现代化 Overlay 渲染管线，避免一次性大规模重写。
-- Move repeated style selection, texture metadata, sampling decisions, and render descriptors into loader-neutral common abstractions where practical.
-- 在可行时，将重复的样式选择、纹理元数据、采样决策和渲染描述逐步迁移到平台无关的 common 抽象。
+- Continue moving texture metadata and sampling decisions into loader-neutral common abstractions where practical.
+- 在可行时，继续将纹理元数据和采样决策逐步迁移到平台无关的 common 抽象。
 - Keep platform renderers focused on loader-specific `GuiGraphics` calls, HUD/screen hooks, and final draw submission.
 - 让平台渲染器逐步聚焦于加载器特有的 `GuiGraphics` 调用、HUD/Screen 事件入口和最终绘制提交。
 
@@ -151,6 +169,8 @@ Last updated: 2026-05-05
 - 当前只支持玩家物品栏槽位收藏，不支持箱子、熔炉等容器自身槽位收藏。
 - Server-authoritative sync exists, and NeoForge dedicated-server installation modes are validated; Fabric and Forge still need real multiplayer matrix validation.
 - 服务端权威同步已存在，NeoForge 真实专用服务端安装模式已验证；Fabric 和 Forge 仍需要多人矩阵实测。
+- In NeoForge Sophisticated screens, empty player-inventory slots can be toggled by single click through the low-level press path, but Mouse Tweaks does not currently emit drag-enter samples for Sophisticated empty slots in the tested modpack, so empty-slot drag marking there is intentionally left as a known limitation.
+- 在 NeoForge 的 Sophisticated 系列界面中，玩家背包空槽可通过单击低层按下路径切换；但在已测试整合包中 Mouse Tweaks 不会为 Sophisticated 空槽发出拖动进入采样，因此该界面内空槽拖动标记暂作为已知限制保留。
 - `FavoritesManager` is still a singleton state manager; it can later evolve into clearer state service/repository interfaces.
 - `FavoritesManager` 仍是单例状态管理器，后续可继续演进为更清晰的状态服务/仓库接口。
 - Automated tests cover core common-layer behavior. NeoForge has completed the listed high-risk in-game checks, while Fabric and Forge still require manual runtime matrix validation.

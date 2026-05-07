@@ -27,6 +27,7 @@ class ConfigManagerTest {
         assertTrue(manager.getConfig().general.lockEmptySlots);
         assertFalse(manager.getConfig().general.autoUnlockEmptySlots);
         assertTrue(manager.getConfig().slotBehavior.moveBehavior == NeoFavoriteItemsConfig.SlotMoveBehavior.STAY_AT_POSITION);
+        assertFalse(Files.readString(configFile, StandardCharsets.UTF_8).contains("renderForegroundContrastBackdrop"));
     }
 
     @Test
@@ -93,6 +94,7 @@ class ConfigManagerTest {
         assertTrue(repaired.contains("preventDrop = false"));
         assertTrue(repaired.contains("lockedStyle = \"LOCK\""));
         assertTrue(repaired.contains("lockedOverlayOpacity = 0.7"));
+        assertFalse(repaired.contains("renderForegroundContrastBackdrop"));
         assertFalse(repaired.contains("unknownOverlayOption"));
         assertFalse(repaired.contains("broken line"));
     }

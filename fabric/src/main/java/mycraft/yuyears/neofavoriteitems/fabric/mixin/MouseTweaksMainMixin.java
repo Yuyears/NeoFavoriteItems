@@ -2,7 +2,6 @@ package mycraft.yuyears.neofavoriteitems.fabric.mixin;
 
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.fabric.FabricSlotInteractionHandler;
-import mycraft.yuyears.neofavoriteitems.fabric.FabricSlotResolver;
 import mycraft.yuyears.neofavoriteitems.fabric.NeoFavoriteItemsFabricClient;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.inventory.Slot;
@@ -19,6 +18,8 @@ import java.lang.reflect.Method;
 @Pseudo
 @Mixin(targets = "yalter.mousetweaks.Main", remap = false)
 public abstract class MouseTweaksMainMixin {
+    private static boolean neoFavoriteItems$lockDragPrimed;
+
     @Inject(
         method = "onMouseClicked(Lnet/minecraft/client/gui/screens/Screen;DDLyalter/mousetweaks/MouseButton;)Z",
         at = @At(
@@ -26,6 +27,7 @@ public abstract class MouseTweaksMainMixin {
             target = "Lyalter/mousetweaks/Main;updateScreen(Lnet/minecraft/client/gui/screens/Screen;)V",
             shift = At.Shift.AFTER
         ),
+        cancellable = true,
         require = 0
     )
     private static void neoFavoriteItems$enableLockDrag(
@@ -35,10 +37,50 @@ public abstract class MouseTweaksMainMixin {
         @Coerce Object button,
         CallbackInfoReturnable<Boolean> cir
     ) {
-        if (isLeftButton(button) && NeoFavoriteItemsFabricClient.isLockOperationKeyHeld() && readMouseTweaksField("handler") != null) {
-            writeMouseTweaksField("canDoLMBDrag", true);
-            DebugLogger.debug("Fabric Mouse Tweaks lock drag enabled");
+        if (!isLeftButton(button) || !NeoFavoriteItemsFabricClient.isLockOperationKeyHeld()) {
+            return;
         }
+
+        Object handler = readMouseTweaksField("handler");
+        if (handler != null) {
+            Slot selectedSlot = resolveSlotUnderMouse(screen, handler, x, y);
+            writeMouseTweaksField("oldSelectedSlot", selectedSlot);
+            writeMouseTweaksField("canDoLMBDrag", true);
+            neoFavoriteItems$lockDragPrimed = true;
+            DebugLogger.debug(
+                "Fabric Mouse Tweaks lock drag primed for unified toggle path: slotNull={}",
+                selectedSlot == null
+            );
+            cir.setReturnValue(false);
+        } else {
+            resetLockDrag();
+        }
+    }
+
+    @Inject(
+        method = "onMouseReleased(Lnet/minecraft/client/gui/screens/Screen;DDLyalter/mousetweaks/MouseButton;)Z",
+        at = @At(
+            value = "INVOKE",
+            target = "Lyalter/mousetweaks/Main;updateScreen(Lnet/minecraft/client/gui/screens/Screen;)V",
+            shift = At.Shift.AFTER
+        ),
+        cancellable = true,
+        require = 0
+    )
+    private static void neoFavoriteItems$finishLockClick(
+        Screen screen,
+        double x,
+        double y,
+        @Coerce Object button,
+        CallbackInfoReturnable<Boolean> cir
+    ) {
+        if (!isLeftButton(button) || !neoFavoriteItems$lockDragPrimed) {
+            return;
+        }
+
+        DebugLogger.debug("Fabric Mouse Tweaks lock operation released");
+        resetLockDrag();
+        cir.setReturnValue(false);
     }
 
     @Inject(
@@ -59,38 +101,51 @@ public abstract class MouseTweaksMainMixin {
         CallbackInfoReturnable<Boolean> cir
     ) {
         if (!isLeftButton(button) || !NeoFavoriteItemsFabricClient.isLockOperationKeyHeld()) {
+            resetLockDrag();
             return;
         }
 
         Object handler = readMouseTweaksField("handler");
         if (handler == null) {
-            return;
-        }
-
-        Slot selectedSlot = resolveSlotUnderMouse(screen, handler, x, y);
-        Slot previousSlot = readMouseTweaksField("oldSelectedSlot", Slot.class);
-        if (selectedSlot == null || selectedSlot == previousSlot || isIgnored(handler, selectedSlot)) {
-            return;
-        }
-
-        if (!FabricSlotResolver.isPlayerInventorySlot(selectedSlot)) {
-            writeMouseTweaksField("oldSelectedSlot", selectedSlot);
+            resetLockDrag();
+            DebugLogger.debug("Fabric Mouse Tweaks lock drag released to container state machine without handler");
             cir.setReturnValue(false);
             return;
         }
 
-        if (FabricSlotInteractionHandler.handleLockOperationToggle(selectedSlot)) {
-            writeMouseTweaksField("oldSelectedSlot", selectedSlot);
-            DebugLogger.debug(
-                "Fabric Mouse Tweaks lock drag toggle handled: inventoryIndex={}",
-                FabricSlotResolver.getPlayerInventoryIndex(selectedSlot)
-            );
+        Slot selectedSlot = resolveSlotUnderMouse(screen, handler, x, y);
+        Slot previousSlot = neoFavoriteItems$lockDragPrimed ? readMouseTweaksField("oldSelectedSlot", Slot.class) : null;
+        neoFavoriteItems$lockDragPrimed = true;
+        if (selectedSlot == null) {
+            writeMouseTweaksField("oldSelectedSlot", null);
+            DebugLogger.debug("Fabric Mouse Tweaks lock drag released to container state machine: reason=no_slot");
             cir.setReturnValue(true);
+            return;
         }
+        if (selectedSlot == previousSlot) {
+            cir.setReturnValue(true);
+            return;
+        }
+        if (isIgnored(handler, selectedSlot)) {
+            writeMouseTweaksField("oldSelectedSlot", selectedSlot);
+            DebugLogger.debug("Fabric Mouse Tweaks lock drag released to container state machine: reason=ignored_slot");
+            cir.setReturnValue(true);
+            return;
+        }
+
+        writeMouseTweaksField("oldSelectedSlot", selectedSlot);
+        if (FabricSlotInteractionHandler.handleLockOperationToggle(selectedSlot)) {
+            DebugLogger.debug("Fabric Mouse Tweaks lock drag slot released to container state machine: slotId={}", selectedSlot.index);
+        }
+        cir.setReturnValue(true);
     }
 
     private static boolean isLeftButton(Object button) {
         return button instanceof Enum<?> enumButton && "LEFT".equals(enumButton.name());
+    }
+
+    private static void resetLockDrag() {
+        neoFavoriteItems$lockDragPrimed = false;
     }
 
     private static Slot resolveSlotUnderMouse(Screen screen, Object handler, double x, double y) {
@@ -142,17 +197,6 @@ public abstract class MouseTweaksMainMixin {
             Method method = handler.getClass().getMethod("isIgnored", Slot.class);
             return Boolean.TRUE.equals(method.invoke(handler, slot));
         } catch (ReflectiveOperationException e) {
-            return false;
-        }
-    }
-
-    private static boolean invokeMouseTweaksClickSlot(Object handler, Slot slot, Object button) {
-        try {
-            Method method = handler.getClass().getMethod("clickSlot", Slot.class, button.getClass(), boolean.class);
-            method.invoke(handler, slot, button, false);
-            return true;
-        } catch (ReflectiveOperationException e) {
-            DebugLogger.debug("Fabric Mouse Tweaks lock drag click simulation failed: {}", e.toString());
             return false;
         }
     }

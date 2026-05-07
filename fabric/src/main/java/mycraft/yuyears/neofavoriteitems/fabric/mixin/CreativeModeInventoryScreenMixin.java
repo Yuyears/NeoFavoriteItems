@@ -31,10 +31,14 @@ public abstract class CreativeModeInventoryScreenMixin {
             return;
         }
 
-        if (NeoFavoriteItemsFabricClient.isLockOperationKeyHeld() && button == 0 && clickType == ClickType.PICKUP) {
-            if (FabricSlotInteractionHandler.handleLockOperationToggle(slot)) {
-                ci.cancel();
-            }
+        if (NeoFavoriteItemsFabricClient.isLockOperationKeyHeld() && button == 0
+            && (clickType == ClickType.QUICK_MOVE || clickType == ClickType.PICKUP)) {
+            DebugLogger.debug(
+                "Fabric creative slotClicked canceled after lock-operation mouse interception: slotId={} clickType={}",
+                slotId,
+                clickType
+            );
+            ci.cancel();
             return;
         }
 

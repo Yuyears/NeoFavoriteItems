@@ -70,6 +70,23 @@ public final class ServerFavoriteService {
         return revisionsByPlayer.getOrDefault(player.getUUID(), 0L);
     }
 
+    public static long markFavoriteStateChanged(ServerPlayer player, String reason) {
+        if (player == null) {
+            return -1L;
+        }
+
+        FavoritesManager.getStateService().setPlayer(player.getUUID());
+        DataPersistenceManager.getInstance().cacheData(player.getUUID());
+        long revision = nextRevision(player);
+        DebugLogger.debug(
+            "Server marked favorite state changed: player={} reason={} revision={}",
+            player.getName().getString(),
+            reason,
+            revision
+        );
+        return revision;
+    }
+
     public static void resetRevision(ServerPlayer player) {
         revisionsByPlayer.put(player.getUUID(), 0L);
         bypassStateByPlayer.put(player.getUUID(), false);

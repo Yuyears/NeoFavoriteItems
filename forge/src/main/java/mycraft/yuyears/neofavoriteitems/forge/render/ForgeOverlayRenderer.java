@@ -4,16 +4,14 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
-import mycraft.yuyears.neofavoriteitems.FavoritesManager;
-import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConfig;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
 import mycraft.yuyears.neofavoriteitems.application.InteractionGuardService;
 import mycraft.yuyears.neofavoriteitems.domain.InteractionType;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
-import mycraft.yuyears.neofavoriteitems.forge.ForgeFavoriteNetworking;
 import mycraft.yuyears.neofavoriteitems.forge.ForgeSlotResolver;
 import mycraft.yuyears.neofavoriteitems.forge.NeoFavoriteItemsForge;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
+import mycraft.yuyears.neofavoriteitems.render.OverlayRenderDescriptor;
 import mycraft.yuyears.neofavoriteitems.render.OverlayRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -22,12 +20,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.Slot;
 import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import org.lwjgl.glfw.GLFW;
 
 import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -55,7 +55,7 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
         }
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onMouseButtonPressed(ScreenEvent.MouseButtonPressed.Pre event) {
         if (event.getButton() != GLFW.GLFW_MOUSE_BUTTON_LEFT && event.getButton() != GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
             return;
@@ -68,48 +68,8 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
 
             if (!lockOperation) {
                 guardFavoriteSlotClick(event, slot);
-                return;
-            }
-
-            if (slot == null || !isPlayerInventorySlot(slot)) {
-                DebugLogger.debug(
-                    "Forge lock-operation click ignored: reason={} button={}",
-                    slot == null ? "no_slot" : "not_player_inventory",
-                    event.getButton()
-                );
-                return;
-            }
-
-            var logicalSlot = SlotMappingService.fromPlayerInventoryIndex(getContainerSlotIndex(slot));
-            if (logicalSlot.isEmpty()) {
-                DebugLogger.debug(
-                    "Forge lock-operation click ignored: reason=unmapped_slot inventoryIndex={}",
-                    getContainerSlotIndex(slot)
-                );
-                return;
-            }
-
-            event.setCanceled(true);
-            int inventoryIndex = getContainerSlotIndex(slot);
-            if (ForgeFavoriteNetworking.trySendToggle(inventoryIndex)) {
-                return;
-            }
-
-            if (isLockableSlot(logicalSlot.get(), hasItem(slot))) {
-                FavoritesManager.getInstance().toggleSlotFavorite(logicalSlot.get());
-                NeoFavoriteItemsForge.showSlotToggleMessage(logicalSlot.get());
-                DebugLogger.debug(
-                    "Forge slot lock toggled: logicalSlot={} inventoryIndex={} nowLocked={}",
-                    logicalSlot.get().value(),
-                    inventoryIndex,
-                    FavoritesManager.getInstance().isSlotFavorite(logicalSlot.get())
-                );
             } else {
-                DebugLogger.debug(
-                    "Forge slot toggle ignored: logicalSlot={} inventoryIndex={} hasItem=false reason=empty_slot",
-                    logicalSlot.get().value(),
-                    getContainerSlotIndex(slot)
-                );
+                DebugLogger.debug("Forge lock-operation click left for container state machine");
             }
         }
     }
@@ -168,19 +128,14 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
 
     public void renderSlotOverlay(GuiGraphics context, int x, int y, LogicalSlotIndex slotIndex, boolean hasItem, boolean isHoldingBypassKey, boolean isHoldingLockOperationKey) {
         if (isHoldingLockOperationKey && isLockableSlot(slotIndex, hasItem)) {
-            boolean isFavorite = favoritesManager.isSlotFavorite(slotIndex);
-            int highlightColor = isFavorite ? getUnlockableHighlightColor() : getLockableHighlightColor();
-            float highlightOpacity = isFavorite ? getUnlockableHighlightOpacity() : getLockableHighlightOpacity();
-            boolean renderInFront = isFavorite ? shouldRenderUnlockableHighlightInFront() : shouldRenderLockableHighlightInFront();
-            renderStyle(context, x, y, getHighlightStyle(), highlightColor, highlightOpacity, 1.0f, renderInFront);
+            renderStyle(context, x, y, highlightOverlayDescriptor(slotIndex, hasItem));
         }
 
         if (!shouldRenderOverlay(slotIndex)) {
             return;
         }
 
-        float multiplier = isHoldingBypassKey ? getBypassOverlayOpacityMultiplier() : 1.0f;
-        renderStyle(context, x, y, getOverlayStyle(slotIndex, isHoldingBypassKey), getLockedOverlayColor(), getLockedOverlayOpacity(), multiplier, shouldRenderLockedOverlayInFront());
+        renderStyle(context, x, y, lockedOverlayDescriptor(slotIndex, isHoldingBypassKey));
     }
 
     public void renderHotbarOverlays(GuiGraphics context) {
@@ -197,28 +152,28 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
             LogicalSlotIndex slotIndex = LogicalSlotIndex.of(hotbarSlot);
             if (shouldRenderOverlay(slotIndex)) {
                 int x = screenWidth / 2 - 88 + hotbarSlot * 20;
-                renderStyle(context, x, y, getOverlayStyle(slotIndex, false), getLockedOverlayColor(), getLockedOverlayOpacity(), 1.0f, shouldRenderLockedOverlayInFront());
+                renderStyle(context, x, y, lockedOverlayDescriptor(slotIndex, false));
             }
         }
     }
 
-    private void renderStyle(GuiGraphics context, int x, int y, NeoFavoriteItemsConfig.OverlayStyle style, int color, float opacity, float multiplier, boolean renderInFront) {
+    private void renderStyle(GuiGraphics context, int x, int y, OverlayRenderDescriptor descriptor) {
         context.pose().pushPose();
-        if (renderInFront) {
+        if (descriptor.renderInFront()) {
             context.pose().translate(0.0f, 0.0f, OVERLAY_Z_OFFSET);
         }
         try {
-            switch (style) {
-                case BORDER -> renderTextureOverlay(context, x, y, BORDER_TEXTURE, color, opacity, multiplier);
-                case CLASSIC -> renderTextureOverlay(context, x, y, CLASSIC_TEXTURE, color, opacity, multiplier);
-                case FRAMEWORK -> renderTextureOverlay(context, x, y, FRAMEWORK_TEXTURE, color, opacity, multiplier);
-                case HIGHLIGHT -> renderTextureOverlay(context, x, y, HIGHLIGHT_TEXTURE, color, opacity, multiplier);
-                case BRACKETS -> renderTextureOverlay(context, x, y, BRACKETS_TEXTURE, color, opacity, multiplier);
-                case LOCK -> renderTextureOverlay(context, x, y, LOCK_TEXTURE, color, opacity, multiplier);
-                case MARK -> renderTextureOverlay(context, x, y, MARK_TEXTURE, color, opacity, multiplier);
-                case TAG -> renderTextureOverlay(context, x, y, TAG_TEXTURE, color, opacity, multiplier);
-                case STAR -> renderTextureOverlay(context, x, y, STAR_TEXTURE, color, opacity, multiplier);
-                case COLOR_OVERLAY -> renderColorOverlay(context, x, y, color, getColorOverlayOpacity(), multiplier);
+            switch (descriptor.style()) {
+                case BORDER -> renderTextureOverlay(context, x, y, BORDER_TEXTURE, descriptor);
+                case CLASSIC -> renderTextureOverlay(context, x, y, CLASSIC_TEXTURE, descriptor);
+                case FRAMEWORK -> renderTextureOverlay(context, x, y, FRAMEWORK_TEXTURE, descriptor);
+                case HIGHLIGHT -> renderTextureOverlay(context, x, y, HIGHLIGHT_TEXTURE, descriptor);
+                case BRACKETS -> renderTextureOverlay(context, x, y, BRACKETS_TEXTURE, descriptor);
+                case LOCK -> renderTextureOverlay(context, x, y, LOCK_TEXTURE, descriptor);
+                case MARK -> renderTextureOverlay(context, x, y, MARK_TEXTURE, descriptor);
+                case TAG -> renderTextureOverlay(context, x, y, TAG_TEXTURE, descriptor);
+                case STAR -> renderTextureOverlay(context, x, y, STAR_TEXTURE, descriptor);
+                case COLOR_OVERLAY -> renderColorOverlay(context, x, y, descriptor.color(), getColorOverlayOpacity(), descriptor.multiplier());
             }
         } finally {
             context.pose().popPose();
@@ -229,10 +184,10 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
         context.renderTooltip(Minecraft.getInstance().font, Component.literal(text), x, y);
     }
 
-    private void renderTextureOverlay(GuiGraphics context, int x, int y, ResourceLocation texture, int color, float opacity, float multiplier) {
+    private void renderTextureOverlay(GuiGraphics context, int x, int y, ResourceLocation texture, OverlayRenderDescriptor descriptor) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        applyOverlayTint(color, opacity, multiplier);
+        applyOverlayTint(descriptor.color(), descriptor.opacity(), descriptor.multiplier());
         TextureSize size = getTextureSize(texture);
         context.blit(texture, x, y, 16, 16, 0.0f, 0.0f, size.width(), size.height(), size.width(), size.height());
         resetOverlayTint();
@@ -262,6 +217,16 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
     }
 
     private Slot findSlotAt(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
+        Slot screenSlot = invokeScreenFindSlot(screen, mouseX, mouseY);
+        if (screenSlot != null) {
+            return screenSlot;
+        }
+
+        Slot hoveredSlot = ReflectionHelper.readField(screen, "hoveredSlot", Slot.class);
+        if (hoveredSlot != null) {
+            return hoveredSlot;
+        }
+
         int left = getScreenLeft(screen);
         int top = getScreenTop(screen);
         for (Slot slot : screen.getMenu().slots) {
@@ -269,6 +234,34 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
             int y = top + slot.y;
             if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
                 return slot;
+            }
+        }
+        return null;
+    }
+
+    private Slot invokeScreenFindSlot(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
+        try {
+            Method method = findMethod(screen.getClass(), "findSlot", double.class, double.class);
+            if (method == null) {
+                return null;
+            }
+            Object result = method.invoke(screen, mouseX, mouseY);
+            return result instanceof Slot slot ? slot : null;
+        } catch (ReflectiveOperationException e) {
+            DebugLogger.debug("Forge screen slot lookup failed: screen={} error={}", screen.getClass().getName(), e.toString());
+            return null;
+        }
+    }
+
+    private Method findMethod(Class<?> type, String name, Class<?>... parameterTypes) {
+        Class<?> current = type;
+        while (current != null) {
+            try {
+                Method method = current.getDeclaredMethod(name, parameterTypes);
+                method.setAccessible(true);
+                return method;
+            } catch (NoSuchMethodException ignored) {
+                current = current.getSuperclass();
             }
         }
         return null;

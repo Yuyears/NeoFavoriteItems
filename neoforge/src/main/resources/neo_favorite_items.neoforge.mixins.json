@@ -10,13 +10,12 @@
     "InvWrapperMixin",
     "RangedWrapperMixin",
     "ServerGamePacketListenerImplMixin",
-    "SophisticatedCoreInventoryHelperMixin",
-    "SophisticatedSorterCoreUtilsMixin",
     "SlotMixin"
   ],
   "client": [
     "AbstractContainerScreenMixin",
     "MinecraftMixin",
+    "MouseHandlerMixin",
     "MouseTweaksMainMixin"
   ],
   "server": [],

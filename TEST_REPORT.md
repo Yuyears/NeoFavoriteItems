@@ -60,8 +60,38 @@ Date: 2026-05-05
 - Quark 兼容说明：
   - NeoForge Quark sorting compatibility is compile-verified and the common locked-slot merge helper is covered by `QuarkSortingCompatServiceTest`.
   - NeoForge Quark 排序兼容已通过编译验证，common 锁槽合并 helper 已由 `QuarkSortingCompatServiceTest` 覆盖。
-  - In-game NeoForge + Quark sorting validation is still recommended because the optional Quark runtime dependency is not part of common unit tests.
-  - 仍建议进行 NeoForge + Quark 实机排序验证，因为可选 Quark 运行时依赖不属于 common 单元测试范围。
+  - NeoForge Quark hotbar changer compatibility is covered by `QuarkSortingCompatServiceTest` for favorite-state swaps between hotbar and main-inventory rows.
+  - NeoForge Quark 快捷栏切换兼容已由 `QuarkSortingCompatServiceTest` 覆盖快捷栏与主背包行之间的收藏状态交换。
+  - In-game NeoForge + Quark sorting and hotbar-changer validation is still recommended because the optional Quark runtime dependency is not part of common unit tests.
+  - 仍建议进行 NeoForge + Quark 排序和快捷栏切换实机验证，因为可选 Quark 运行时依赖不属于 common 单元测试范围。
+- Sophisticated Backpacks compatibility note:
+- Sophisticated Backpacks 兼容说明：
+  - NeoForge Sophisticated Backpacks screens use a dedicated `StorageScreenBase.findSlot(x, y)` container mouse state machine, including a coordinate fallback for player-inventory slots when the backpack screen does not expose empty slots through its own lookup.
+  - NeoForge Sophisticated Backpacks 界面使用专用的 `StorageScreenBase.findSlot(x, y)` 容器鼠标状态机；当背包界面自身查找不暴露空玩家槽时，会回退到玩家背包槽坐标解析。
+  - Vanilla and modded container screens now fall back through screen `findSlot(x, y)`, `hoveredSlot`, and the legacy coordinate scan. This is compile-verified for Quark/ModernUI-style inventory screen rewrites where raw `leftPos/topPos` coordinates may not identify the slot.
+  - 原版和被 Mod 改写的容器界面现在会依次回退到界面 `findSlot(x, y)`、`hoveredSlot` 和旧坐标扫描。该路径已通过编译验证，用于 Quark/ModernUI 这类可能让原始 `leftPos/topPos` 坐标无法命中槽位的玩家背包改写场景。
+  - Lock-operation `mouseClicked`/`mouseReleased` state machines are the base toggle path on Fabric, Forge, and NeoForge: the physical Alt-left-click toggles once, release resets state, and `mouseDragged` only consumes leaked vanilla drag while active.
+  - Fabric、Forge、NeoForge 的锁定操作以 `mouseClicked`/`mouseReleased` 状态机作为基础 toggle 路径：物理 Alt+左键只切换一次，释放只重置状态，`mouseDragged` 只在 active 时消费漏进来的原版拖动。
+  - Mouse Tweaks compatibility on all three loaders borrows Mouse Tweaks' refreshed slot-enter detection and routes newly entered slots into the loader toggle handler, without invoking Mouse Tweaks' own click path.
+  - 三个平台的 Mouse Tweaks 兼容都会借用 Mouse Tweaks 刷新后的槽位进入检测，并把新进入的槽位路由到对应加载器的切换 handler，不调用 Mouse Tweaks 自己的点击路径。
+  - `StorageScreenBase.slotClicked` is now hooked directly on NeoForge because SophisticatedCore overrides the vanilla `AbstractContainerScreen.slotClicked` method.
+  - NeoForge 现在会直接钩住 `StorageScreenBase.slotClicked`，因为 SophisticatedCore 覆盖了原版 `AbstractContainerScreen.slotClicked` 方法。
+  - `StorageScreenBase.slotClicked` and vanilla `AbstractContainerScreen.slotClicked` only cancel leaked `PICKUP`/`QUICK_MOVE` inventory actions while Alt is held; they do not toggle state.
+  - 按住 Alt 时，`StorageScreenBase.slotClicked` 与原版 `AbstractContainerScreen.slotClicked` 只会取消漏进来的 `PICKUP`/`QUICK_MOVE` 库存动作，不会切换状态。
+  - NeoForge has a low-level `MouseHandler` press entry for modpack cases where Sophisticated empty-slot clicks do not reach `ScreenEvent` or screen `mouseClicked`. When Mouse Tweaks is present, this entry primes/toggles the press target without canceling the raw press so Mouse Tweaks drag initialization is preserved.
+  - NeoForge 针对整合包中 Sophisticated 空槽点击到不了 `ScreenEvent` 或界面 `mouseClicked` 的情况提供低层 `MouseHandler` 按下入口。存在 Mouse Tweaks 时，该入口只预激活/切换按下目标，不取消原始按下，因此保留 Mouse Tweaks 拖动初始化。
+  - Current runtime limitation: Sophisticated empty-slot single-click toggling works through the low-level press path, but empty-slot drag marking is not guaranteed when Mouse Tweaks does not emit drag-enter samples for those empty slots.
+  - 当前运行限制：Sophisticated 空槽单击切换可通过低层按下路径工作，但如果 Mouse Tweaks 不为这些空槽发出拖动进入采样，空槽拖动标记不作保证。
+  - This client mixin path is compile-verified; in-game NeoForge + Sophisticated Backpacks validation is still recommended with the user modpack.
+  - 该客户端 Mixin 路径已通过编译验证；仍建议在用户整合包中进行 NeoForge + Sophisticated Backpacks 实机复测。
+- Overlay rendering note:
+- Overlay 渲染说明：
+  - `ConfigManagerTest` verifies that the removed `renderForegroundContrastBackdrop` option is no longer generated and is stripped during config repair.
+  - `ConfigManagerTest` 验证已移除的 `renderForegroundContrastBackdrop` 配置项不再生成，并会在配置修复时被清理。
+  - Fabric, Forge, and NeoForge renderers now consume common `OverlayRenderDescriptor` decisions and are compile-verified.
+  - Fabric、Forge、NeoForge 渲染器现在消费 common `OverlayRenderDescriptor` 决策，并已通过编译验证。
+  - ModernUI source review shows rounded tooltip shadow is produced by its tooltip shader/render state, so the low-alpha contrast backing was removed instead of kept as an ineffective workaround.
+  - ModernUI 源码检查表明圆角 tooltip 阴影由 tooltip shader/render state 生成，因此已删除低透明度对比底，不保留这个无效绕路方案。
 - Existing persistence coverage:
 - 既有持久化覆盖点：
   - client-only storage namespace by server address
@@ -110,10 +140,20 @@ Date: 2026-05-05
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：通过
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`: passed
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`：通过
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:processResources`: passed after rerunning outside the sandbox because the first sandboxed run could not initialize Gradle's Windows native-platform library.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:processResources`：通过；首次沙盒内运行无法初始化 Gradle 的 Windows native-platform 库，沙盒外重跑后成功。
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：通过
-  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed
-  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：通过
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after the three-loader Mouse Tweaks/lock-click synchronization changes.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：三端 Mouse Tweaks/锁定点击同步修改后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after synchronizing Fabric, Forge, and NeoForge lock-operation click architecture.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：同步 Fabric、Forge、NeoForge 锁定操作点击架构后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the three-loader click architecture and documentation updates.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：三端点击架构与文档更新后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`: passed after NeoForge state-machine naming cleanup.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`：NeoForge 状态机命名整理后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after NeoForge state-machine naming cleanup.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：NeoForge 状态机命名整理后通过。
 
 - Command: `.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
 - 命令：`.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`

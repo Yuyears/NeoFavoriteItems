@@ -21,6 +21,7 @@ public final class NeoForgeSlotInteractionHandler {
 
         int inventoryIndex = NeoForgeSlotResolver.getPlayerInventoryIndex(slot);
         boolean hasItem = NeoForgeSlotResolver.hasItem(slot);
+        boolean emptySlot = !hasItem;
         var logicalSlot = SlotMappingService.fromPlayerInventoryIndex(inventoryIndex);
         if (logicalSlot.isEmpty()) {
             DebugLogger.debug(
@@ -33,8 +34,9 @@ public final class NeoForgeSlotInteractionHandler {
         boolean isFavorite = FavoritesManager.getInstance().isSlotFavorite(logicalSlot.get());
         if (!FavoriteLockRules.canToggleFavorite(isFavorite, hasItem, ConfigManager.getInstance().getConfig())) {
             DebugLogger.debug(
-                "NeoForge slot toggle ignored: inventoryIndex={} hasItem=false reason=empty_slot_disabled",
-                inventoryIndex
+                "NeoForge slot toggle ignored: inventoryIndex={} emptySlot={} reason=empty_slot_disabled",
+                inventoryIndex,
+                emptySlot
             );
             return true;
         }

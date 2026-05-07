@@ -2,8 +2,7 @@ package mycraft.yuyears.neofavoriteitems.neoforge.mixin;
 
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.neoforge.NeoFavoriteItemsNeoForge;
-import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeSlotInteractionHandler;
-import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeSlotResolver;
+import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeLockOperationStateMachine;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.inventory.Slot;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,6 +18,8 @@ import java.lang.reflect.Method;
 @Pseudo
 @Mixin(targets = "yalter.mousetweaks.Main", remap = false)
 public abstract class MouseTweaksMainMixin {
+    private static boolean neoFavoriteItems$lockDragPrimed;
+
     @Inject(
         method = "onMouseClicked(Lnet/minecraft/client/gui/screens/Screen;DDLyalter/mousetweaks/MouseButton;)Z",
         at = @At(
@@ -26,18 +27,33 @@ public abstract class MouseTweaksMainMixin {
             target = "Lyalter/mousetweaks/Main;updateScreen(Lnet/minecraft/client/gui/screens/Screen;)V",
             shift = At.Shift.AFTER
         ),
+        cancellable = true,
         require = 0
     )
-    private static void neoFavoriteItems$enableLockDrag(
+    private static void neoFavoriteItems$passLockClickToStateMachine(
         Screen screen,
         double x,
         double y,
         @Coerce Object button,
         CallbackInfoReturnable<Boolean> cir
     ) {
-        if (isLeftButton(button) && NeoFavoriteItemsNeoForge.isLockOperationKeyHeld() && readMouseTweaksField("handler") != null) {
+        if (!isLeftButton(button) || !NeoFavoriteItemsNeoForge.isLockOperationKeyHeld()) {
+            return;
+        }
+
+        Object handler = readMouseTweaksField("handler");
+        if (handler != null) {
+            Slot selectedSlot = invokeSlotUnderMouse(handler, x, y);
+            writeMouseTweaksField("oldSelectedSlot", selectedSlot);
             writeMouseTweaksField("canDoLMBDrag", true);
-            DebugLogger.debug("NeoForge Mouse Tweaks lock drag enabled");
+            neoFavoriteItems$lockDragPrimed = true;
+            DebugLogger.debug(
+                "NeoForge Mouse Tweaks lock drag primed for state machine: slotNull={}",
+                selectedSlot == null
+            );
+            cir.setReturnValue(false);
+        } else {
+            neoFavoriteItems$lockDragPrimed = false;
         }
     }
 
@@ -51,7 +67,7 @@ public abstract class MouseTweaksMainMixin {
         cancellable = true,
         require = 0
     )
-    private static void neoFavoriteItems$handleLockDrag(
+    private static void neoFavoriteItems$passLockDragToStateMachine(
         Screen screen,
         double x,
         double y,
@@ -59,33 +75,69 @@ public abstract class MouseTweaksMainMixin {
         CallbackInfoReturnable<Boolean> cir
     ) {
         if (!isLeftButton(button) || !NeoFavoriteItemsNeoForge.isLockOperationKeyHeld()) {
+            neoFavoriteItems$lockDragPrimed = false;
             return;
         }
 
         Object handler = readMouseTweaksField("handler");
         if (handler == null) {
-            return;
-        }
-
-        Slot selectedSlot = resolveSlotUnderMouse(screen, handler, x, y);
-        Slot previousSlot = readMouseTweaksField("oldSelectedSlot", Slot.class);
-        if (selectedSlot == null || selectedSlot == previousSlot || isIgnored(handler, selectedSlot)) {
-            return;
-        }
-
-        if (!NeoForgeSlotResolver.isPlayerInventorySlot(selectedSlot)) {
-            writeMouseTweaksField("oldSelectedSlot", selectedSlot);
+            neoFavoriteItems$lockDragPrimed = false;
+            DebugLogger.debug("NeoForge Mouse Tweaks lock drag suppressed without handler");
             cir.setReturnValue(false);
             return;
         }
 
-        if (NeoForgeSlotInteractionHandler.handleLockOperationToggle(selectedSlot)) {
-            writeMouseTweaksField("oldSelectedSlot", selectedSlot);
-            DebugLogger.debug(
-                "NeoForge Mouse Tweaks lock drag toggle handled: inventoryIndex={}",
-                NeoForgeSlotResolver.getPlayerInventoryIndex(selectedSlot)
-            );
+        Slot selectedSlot = invokeSlotUnderMouse(handler, x, y);
+        Slot previousSlot = neoFavoriteItems$lockDragPrimed ? readMouseTweaksField("oldSelectedSlot", Slot.class) : null;
+        neoFavoriteItems$lockDragPrimed = true;
+
+        if (selectedSlot == null) {
+            writeMouseTweaksField("oldSelectedSlot", null);
+            DebugLogger.debug("NeoForge Mouse Tweaks lock drag released to state machine: reason=no_slot");
             cir.setReturnValue(true);
+            return;
+        }
+        if (selectedSlot == previousSlot) {
+            cir.setReturnValue(true);
+            return;
+        }
+        if (isIgnored(handler, selectedSlot)) {
+            writeMouseTweaksField("oldSelectedSlot", selectedSlot);
+            DebugLogger.debug("NeoForge Mouse Tweaks lock drag released to state machine: reason=ignored_slot");
+            cir.setReturnValue(true);
+            return;
+        }
+
+        writeMouseTweaksField("oldSelectedSlot", selectedSlot);
+        if (NeoForgeLockOperationStateMachine.INSTANCE.toggleEnteredSlot(selectedSlot, "mousetweaks-drag-slot")) {
+            DebugLogger.debug("NeoForge Mouse Tweaks lock drag slot released to state machine: slotId={}", selectedSlot.index);
+        } else {
+            DebugLogger.debug("NeoForge Mouse Tweaks lock drag suppressed without active state machine");
+        }
+        cir.setReturnValue(true);
+    }
+
+    @Inject(
+        method = "onMouseReleased(Lnet/minecraft/client/gui/screens/Screen;DDLyalter/mousetweaks/MouseButton;)Z",
+        at = @At(
+            value = "INVOKE",
+            target = "Lyalter/mousetweaks/Main;updateScreen(Lnet/minecraft/client/gui/screens/Screen;)V",
+            shift = At.Shift.AFTER
+        ),
+        cancellable = true,
+        require = 0
+    )
+    private static void neoFavoriteItems$passLockReleaseToStateMachine(
+        Screen screen,
+        double x,
+        double y,
+        @Coerce Object button,
+        CallbackInfoReturnable<Boolean> cir
+    ) {
+        if (isLeftButton(button) && neoFavoriteItems$lockDragPrimed) {
+            neoFavoriteItems$lockDragPrimed = false;
+            DebugLogger.debug("NeoForge Mouse Tweaks lock operation released");
+            cir.setReturnValue(false);
         }
     }
 
@@ -93,45 +145,11 @@ public abstract class MouseTweaksMainMixin {
         return button instanceof Enum<?> enumButton && "LEFT".equals(enumButton.name());
     }
 
-    private static Slot resolveSlotUnderMouse(Screen screen, Object handler, double x, double y) {
-        Slot sophisticatedSlot = invokeSophisticatedFindSlot(screen, x, y);
-        return sophisticatedSlot != null ? sophisticatedSlot : invokeSlotUnderMouse(handler, x, y);
-    }
-
-    private static Slot invokeSophisticatedFindSlot(Screen screen, double x, double y) {
-        if (!isSophisticatedStorageScreen(screen)) {
-            return null;
-        }
-
-        try {
-            Method method = screen.getClass().getMethod("findSlot", double.class, double.class);
-            Object result = method.invoke(screen, x, y);
-            return result instanceof Slot slot ? slot : null;
-        } catch (ReflectiveOperationException e) {
-            DebugLogger.debug("NeoForge Mouse Tweaks lock drag sophisticated slot lookup failed: {}", e.toString());
-            return null;
-        }
-    }
-
-    private static boolean isSophisticatedStorageScreen(Screen screen) {
-        if (screen == null) {
-            return false;
-        }
-
-        Class<?> current = screen.getClass();
-        while (current != null) {
-            if ("net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase".equals(current.getName())) {
-                return true;
-            }
-            current = current.getSuperclass();
-        }
-        return false;
-    }
-
     private static Slot invokeSlotUnderMouse(Object handler, double x, double y) {
         try {
             Method method = handler.getClass().getMethod("getSlotUnderMouse", double.class, double.class);
-            return (Slot) method.invoke(handler, x, y);
+            Object result = method.invoke(handler, x, y);
+            return result instanceof Slot slot ? slot : null;
         } catch (ReflectiveOperationException e) {
             return null;
         }
@@ -142,17 +160,6 @@ public abstract class MouseTweaksMainMixin {
             Method method = handler.getClass().getMethod("isIgnored", Slot.class);
             return Boolean.TRUE.equals(method.invoke(handler, slot));
         } catch (ReflectiveOperationException e) {
-            return false;
-        }
-    }
-
-    private static boolean invokeMouseTweaksClickSlot(Object handler, Slot slot, Object button) {
-        try {
-            Method method = handler.getClass().getMethod("clickSlot", Slot.class, button.getClass(), boolean.class);
-            method.invoke(handler, slot, button, false);
-            return true;
-        } catch (ReflectiveOperationException e) {
-            DebugLogger.debug("NeoForge Mouse Tweaks lock drag click simulation failed: {}", e.toString());
             return false;
         }
     }

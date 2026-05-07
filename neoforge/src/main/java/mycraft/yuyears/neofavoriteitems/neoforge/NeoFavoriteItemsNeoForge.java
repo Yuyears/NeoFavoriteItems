@@ -162,6 +162,7 @@ public class NeoFavoriteItemsNeoForge {
                 logKeyStatesIfChanged();
             }
 
+            NeoForgeLockOperationStateMachine.INSTANCE.tick();
             PlatformFavoriteSupport.synchronizeClientPersistence(minecraft, NeoForgeFavoriteNetworking.isServerPresent());
         }
 

@@ -44,4 +44,14 @@ class FavoriteLockRulesTest {
 
         assertTrue(FavoriteLockRules.canToggleFavorite(false, true, config));
     }
+
+    @Test
+    void emptySlotPermissionDependsOnlyOnEmptySlotConfig() {
+        NeoFavoriteItemsConfig config = new NeoFavoriteItemsConfig();
+        config.general.lockEmptySlots = false;
+        config.general.autoUnlockEmptySlots = false;
+
+        assertFalse(FavoriteLockRules.canKeepEmptySlotLocked(config));
+        assertFalse(FavoriteLockRules.canToggleFavorite(false, false, config));
+    }
 }

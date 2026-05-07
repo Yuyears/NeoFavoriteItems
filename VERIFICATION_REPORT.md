@@ -65,6 +65,22 @@ Date: 2026-05-05
 46. 服务端权威持久化现在使用当前世界目录而不是游戏目录；旧 `<游戏目录>/data/neo_favorite_items` 文件会在首次成功读取后迁移并删除。
 47. NeoForge Quark sorting compatibility now augments Quark's sorting-locked slot list with favorite player-inventory slots before Quark clears and rewrites the sorted range.
 48. NeoForge Quark 排序兼容现在会在 Quark 清空并重写排序范围前，把已收藏玩家背包槽补入 Quark 的排序锁定槽列表。
+49. NeoForge Quark hotbar changer compatibility now handles `ChangeHotbarMessage.swap(Container, int, int)` as an atomic swap under a scoped inventory-guard bypass, then swaps favorite state between the two player inventory indices and sends a full favorite sync.
+50. NeoForge Quark 快捷栏切换兼容现在会把 `ChangeHotbarMessage.swap(Container, int, int)` 作为有作用域库存守卫旁路下的原子交换处理，随后在两个玩家背包索引之间交换收藏状态并发送全量收藏同步。
+51. NeoForge Sophisticated Backpacks screens now resolve lock-operation slots through a dedicated `StorageScreenBase.findSlot(x, y)` container mouse state machine, with a coordinate fallback for empty player-inventory slots that Sophisticated's lookup can omit.
+52. NeoForge Sophisticated Backpacks 界面现在通过专用 `StorageScreenBase.findSlot(x, y)` 容器鼠标状态机解析锁定操作槽位，并对 Sophisticated 自身查找可能遗漏的空玩家槽提供坐标回退。
+53. Fabric, Forge, and NeoForge lock-operation `mouseClicked`/`mouseDragged`/`mouseReleased` state machines now consume Alt-left-click before inventory click semantics are selected, converting physical clicks and sampled drag slots into loader slot-toggle handler calls.
+54. Fabric、Forge、NeoForge 的锁定操作 `mouseClicked`/`mouseReleased` 状态机会在库存点击语义被选择前消费 Alt+左键，并把物理点击转换为对应加载器槽位切换 handler 调用；拖动槽位切换只由 Mouse Tweaks 兼容层在 MT 存在时转发。
+55. NeoForge now hooks SophisticatedCore's `StorageScreenBase.slotClicked` override directly, because that screen does not rely on the vanilla `AbstractContainerScreen.slotClicked` implementation.
+56. NeoForge 现在会直接钩住 SophisticatedCore 的 `StorageScreenBase.slotClicked` 覆盖实现，因为该界面不依赖原版 `AbstractContainerScreen.slotClicked` 实现。
+57. Vanilla, Fabric creative, and NeoForge Sophisticated `slotClicked` hooks now cancel leaked `PICKUP` and `QUICK_MOVE` inventory actions while Alt is held, but do not toggle state.
+58. 原版、Fabric 创造模式与 NeoForge Sophisticated 的 `slotClicked` 钩子现在会在按住 Alt 时取消漏进来的 `PICKUP` 和 `QUICK_MOVE` 库存动作，但不会切换状态。
+59. Mouse Tweaks drag compatibility on Fabric, Forge, and NeoForge now refreshes Mouse Tweaks' bookkeeping, borrows its slot-enter detection, and routes newly entered slots to this mod's lock toggle handler while consuming Mouse Tweaks' original Alt click semantics.
+60. Fabric、Forge、NeoForge 的 Mouse Tweaks 拖动兼容现在会刷新 Mouse Tweaks 账本，借用其槽位进入检测，并把新进入的槽位路由到本模组的锁定切换 handler，同时消费 Mouse Tweaks 原本的 Alt 点击语义。
+61. Overlay rendering now uses a common `OverlayRenderDescriptor` for style, tint, opacity, and foreground placement decisions.
+62. Overlay 渲染现在使用 common `OverlayRenderDescriptor` 统一描述样式、染色、透明度和前景位置决策。
+63. ModernUI rounded tooltip shadow is generated inside its tooltip shader/render state above normal slot overlays; the removed contrast backing should no longer be present in configs or renderer code.
+64. ModernUI 圆角 tooltip 阴影由其 tooltip shader/render state 在普通槽位 Overlay 上方生成；已移除的对比底不应再出现在配置或渲染代码中。
 
 ## Integration Validation Summary
 
@@ -130,6 +146,26 @@ Date: 2026-05-05
   - 在 NeoForge 上，Quark 主背包排序会把已收藏玩家背包槽视作 Quark 排序锁定槽并跳过这些槽。
   - Existing Quark-provided locked slots are preserved and merged with favorite slots instead of being replaced.
   - 菜单自身提供的 Quark 锁定槽会被保留，并与收藏槽合并，而不是被覆盖。
+- Quark hotbar changer expectation:
+- Quark 快捷栏切换预期：
+  - On NeoForge, Quark `Z` hotbar row swaps exchange both stacks even when one side is locked, because the swap is treated as an intentional item move rather than a blocked insertion into a locked slot.
+  - 在 NeoForge 上，Quark `Z` 键快捷栏行交换即使一侧已锁定也会交换两边物品，因为该交换会被视为一次有意物品移动，而不是一次应被阻止的锁槽放入。
+  - Favorite state follows the exchanged stack between hotbar slots `0..8` and main-inventory rows `9..35`, then the updated favorite set is synchronized to the client.
+  - 收藏状态会随被交换物品在快捷栏 `0..8` 与主背包行 `9..35` 之间移动，随后更新后的收藏集合会同步给客户端。
+- Sophisticated Backpacks click expectation:
+- Sophisticated Backpacks 点击预期：
+  - On NeoForge, Alt-left-click lock operations in Sophisticated Backpacks screens are handled by the dedicated container mouse state machine before the screen can emit `PICKUP` or `QUICK_MOVE` inventory actions.
+  - 在 NeoForge 上，Sophisticated Backpacks 界面中的 Alt+左键锁定操作会先由专用容器鼠标状态机处理，再轮到界面生成 `PICKUP` 或 `QUICK_MOVE` 库存动作。
+  - In normal and Quark/ModernUI-reworked player inventory screens, Alt-left-click slot detection should use the screen's resolved slot before falling back to legacy coordinate scanning, avoiding `reason=no_slot` when the cursor is visibly over a player inventory slot.
+  - 在普通玩家背包以及被 Quark/ModernUI 改写的玩家背包界面中，Alt+左键槽位检测应先使用界面解析出的槽位，再回退到旧坐标扫描，避免光标明显位于玩家背包槽上时出现 `reason=no_slot`。
+  - If SophisticatedCore handles the click through its own `StorageScreenBase.slotClicked` override, the dedicated mixin cancels that override before `handleInventoryMouseClick`.
+  - 如果 SophisticatedCore 通过自己的 `StorageScreenBase.slotClicked` 覆盖方法处理点击，专用 Mixin 会在 `handleInventoryMouseClick` 前取消该覆盖方法。
+  - On all three loaders, `PICKUP` and `QUICK_MOVE` callbacks produced after an Alt-left-click are canceled as leaked inventory actions; the physical-click toggle has already happened in the container `mouseClicked` state-machine layer.
+  - 在三个加载器上，Alt+左键之后产生的 `PICKUP` 与 `QUICK_MOVE` 回调都会作为漏进来的库存动作被取消；物理点击的收藏切换已经在容器 `mouseClicked` 状态机层完成。
+  - Mouse Tweaks drag movement remains supported by suppressing Mouse Tweaks' original Alt inventory click and forwarding newly reached player-inventory slots from the Mouse Tweaks compatibility layer to this mod's toggle path.
+  - Mouse Tweaks 拖动仍然受支持：Mouse Tweaks 原本的 Alt 库存点击会被压制，新经过的玩家背包槽由 Mouse Tweaks 兼容层转发到本模组的切换路径。
+  - The original quick-move click is canceled after the lock toggle, so the item should not be moved by the backpack screen.
+  - 锁定切换后原 quick-move 点击会被取消，因此物品不应被背包界面移动。
 - Death lifecycle expectation:
 - 死亡生命周期预期：
   - `keepInventory=true` keeps locked slot contents through respawn because vanilla inventory restoration is not blocked by lock guards.
@@ -200,6 +236,10 @@ Date: 2026-05-05
   - AE2 终端空格+左键 MOVE_REGION 对锁定玩家背包槽的放入与取出
 - NeoForge in-game validation of Quark sorting with locked player main-inventory slots.
 - NeoForge 仍需实机验证 Quark 排序遇到已锁玩家主背包槽时的行为。
+- NeoForge in-game validation of Quark hotbar changer (`Z`) swaps with locked hotbar and main-inventory slots.
+- NeoForge 仍需实机验证 Quark 快捷栏切换（`Z`）在锁定快捷栏和主背包槽时的交换行为。
+- NeoForge in-game validation of Sophisticated Backpacks Alt-left-click slot locking after the `QUICK_MOVE` click-path fix.
+- NeoForge 仍需实机验证 Sophisticated Backpacks 在修复 `QUICK_MOVE` 点击路径后的 Alt+左键槽位锁定行为。
 - Manual matrix validation for persistence paths and lifecycle timing:
 - 持久化路径与生命周期时机的手工矩阵验证：
   - client-only join to unmodded server

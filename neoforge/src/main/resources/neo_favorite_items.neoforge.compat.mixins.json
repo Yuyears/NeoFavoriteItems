@@ -7,9 +7,15 @@
   "mixins": [
     "AppEngMenuMixin",
     "AppEngStorageMenuMixin",
-    "QuarkSortingHandlerMixin"
+    "QuarkChangeHotbarMessageMixin",
+    "QuarkSortingHandlerMixin",
+    "SophisticatedCoreInventoryHelperMixin",
+    "SophisticatedSorterCoreUtilsMixin"
   ],
-  "client": [],
+  "client": [
+    "QuarkEasyTransferringClientMixin",
+    "SophisticatedStorageScreenBaseMixin"
+  ],
   "server": [],
   "injectors": {
     "defaultRequire": 0

@@ -13,6 +13,7 @@ public class NeoForgeCompatMixinPlugin implements IMixinConfigPlugin {
     
     private static final String SOPHISTICATED_SORTER_MOD_ID = "sophisticatedsorter";
     private static final String SOPHISTICATED_CORE_MOD_ID = "sophisticatedcore";
+    private static final String QUARK_MOD_ID = "quark";
     
     @Override
     public void onLoad(String mixinPackage) {
@@ -36,8 +37,16 @@ public class NeoForgeCompatMixinPlugin implements IMixinConfigPlugin {
             return isModLoaded(SOPHISTICATED_CORE_MOD_ID);
         }
 
+        if (mixinClassName.endsWith("SophisticatedStorageScreenBaseMixin")) {
+            return true;
+        }
+
         if (mixinClassName.endsWith("MouseTweaksMainMixin")) {
             return true;
+        }
+
+        if (mixinClassName.endsWith("QuarkEasyTransferringClientMixin")) {
+            return isModLoaded(QUARK_MOD_ID);
         }
 
         if (mixinClassName.endsWith("AppEngMenuMixin")) {

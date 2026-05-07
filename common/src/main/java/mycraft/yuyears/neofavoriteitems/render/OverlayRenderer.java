@@ -75,6 +75,43 @@ public abstract class OverlayRenderer {
         return configManager.getConfig().overlay.renderUnlockableHighlightInFront;
     }
 
+    protected OverlayRenderDescriptor lockedOverlayDescriptor(LogicalSlotIndex slotIndex, boolean isHoldingBypassKey) {
+        return overlayDescriptor(
+            getOverlayStyle(slotIndex, isHoldingBypassKey),
+            getLockedOverlayColor(),
+            getLockedOverlayOpacity(),
+            isHoldingBypassKey ? getBypassOverlayOpacityMultiplier() : 1.0f,
+            shouldRenderLockedOverlayInFront()
+        );
+    }
+
+    protected OverlayRenderDescriptor highlightOverlayDescriptor(LogicalSlotIndex slotIndex, boolean hasItem) {
+        boolean isFavorite = favoritesManager.isSlotFavorite(slotIndex);
+        return overlayDescriptor(
+            getHighlightStyle(),
+            isFavorite ? getUnlockableHighlightColor() : getLockableHighlightColor(),
+            isFavorite ? getUnlockableHighlightOpacity() : getLockableHighlightOpacity(),
+            1.0f,
+            isFavorite ? shouldRenderUnlockableHighlightInFront() : shouldRenderLockableHighlightInFront()
+        );
+    }
+
+    private OverlayRenderDescriptor overlayDescriptor(
+        NeoFavoriteItemsConfig.OverlayStyle style,
+        int color,
+        float opacity,
+        float multiplier,
+        boolean renderInFront
+    ) {
+        return new OverlayRenderDescriptor(
+            style,
+            color,
+            opacity,
+            multiplier,
+            renderInFront
+        );
+    }
+
     protected float getColorRed(int color) {
         return ((color >> 16) & 0xFF) / 255.0f;
     }

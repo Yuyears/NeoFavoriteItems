@@ -3,14 +3,13 @@ package mycraft.yuyears.neofavoriteitems.fabric.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.platform.NativeImage;
-import mycraft.yuyears.neofavoriteitems.fabric.FabricSlotInteractionHandler;
 import mycraft.yuyears.neofavoriteitems.fabric.FabricSlotResolver;
 import mycraft.yuyears.neofavoriteitems.fabric.NeoFavoriteItemsFabricClient;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
-import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConfig;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
+import mycraft.yuyears.neofavoriteitems.render.OverlayRenderDescriptor;
 import mycraft.yuyears.neofavoriteitems.render.OverlayRenderer;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -71,35 +70,8 @@ public class FabricOverlayRenderer extends OverlayRenderer {
             return true;
         }
 
-        Slot slot = findPlayerInventorySlotAt(screen, mouseX, mouseY);
-        if (slot == null) {
-            DebugLogger.debug("Fabric lock-operation mouse click ignored: reason=no_player_inventory_slot mouseX={} mouseY={}", mouseX, mouseY);
-            return true;
-        }
-
-        FabricSlotInteractionHandler.handleLockOperationToggle(slot);
-        return false;
-    }
-
-    private Slot findPlayerInventorySlotAt(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
-        var player = Minecraft.getInstance().player;
-        if (player == null) {
-            return null;
-        }
-
-        int left = getScreenLeft(screen);
-        int top = getScreenTop(screen);
-        for (Slot slot : screen.getMenu().slots) {
-            if (!FabricSlotResolver.isPlayerInventorySlot(slot, player)) {
-                continue;
-            }
-            int x = left + slot.x;
-            int y = top + slot.y;
-            if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
-                return slot;
-            }
-        }
-        return null;
+        DebugLogger.debug("Fabric lock-operation click left for container state machine");
+        return true;
     }
 
     private void registerHudEvents() {
@@ -115,7 +87,6 @@ public class FabricOverlayRenderer extends OverlayRenderer {
         if (player == null) {
             return;
         }
-        
         int highlightableSlots = 0;
         int lockedSlots = 0;
         for (Slot slot : screen.getMenu().slots) {
@@ -160,17 +131,12 @@ public class FabricOverlayRenderer extends OverlayRenderer {
 
     public void renderSlotOverlay(GuiGraphics context, int x, int y, LogicalSlotIndex slotIndex, boolean hasItem, boolean isHoldingBypassKey, boolean isHoldingLockOperationKey) {
         if (isHoldingLockOperationKey && (hasItem || shouldRenderOverlay(slotIndex))) {
-            boolean isFavorite = favoritesManager.isSlotFavorite(slotIndex);
-            int highlightColor = isFavorite ? getUnlockableHighlightColor() : getLockableHighlightColor();
-            float highlightOpacity = isFavorite ? getUnlockableHighlightOpacity() : getLockableHighlightOpacity();
-            boolean renderInFront = isFavorite ? shouldRenderUnlockableHighlightInFront() : shouldRenderLockableHighlightInFront();
-            renderStyle(context, x, y, getHighlightStyle(), highlightColor, highlightOpacity, 1.0f, renderInFront);
+            renderStyle(context, x, y, highlightOverlayDescriptor(slotIndex, hasItem));
             return;
         }
 
         if (shouldRenderOverlay(slotIndex)) {
-            float multiplier = isHoldingBypassKey ? getBypassOverlayOpacityMultiplier() : 1.0f;
-            renderStyle(context, x, y, getOverlayStyle(slotIndex, isHoldingBypassKey), getLockedOverlayColor(), getLockedOverlayOpacity(), multiplier, shouldRenderLockedOverlayInFront());
+            renderStyle(context, x, y, lockedOverlayDescriptor(slotIndex, isHoldingBypassKey));
         }
     }
 
@@ -188,28 +154,28 @@ public class FabricOverlayRenderer extends OverlayRenderer {
             LogicalSlotIndex slotIndex = LogicalSlotIndex.of(hotbarSlot);
             if (shouldRenderOverlay(slotIndex)) {
                 int x = screenWidth / 2 - 88 + hotbarSlot * 20;
-                renderStyle(context, x, y, getOverlayStyle(slotIndex, false), getLockedOverlayColor(), getLockedOverlayOpacity(), 1.0f, shouldRenderLockedOverlayInFront());
+                renderStyle(context, x, y, lockedOverlayDescriptor(slotIndex, false));
             }
         }
     }
 
-    private void renderStyle(GuiGraphics context, int x, int y, NeoFavoriteItemsConfig.OverlayStyle style, int color, float opacity, float multiplier, boolean renderInFront) {
+    private void renderStyle(GuiGraphics context, int x, int y, OverlayRenderDescriptor descriptor) {
         context.pose().pushPose();
-        if (renderInFront) {
+        if (descriptor.renderInFront()) {
             context.pose().translate(0.0f, 0.0f, OVERLAY_Z_OFFSET);
         }
         try {
-            switch (style) {
-                case BORDER -> renderTextureOverlay(context, x, y, BORDER_TEXTURE, color, opacity, multiplier);
-                case CLASSIC -> renderTextureOverlay(context, x, y, CLASSIC_TEXTURE, color, opacity, multiplier);
-                case FRAMEWORK -> renderTextureOverlay(context, x, y, FRAMEWORK_TEXTURE, color, opacity, multiplier);
-                case HIGHLIGHT -> renderTextureOverlay(context, x, y, HIGHLIGHT_TEXTURE, color, opacity, multiplier);
-                case BRACKETS -> renderTextureOverlay(context, x, y, BRACKETS_TEXTURE, color, opacity, multiplier);
-                case LOCK -> renderTextureOverlay(context, x, y, LOCK_TEXTURE, color, opacity, multiplier);
-                case MARK -> renderTextureOverlay(context, x, y, MARK_TEXTURE, color, opacity, multiplier);
-                case TAG -> renderTextureOverlay(context, x, y, TAG_TEXTURE, color, opacity, multiplier);
-                case STAR -> renderTextureOverlay(context, x, y, STAR_TEXTURE, color, opacity, multiplier);
-                case COLOR_OVERLAY -> renderColorOverlay(context, x, y, color, getColorOverlayOpacity(), multiplier);
+            switch (descriptor.style()) {
+                case BORDER -> renderTextureOverlay(context, x, y, BORDER_TEXTURE, descriptor);
+                case CLASSIC -> renderTextureOverlay(context, x, y, CLASSIC_TEXTURE, descriptor);
+                case FRAMEWORK -> renderTextureOverlay(context, x, y, FRAMEWORK_TEXTURE, descriptor);
+                case HIGHLIGHT -> renderTextureOverlay(context, x, y, HIGHLIGHT_TEXTURE, descriptor);
+                case BRACKETS -> renderTextureOverlay(context, x, y, BRACKETS_TEXTURE, descriptor);
+                case LOCK -> renderTextureOverlay(context, x, y, LOCK_TEXTURE, descriptor);
+                case MARK -> renderTextureOverlay(context, x, y, MARK_TEXTURE, descriptor);
+                case TAG -> renderTextureOverlay(context, x, y, TAG_TEXTURE, descriptor);
+                case STAR -> renderTextureOverlay(context, x, y, STAR_TEXTURE, descriptor);
+                case COLOR_OVERLAY -> renderColorOverlay(context, x, y, descriptor.color(), getColorOverlayOpacity(), descriptor.multiplier());
             }
         } finally {
             context.pose().popPose();
@@ -220,10 +186,10 @@ public class FabricOverlayRenderer extends OverlayRenderer {
         context.renderTooltip(Minecraft.getInstance().font, net.minecraft.network.chat.Component.literal(text), x, y);
     }
 
-    private void renderTextureOverlay(GuiGraphics context, int x, int y, ResourceLocation texture, int color, float opacity, float multiplier) {
+    private void renderTextureOverlay(GuiGraphics context, int x, int y, ResourceLocation texture, OverlayRenderDescriptor descriptor) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        applyOverlayTint(color, opacity, multiplier);
+        applyOverlayTint(descriptor.color(), descriptor.opacity(), descriptor.multiplier());
         TextureSize size = getTextureSize(texture);
         context.blit(texture, x, y, 16, 16, 0.0f, 0.0f, size.width(), size.height(), size.width(), size.height());
         resetOverlayTint();

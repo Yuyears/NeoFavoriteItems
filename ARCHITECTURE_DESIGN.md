@@ -103,8 +103,8 @@ Location: `common/.../application`
 - `ClientFavoriteSyncService`：应用客户端全量/增量同步、过滤过期修订并检测同步缺口
 - `ClientDropGuard`: decides whether a selected hotbar stack drop should be blocked before the client plays drop animation
 - `ClientDropGuard`：决定是否应在客户端播放丢弃动画前阻止当前手持快捷栏物品被丢弃
-- `QuarkSortingCompatService`: merges favorite player-inventory slots into Quark's sorting-locked slot list before Quark clears and rewrites a sorted inventory range
-- `QuarkSortingCompatService`：在 Quark 清空并重写排序范围前，把已收藏玩家背包槽合并进 Quark 的排序锁定槽列表
+- `QuarkSortingCompatService`: merges favorite player-inventory slots into Quark's sorting-locked slot list before Quark clears and rewrites a sorted inventory range; it also owns the common favorite-state swap helper used by Quark's hotbar changer compatibility
+- `QuarkSortingCompatService`：在 Quark 清空并重写排序范围前，把已收藏玩家背包槽合并进 Quark 的排序锁定槽列表；同时提供 Quark 快捷栏切换兼容所用的收藏状态交换 helper
 
 ### Integration
 
@@ -151,6 +151,8 @@ Location: `common/.../render`
 
 - `OverlayRenderer`: common base class and color/resource utilities for platform renderers.
 - `OverlayRenderer`：平台渲染器的公共基类和颜色/资源工具。
+- `OverlayRenderDescriptor`: loader-neutral render description for style, tint, opacity, and foreground placement.
+- `OverlayRenderDescriptor`：平台无关的渲染描述，统一表达样式、染色、透明度和前景位置。
 - Loader modules resolve common textures into loader-specific rendering calls.
 - 平台模块负责把公共材质解析为各自加载器可用的渲染调用。
 
@@ -168,8 +170,8 @@ Location: `common/.../render`
 - `NeoFavoriteItemsFabricClient`：客户端配置、按键、Overlay、客户端同步接收，以及逐 tick 的客户端持久化上下文同步。
 - `FabricFavoriteNetworking`: Toggle, Full Sync, Delta Sync, and Bypass Key State payloads.
 - `FabricFavoriteNetworking`：Toggle、Full Sync、Delta Sync、Bypass Key State payload。
-- Mixins cover normal containers, creative slots, inventory interactions, client `slotClicked` lock toggles, and player inventory mutation protection.
-- Mixin 覆盖普通容器、创造模式槽位、物品栏交互、客户端 `slotClicked` 锁定切换和玩家背包变更保护。
+- Mixins cover normal containers, creative slots, inventory interactions, the unified Alt lock-operation mouse state machine, leaked `slotClicked` cancellation while the lock-operation key is held, and player inventory mutation protection.
+- Mixin 覆盖普通容器、创造模式槽位、物品栏交互、统一 Alt 锁定操作鼠标状态机、按住锁定操作键时漏进来的 `slotClicked` 取消，以及玩家背包变更保护。
 - Player inventory mutation protection includes standard `Slot` mutation APIs such as `safeInsert`, `safeTake`, `tryRemove`, `remove`, `set`, and `setByPlayer`, avoiding risky global item-read hiding while covering custom menus that respect Minecraft slot semantics.
 - 玩家背包变更保护覆盖 `safeInsert`、`safeTake`、`tryRemove`、`remove`、`set` 和 `setByPlayer` 等标准 `Slot` 变更 API，在不隐藏全局物品读取的前提下覆盖遵循 Minecraft 槽位语义的自定义菜单。
 - Forge/NeoForge additionally guard player-inventory item-handler wrappers (`InvWrapper` and `RangedWrapper`) only at mutation boundaries such as validity checks, extraction, insertion, and direct writes. Read APIs such as `getStackInSlot` and `getSlotLimit` are left untouched so item-handler-backed custom GUIs keep rendering real player inventory contents.
@@ -187,8 +189,8 @@ Location: `common/.../render`
 - `NeoFavoriteItemsForge`：Mod 入口、事件总线、按键、GUI Layer、玩家登录/登出、服务端同步。
 - `ForgeFavoriteNetworking`: Forge SimpleChannel packet registration and send/receive handling.
 - `ForgeFavoriteNetworking`：Forge SimpleChannel 网络包注册与收发。
-- Mixins and Forge adapters reuse common decision services, including client `slotClicked` handling for normal clicks and Mouse Tweaks simulated drag clicks.
-- Mixin 和 Forge 适配类复用 common 决策服务，包括普通点击与 Mouse Tweaks 模拟拖动点击的客户端 `slotClicked` 处理。
+- Mixins and Forge adapters reuse common decision services. Lock-operation toggles have a single Alt-state-machine exit: the physical click and each sampled drag slot call the loader slot-toggle handler directly, while leaked `slotClicked` inventory actions are only canceled.
+- Mixin 和 Forge 适配类复用 common 决策服务。锁定操作的基础状态机只处理 Alt 物理点击、事件拦截与释放收尾；Mouse Tweaks 存在时，拖动槽位进入检测由兼容层转发到同一个加载器槽位切换 handler，漏进来的 `slotClicked` 库存动作只会被取消。
 
 ### NeoForge
 
@@ -198,10 +200,16 @@ Location: `common/.../render`
 - `NeoFavoriteItemsNeoForge`：Mod 入口、NeoForge 事件、按键、GUI Layer、payload handler、玩家登录/登出。
 - `NeoForgeFavoriteNetworking`: NeoForge payload registration and send/receive handling.
 - `NeoForgeFavoriteNetworking`：NeoForge payload 注册与收发。
-- Mixins and NeoForge adapters reuse common decision services, including client `slotClicked` handling for normal clicks and Mouse Tweaks simulated drag clicks.
-- Mixin 和 NeoForge 适配类复用 common 决策服务，包括普通点击与 Mouse Tweaks 模拟拖动点击的客户端 `slotClicked` 处理。
-- The optional NeoForge compatibility mixin for Quark targets `SortingHandler.sortInventory(Container, int, int, int[])` and augments Quark's locked slot array with favorite player-inventory indices.
-- NeoForge 的可选 Quark 兼容 Mixin 目标为 `SortingHandler.sortInventory(Container, int, int, int[])`，会把已收藏玩家背包索引补入 Quark 的排序锁定槽数组。
+- Mixins and NeoForge adapters reuse common decision services. Lock-operation toggles have a single Alt-state-machine exit: the physical click and each sampled drag slot call the loader slot-toggle handler directly, while leaked `slotClicked` inventory actions are only canceled.
+- Mixin 和 NeoForge 适配类复用 common 决策服务。锁定操作的基础状态机只处理 Alt 物理点击、事件拦截与释放收尾；Mouse Tweaks 存在时，拖动槽位进入检测由兼容层转发到同一个加载器槽位切换 handler，漏进来的 `slotClicked` 库存动作只会被取消。
+- Container mouse state machines on all three loaders consume Alt-left-click or Alt-left-drag before vanilla can turn it into `PICKUP` or `QUICK_MOVE`. NeoForge Sophisticated Backpacks uses a dedicated pure slot-location branch that avoids `StorageScreenBase.findSlot`, because that method carries storage-screen click semantics such as filtered/all-similar selection and empty-slot behavior.
+- 三个平台的容器鼠标状态机会在原版把 Alt+左键或 Alt+左键拖动转换成 `PICKUP`/`QUICK_MOVE` 前消费掉。NeoForge Sophisticated Backpacks 使用专用的纯槽位定位分支，避免调用 `StorageScreenBase.findSlot`，因为该方法包含过滤/同类选择和空槽点击等存储界面业务语义。
+- NeoForge Sophisticated compatibility resolves player inventory slots through `StorageContainerMenuBase` indexing: `getInventorySlotsSize() - 36` through `getInventorySlotsSize() - 1`. The state machine then performs its own coordinate hit-testing and toggle timing without borrowing Sophisticated's click event flow.
+- NeoForge 的 Sophisticated 兼容通过 `StorageContainerMenuBase` 的索引体系定位玩家物品栏槽位：`getInventorySlotsSize() - 36` 到 `getInventorySlotsSize() - 1`。随后状态机自行做坐标命中和切换时机控制，不借用 Sophisticated 的点击事件流。
+- NeoForge has one additional low-level `MouseHandler` press entry for modpacks where empty-slot clicks do not reach `ScreenEvent` or `mouseClicked`. When Mouse Tweaks is present, this entry primes and toggles the press target without canceling the raw press so Mouse Tweaks can still initialize drag detection.
+- NeoForge 额外提供一个低层 `MouseHandler` 按下入口，用于处理部分整合包中空槽点击到不了 `ScreenEvent` 或 `mouseClicked` 的情况。存在 Mouse Tweaks 时，该入口只预激活并切换按下目标，不取消原始按下，从而让 Mouse Tweaks 继续初始化拖动检测。
+- The optional NeoForge compatibility mixins for Quark target `SortingHandler.sortInventory(Container, int, int, int[])` and `ChangeHotbarMessage.swap(Container, int, int)`. Sorting augments Quark's locked slot array with favorite player-inventory indices. Hotbar changing runs the swap under a scoped inventory-guard bypass, then swaps favorite state and sends a full favorite sync.
+- NeoForge 的可选 Quark 兼容 Mixin 目标为 `SortingHandler.sortInventory(Container, int, int, int[])` 与 `ChangeHotbarMessage.swap(Container, int, int)`。排序路径会把已收藏玩家背包索引补入 Quark 的排序锁定槽数组；快捷栏切换路径会在有作用域的库存守卫旁路下执行交换，随后交换收藏状态并发送全量收藏同步。
 
 ## Runtime Flows
 
@@ -246,18 +254,24 @@ Location: `common/.../render`
 14. 标准槽位变更会在 `Slot` API 边界被守卫，因此调用 `safeInsert`、`safeTake`、`tryRemove`、`remove`、`set` 或 `setByPlayer` 的自定义菜单流程仍会复用 common 决策服务。
 15. Forge/NeoForge item-handler-backed player inventory views keep read APIs transparent while guarding extraction, insertion, and direct mutation. This protects external transfers without making locked slots look empty in custom screens such as JustDireThings.
 16. Forge/NeoForge 中基于 item handler 的玩家背包视图保持读取 API 透明，只拦截提取、放入和直接变更。这样既能保护外部转移，也不会让 JustDireThings 等自定义界面中的锁定槽显示为空。
-17. Item-handler-backed player slots are resolved before overlay rendering, client `slotClicked` handling, screen mouse pre-events, and server menu click handling. This keeps JDT-style GUI behavior consistent with vanilla inventory slots.
-18. 基于 item handler 的玩家槽位会在 Overlay 渲染、客户端 `slotClicked`、屏幕鼠标预事件和服务端菜单点击处理中先被解析，因此 JDT 风格 GUI 的行为与原版玩家槽保持一致。
+17. Item-handler-backed player slots are resolved before overlay rendering, client `slotClicked` handling, container mouse state machines, and server menu click handling. This keeps JDT-style GUI behavior consistent with vanilla inventory slots.
+18. 基于 item handler 的玩家槽位会在 Overlay 渲染、客户端 `slotClicked`、容器鼠标状态机和服务端菜单点击处理中先被解析，因此 JDT 风格 GUI 的行为与原版玩家槽保持一致。
 19. AE2 `MOVE_REGION` uses AE2 menu-layer compatibility: player-slot sources are blocked in `AEBaseMenu.quickMoveStack`, and network-to-player region moves are canceled from `MEStorageMenu.handleNetworkInteraction` when they would target a locked player inventory slot.
 20. AE2 的 `MOVE_REGION` 通过 AE2 菜单层兼容处理：玩家槽作为来源时在 `AEBaseMenu.quickMoveStack` 拦截，网络物品批量移入玩家背包时在 `MEStorageMenu.handleNetworkInteraction` 预检查锁定目标槽并取消。
 21. NeoForge Quark sorting compatibility feeds favorite player-inventory slots into Quark's own sorting lock mechanism, preserving locked slot contents while allowing the remaining range to be sorted normally.
 22. NeoForge 的 Quark 排序兼容会把已收藏玩家背包槽交给 Quark 自身的排序锁定机制，从而保留锁定槽内容，同时允许其余范围正常排序。
-23. The guard deliberately does not hide `Slot.getItem`, `Inventory.getItem`, item-handler `getStackInSlot`, or item-handler slot-limit reads, because read interception can break menu synchronization, rendering, and third-party inspection logic.
-24. 守卫刻意不隐藏 `Slot.getItem`、`Inventory.getItem`、item-handler `getStackInSlot` 或 item-handler 槽位上限读取，因为读取拦截可能破坏菜单同步、渲染和第三方检查逻辑。
-25. Bypass-key state is polled on the client and synced to the server.
-26. 旁路键状态由客户端按键轮询同步到服务端。
-27. When the lock-operation key is held, client `slotClicked` mixins consume left-click pickup events and toggle the reached player-inventory slot. This also covers Mouse Tweaks drag clicks because it simulates movement by invoking `slotClicked` for each entered slot.
-28. 按住锁定操作键时，客户端 `slotClicked` Mixin 会消费左键 PICKUP 事件并切换经过的玩家物品栏槽位。Mouse Tweaks 的拖动点击通过为每个进入的槽位调用 `slotClicked` 实现，因此同样会进入该流程。
+23. NeoForge Quark hotbar changer compatibility treats each Quark `Z` key row swap as an atomic item swap: generic inventory set guards are bypassed only for that swap, favorite state is swapped between the two player inventory indices, persistence is cached, and the client receives a full favorite sync.
+24. NeoForge 的 Quark 快捷栏切换兼容会把每次 Quark `Z` 键行交换视为原子物品交换：通用库存写入守卫只在该交换范围内旁路，收藏状态会在两个玩家背包索引之间交换，随后缓存持久化并向客户端发送全量收藏同步。
+25. The guard deliberately does not hide `Slot.getItem`, `Inventory.getItem`, item-handler `getStackInSlot`, or item-handler slot-limit reads, because read interception can break menu synchronization, rendering, and third-party inspection logic.
+26. 守卫刻意不隐藏 `Slot.getItem`、`Inventory.getItem`、item-handler `getStackInSlot` 或 item-handler 槽位上限读取，因为读取拦截可能破坏菜单同步、渲染和第三方检查逻辑。
+27. Bypass-key state is polled on the client and synced to the server.
+28. 旁路键状态由客户端按键轮询同步到服务端。
+29. When the lock-operation key is held, the state machine has explicit exits: `beginPress` activates the operation and toggles the press target, `toggleEnteredSlot` handles Mouse Tweaks drag-enter targets, `toggleLeakedSlotClick` handles Sophisticated leaked click actions, and `consumeActiveDrag` only suppresses leaked vanilla drag while active.
+30. 按住锁定操作键时，状态机有明确出口：`beginPress` 激活操作并切换按下目标，`toggleEnteredSlot` 处理 Mouse Tweaks 拖动进入目标，`toggleLeakedSlotClick` 处理 Sophisticated 漏出的点击动作，`consumeActiveDrag` 只在 active 时吞掉漏出的原版拖动。
+31. Mouse Tweaks compatibility on all three loaders refreshes Mouse Tweaks' screen bookkeeping, borrows its `getSlotUnderMouse` and `oldSelectedSlot` slot-enter detection, then consumes the Alt drag event before Mouse Tweaks can run its own click semantics. Newly entered slots are handed to this mod's lock-operation toggle exit, keeping Mouse Tweaks optional without inheriting its empty-slot, carried-stack, shift, or config rules.
+32. 三个平台的 Mouse Tweaks 兼容都会先刷新 Mouse Tweaks 的界面账本，借用它的 `getSlotUnderMouse` 与 `oldSelectedSlot` 槽位进入检测，然后在 Mouse Tweaks 执行自身点击语义前消费 Alt 拖动事件。新进入的槽位会交给本模组的锁定操作切换出口，因此 Mouse Tweaks 仍是可选兼容，但不会继承它的空槽、光标物品、Shift 或配置规则。
+33. In NeoForge Sophisticated screens, empty-slot single clicks may be recovered through the low-level press entry when other GUI/input mods suppress higher-level events. Empty-slot drag marking is not guaranteed because it depends on Mouse Tweaks emitting slot-enter samples for those Sophisticated empty slots.
+34. 在 NeoForge 的 Sophisticated 系列界面中，如果其他 GUI/输入模组压掉高层事件，空槽单击可由低层按下入口恢复。空槽拖动标记不作保证，因为它依赖 Mouse Tweaks 是否为这些 Sophisticated 空槽发出槽位进入采样。
 
 ### Installation Modes
 
@@ -321,12 +335,14 @@ Location: `common/.../render`
 2. 平台渲染器枚举 GUI 槽位或快捷栏槽位。
 3. Slots are mapped to `LogicalSlotIndex`.
 4. 槽位映射到 `LogicalSlotIndex`。
-5. Overlay style is selected from favorite state, lock-operation key state, bypass-key state, and config.
-6. 根据收藏状态、锁定操作键、旁路键和配置选择 Overlay 样式。
+5. Common code builds an `OverlayRenderDescriptor` from favorite state, lock-operation key state, bypass-key state, and config.
+6. common 代码根据收藏状态、锁定操作键、旁路键和配置构建 `OverlayRenderDescriptor`。
 7. PNG textures are sampled at their actual dimensions and scaled to 16x16 slots.
 8. PNG 材质按实际尺寸采样并缩放到 16x16 槽位。
 9. Config decides whether overlays render in front of or behind item icons.
 10. 根据配置决定绘制在物品图标前方或后方。
+11. ModernUI rounded tooltips draw their shadow as part of the tooltip render state, so slot overlays rendered before tooltip submission are intentionally covered by the tooltip bounds and shadow spread.
+12. ModernUI 圆角 tooltip 会把阴影作为 tooltip 渲染状态的一部分绘制，因此在 tooltip 提交前绘制的槽位 Overlay 会被 tooltip 范围和阴影扩散正常覆盖。
 
 ## Current Constraints
 
@@ -348,8 +364,10 @@ Location: `common/.../render`
 - 交互决策测试也已覆盖锁定槽作为快速移动来源时的取出拒绝，以及旁路键放行行为。
 - AE2 compatibility is intentionally common-abstraction based. The NeoForge AE2 terminal scenario has been validated for space-left-click `MOVE_REGION` into and out of locked player inventory slots; Fabric and Forge still need runtime checks.
 - AE2 兼容刻意基于公共抽象层实现。NeoForge 的 AE2 终端场景已验证空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出；Fabric 和 Forge 仍需运行时验证。
-- Quark sorting compatibility is compile-verified and unit-tested through the common locked-slot merge helper. NeoForge runtime validation with Quark is still recommended.
-- Quark 排序兼容已通过编译验证，并通过 common 锁槽合并 helper 的单元测试覆盖。仍建议在 NeoForge + Quark 环境中实机复测。
+- Quark sorting compatibility is compile-verified and unit-tested through the common locked-slot merge helper. Quark hotbar changer favorite-state movement is covered by common unit tests and NeoForge build verification. NeoForge runtime validation with Quark is still recommended.
+- Quark 排序兼容已通过编译验证，并通过 common 锁槽合并 helper 的单元测试覆盖。Quark 快捷栏切换中的收藏状态跟随移动已由 common 单元测试与 NeoForge 构建验证覆盖。仍建议在 NeoForge + Quark 环境中实机复测。
+- NeoForge Sophisticated empty-slot drag marking is a known compatibility limitation in modpacks where Mouse Tweaks does not emit drag-enter samples for those empty slots; single-click empty-slot toggling remains supported.
+- NeoForge 的 Sophisticated 空槽拖动标记在 Mouse Tweaks 不为这些空槽发出拖动进入采样的整合包中属于已知兼容限制；空槽单击切换仍受支持。
 
 ## Maintenance Rules
 
