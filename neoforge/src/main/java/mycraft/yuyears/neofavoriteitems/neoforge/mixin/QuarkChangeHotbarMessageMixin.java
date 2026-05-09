@@ -1,6 +1,6 @@
 package mycraft.yuyears.neofavoriteitems.neoforge.mixin;
 
-import mycraft.yuyears.neofavoriteitems.application.QuarkSortingCompatService;
+import mycraft.yuyears.neofavoriteitems.application.InventorySortingCompatService;
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeFavoriteNetworking;
 import net.minecraft.server.level.ServerPlayer;
@@ -36,7 +36,7 @@ public abstract class QuarkChangeHotbarMessageMixin {
             inventory.setItem(slot1, stack2);
         });
 
-        if (QuarkSortingCompatService.applyHotbarSwapFavoriteState(inventory, slot1, slot2)) {
+        if (InventorySortingCompatService.applyHotbarSwapFavoriteState(inventory, slot1, slot2)) {
             NeoForgeFavoriteNetworking.sendFullSync(serverPlayer);
         }
         ci.cancel();

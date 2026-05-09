@@ -31,7 +31,7 @@ Date: 2026-05-05
   - `DataPersistenceManagerTest`
   - `ReflectionHelperTest`
   - `PlatformFavoriteSupportTest`
-  - `QuarkSortingCompatServiceTest`
+  - `InventorySortingCompatServiceTest`
 - Interaction coverage additions in this round:
 - 本轮新增的交互覆盖点：
   - locked empty offhand rejects incoming GUI/GUI-outside swap targets
@@ -56,14 +56,14 @@ Date: 2026-05-05
   - Forge/NeoForge 槽位解析器现在会识别玩家背包 `SlotItemHandler(InvWrapper/RangedWrapper)` 槽位，以支持 Overlay 渲染和提前点击拦截。
   - These paths are compile-verified; in-game JDT screen validation is still recommended.
   - 这些路径已通过编译验证，仍建议进行 JDT 界面实机复测。
-- Quark compatibility note:
-- Quark 兼容说明：
-  - NeoForge Quark sorting compatibility is compile-verified and the common locked-slot merge helper is covered by `QuarkSortingCompatServiceTest`.
-  - NeoForge Quark 排序兼容已通过编译验证，common 锁槽合并 helper 已由 `QuarkSortingCompatServiceTest` 覆盖。
-  - NeoForge Quark hotbar changer compatibility is covered by `QuarkSortingCompatServiceTest` for favorite-state swaps between hotbar and main-inventory rows.
-  - NeoForge Quark 快捷栏切换兼容已由 `QuarkSortingCompatServiceTest` 覆盖快捷栏与主背包行之间的收藏状态交换。
-  - In-game NeoForge + Quark sorting and hotbar-changer validation is still recommended because the optional Quark runtime dependency is not part of common unit tests.
-  - 仍建议进行 NeoForge + Quark 排序和快捷栏切换实机验证，因为可选 Quark 运行时依赖不属于 common 单元测试范围。
+- Sorting compatibility note:
+- 整理兼容说明：
+  - NeoForge Quark sorting compatibility and Inventory Tweaks ReFoxed player-sort compatibility both use the common favorite-slot merge helper covered by `InventorySortingCompatServiceTest`.
+  - NeoForge Quark 排序兼容与 Inventory Tweaks ReFoxed 玩家背包整理兼容都复用 common 收藏锁槽合并 helper，并由 `InventorySortingCompatServiceTest` 覆盖。
+  - NeoForge Quark hotbar changer compatibility is covered by `InventorySortingCompatServiceTest` for favorite-state swaps between hotbar and main-inventory rows.
+  - NeoForge Quark 快捷栏切换兼容已由 `InventorySortingCompatServiceTest` 覆盖快捷栏与主背包行之间的收藏状态交换。
+  - In-game NeoForge + Quark and NeoForge + Inventory Tweaks ReFoxed validation is still recommended because optional sorter runtime dependencies are not part of common unit tests.
+  - 仍建议进行 NeoForge + Quark 与 NeoForge + Inventory Tweaks ReFoxed 实机验证，因为这些可选整理模组运行时依赖不属于 common 单元测试范围。
 - Sophisticated Backpacks compatibility note:
 - Sophisticated Backpacks 兼容说明：
   - NeoForge Sophisticated Backpacks screens use a dedicated `StorageScreenBase.findSlot(x, y)` container mouse state machine, including a coordinate fallback for player-inventory slots when the backpack screen does not expose empty slots through its own lookup.
@@ -78,6 +78,8 @@ Date: 2026-05-05
   - NeoForge 现在会直接钩住 `StorageScreenBase.slotClicked`，因为 SophisticatedCore 覆盖了原版 `AbstractContainerScreen.slotClicked` 方法。
   - `StorageScreenBase.slotClicked` and vanilla `AbstractContainerScreen.slotClicked` only cancel leaked `PICKUP`/`QUICK_MOVE` inventory actions while Alt is held; they do not toggle state.
   - 按住 Alt 时，`StorageScreenBase.slotClicked` 与原版 `AbstractContainerScreen.slotClicked` 只会取消漏进来的 `PICKUP`/`QUICK_MOVE` 库存动作，不会切换状态。
+  - Server-side Sophisticated menu clicks now distinguish storage-owned slots from the embedded 36 player-inventory slots before resolving item-handler-backed player indices, preventing memory/storage slots from being pseudo-locked by matching player inventory index numbers.
+  - 服务端 Sophisticated 菜单点击现在会先区分存储自身槽与内嵌的 36 个玩家背包槽，再解析 item-handler-backed 玩家索引，避免记忆/存储槽因为槽号碰巧对应玩家背包索引而出现伪锁定。
   - NeoForge has a low-level `MouseHandler` press entry for modpack cases where Sophisticated empty-slot clicks do not reach `ScreenEvent` or screen `mouseClicked`. When Mouse Tweaks is present, this entry primes/toggles the press target without canceling the raw press so Mouse Tweaks drag initialization is preserved.
   - NeoForge 针对整合包中 Sophisticated 空槽点击到不了 `ScreenEvent` 或界面 `mouseClicked` 的情况提供低层 `MouseHandler` 按下入口。存在 Mouse Tweaks 时，该入口只预激活/切换按下目标，不取消原始按下，因此保留 Mouse Tweaks 拖动初始化。
   - Current runtime limitation: Sophisticated empty-slot single-click toggling works through the low-level press path, but empty-slot drag marking is not guaranteed when Mouse Tweaks does not emit drag-enter samples for those empty slots.
@@ -154,6 +156,10 @@ Date: 2026-05-05
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`：NeoForge 状态机命名整理后通过。
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after NeoForge state-machine naming cleanup.
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：NeoForge 状态机命名整理后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after the Sophisticated server menu pseudo-lock fix.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：Sophisticated 服务端菜单伪锁定修复后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the Sophisticated server menu pseudo-lock fix.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：Sophisticated 服务端菜单伪锁定修复后通过。
 
 - Command: `.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
 - 命令：`.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`

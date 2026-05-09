@@ -16,6 +16,8 @@ Last updated: 2026-05-05
 - [ ] P0：实测创造模式、普通容器、快捷栏交换、拖拽和外部物品转移的一致性。
 - [ ] P0: Runtime validate NeoForge Quark inventory sorting with locked main-inventory slots.
 - [ ] P0：实机验证 NeoForge + Quark 背包排序遇到已锁主背包槽时会跳过锁槽。
+- [ ] P0: Runtime validate NeoForge Inventory Tweaks ReFoxed player sorting with locked hotbar and main-inventory slots.
+- [ ] P0：实机验证 NeoForge + Inventory Tweaks ReFoxed 玩家背包整理遇到已锁快捷栏和主背包槽时会跳过锁槽。
 - [ ] P0: Runtime validate NeoForge Quark hotbar changer (`Z`) swaps with locked hotbar and main-inventory slots.
 - [ ] P0：实机验证 NeoForge + Quark 快捷栏切换（`Z`）在锁定快捷栏和主背包槽时的交换行为。
 - [ ] P0: Runtime validate NeoForge Sophisticated Backpacks Alt-left-click lock toggling after the `QUICK_MOVE` click-path fix.
@@ -87,6 +89,8 @@ Last updated: 2026-05-05
 - 服务端权威持久化现在解析到当前世界目录，并会迁移随后删除旧游戏根目录 `data/neo_favorite_items` 下的文件。
 - NeoForge Quark sorting compatibility now augments Quark's sorting-locked slot list with favorite player-inventory slots.
 - NeoForge Quark 排序兼容现在会把已收藏玩家背包槽补入 Quark 的排序锁定槽列表。
+- NeoForge Inventory Tweaks ReFoxed player-sort compatibility now augments the mod's locked/frozen slot list with favorite player-inventory slots.
+- NeoForge Inventory Tweaks ReFoxed 玩家背包整理兼容现在会把已收藏玩家背包槽补入该模组的 locked/frozen 槽列表。
 - NeoForge Quark hotbar changer compatibility now swaps hotbar row items under a scoped guard bypass, moves favorite state with the exchanged stack, and syncs the updated favorite state back to the client.
 - NeoForge Quark 快捷栏切换兼容现在会在有作用域的守卫旁路下交换快捷栏行物品，让收藏状态跟随被交换物品移动，并把更新后的收藏状态同步回客户端。
 - Lock-operation left-click now uses a unified container mouse state machine on all three loaders. The physical Alt-left-click toggles once at `mouseClicked`, `mouseDragged` only consumes leaked vanilla drag while active, and Mouse Tweaks compatibility is the only drag-slot toggle source when Mouse Tweaks is present. NeoForge additionally resolves Sophisticated screens through its dedicated screen state machine and pure slot-location helpers.
@@ -112,6 +116,8 @@ Last updated: 2026-05-05
 - 后续在 Fabric/Forge 上复测 AE2 终端空格+左键 MOVE_REGION 是否已被公共菜单层兼容钩子覆盖。
 - Runtime-test Quark sorting on NeoForge with locked player main-inventory slots, including existing Quark locked slots if a menu supplies them.
 - 在 NeoForge 实机复测 Quark 排序遇到已锁玩家主背包槽时的行为，并覆盖菜单自身提供 Quark 锁定槽的情况。
+- Runtime-test Inventory Tweaks ReFoxed player sorting on NeoForge with locked hotbar and main-inventory slots, including its own `/LOCKED` and `/FROZEN` rule slots.
+- 在 NeoForge 实机复测 Inventory Tweaks ReFoxed 玩家背包整理遇到已锁快捷栏和主背包槽时的行为，并覆盖其自身 `/LOCKED` 与 `/FROZEN` 规则槽。
 - Runtime-test Quark hotbar changer on NeoForge by locking hotbar slot `0`, swapping with main-inventory rows `9`, `18`, or `27`, and confirming both item stacks and favorite state exchange cleanly without ghost items.
 - 在 NeoForge 实机复测 Quark 快捷栏切换：锁定快捷栏 `0` 号槽，与主背包行 `9`、`18` 或 `27` 交换，确认两边物品与收藏状态都能干净交换且不留下幽灵物品。
 - Runtime-test Sophisticated Backpacks on NeoForge by opening a backpack, holding Alt, left-clicking player inventory slots, and confirming the favorite lock toggles without quick-moving the stack.

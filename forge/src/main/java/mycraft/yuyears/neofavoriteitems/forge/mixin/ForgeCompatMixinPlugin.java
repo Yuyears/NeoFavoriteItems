@@ -12,7 +12,6 @@ import java.util.Set;
 public class ForgeCompatMixinPlugin implements IMixinConfigPlugin {
     
     private static final String SOPHISTICATED_SORTER_MOD_ID = "sophisticatedsorter";
-    private static final String SOPHISTICATED_CORE_MOD_ID = "sophisticatedcore";
     
     @Override
     public void onLoad(String mixinPackage) {
@@ -31,11 +30,6 @@ public class ForgeCompatMixinPlugin implements IMixinConfigPlugin {
             return isModLoaded(SOPHISTICATED_SORTER_MOD_ID);
         }
         
-        // Check if SophisticatedCoreInventoryHelperMixin should be applied
-        if (mixinClassName.endsWith("SophisticatedCoreInventoryHelperMixin")) {
-            return isModLoaded(SOPHISTICATED_CORE_MOD_ID);
-        }
-
         if (mixinClassName.endsWith("MouseTweaksMainMixin")) {
             return true;
         }

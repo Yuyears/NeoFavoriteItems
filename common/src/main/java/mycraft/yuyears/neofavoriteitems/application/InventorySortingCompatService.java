@@ -1,6 +1,7 @@
 package mycraft.yuyears.neofavoriteitems.application;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Set;
 import java.util.TreeSet;
 import mycraft.yuyears.neofavoriteitems.FavoritesManager;
@@ -10,8 +11,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 
-public final class QuarkSortingCompatService {
-    private QuarkSortingCompatService() {}
+public final class InventorySortingCompatService {
+    private InventorySortingCompatService() {}
 
     public static int[] augmentLockedSlots(Container container, int startInclusive, int endExclusive, int[] lockedSlots) {
         if (!(container instanceof Inventory inventory) || inventory.player == null) {
@@ -25,6 +26,21 @@ public final class QuarkSortingCompatService {
             endExclusive,
             lockedSlots
         );
+    }
+
+    public static int[] favoriteSlotsForPlayerSort(Inventory inventory, int startInclusive, int endExclusive) {
+        if (inventory == null || inventory.player == null) {
+            return new int[0];
+        }
+
+        FavoritesManager.getStateService().setPlayer(inventory.player.getUUID());
+        int[] favoriteLocks = mergeLockedSlots(
+            FavoritesManager.getStateService().getFavoriteSlots(),
+            startInclusive,
+            endExclusive,
+            null
+        );
+        return favoriteLocks == null ? new int[0] : favoriteLocks;
     }
 
     public static boolean applyHotbarSwapFavoriteState(Inventory inventory, int slot1, int slot2) {
@@ -80,7 +96,7 @@ public final class QuarkSortingCompatService {
             && currentClickType == ClickType.PICKUP;
     }
 
-    static int[] mergeLockedSlots(Set<Integer> favoriteSlots, int startInclusive, int endExclusive, int[] lockedSlots) {
+    static int[] mergeLockedSlots(Collection<Integer> favoriteSlots, int startInclusive, int endExclusive, int[] lockedSlots) {
         if (favoriteSlots == null || favoriteSlots.isEmpty()) {
             return lockedSlots;
         }
