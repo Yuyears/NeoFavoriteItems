@@ -57,8 +57,8 @@
 - Forge/NeoForge 的槽位解析也能识别以 `SlotItemHandler(InvWrapper/RangedWrapper)` 暴露的玩家槽位，因此基于 item handler 的 GUI 中也会渲染 Overlay 并提前拦截点击。
 - AE2 terminal `MOVE_REGION` is handled through AE2's shared menu abstractions when AE2 is present, covering space-left-click transfers without adapting each terminal screen separately.
 - 安装 AE2 时，AE2 终端的 `MOVE_REGION` 会通过 AE2 公共菜单抽象层处理，覆盖空格+左键转移，而不需要逐个终端界面适配。
-- NeoForge Quark inventory sorting is integrated with the favorite state: Quark receives favorite player-inventory slots as sorting-locked slots so sorting skips them instead of clearing or reordering them.
-- NeoForge 的 Quark 背包排序已接入收藏状态：排序前会把已收藏玩家背包槽补入 Quark 的排序锁定槽列表，使排序跳过这些槽位，而不是清空或重排它们。
+- Inventory sorting compatibility uses each sorter mod's own locked-slot concept when available: Quark and Inventory Tweaks ReFoxed receive favorite player-inventory slots as sorting-locked slots so sorting skips them instead of clearing or reordering them.
+- 整理模组兼容会优先复用整理模组自身的锁槽概念：Quark 与 Inventory Tweaks ReFoxed 会在排序前收到已收藏玩家背包槽作为排序锁槽，使排序跳过这些槽位，而不是清空或重排它们。
 - NeoForge Quark hotbar changer swaps are handled separately from sorting: when Quark's `Z` hotbar switch exchanges hotbar slots with main-inventory rows, the item exchange bypasses the generic lock guard and the favorite state moves with the exchanged stack.
 - NeoForge 的 Quark 快捷栏切换会与排序分开处理：当 Quark 的 `Z` 键快捷栏切换在快捷栏与主背包行之间交换物品时，该物品交换会绕过通用锁槽守卫，并让收藏状态跟随被交换的物品移动。
 - Mouse Tweaks-style drag clicks are supported on all three loaders. The compatibility layer borrows Mouse Tweaks' slot-enter detection, then routes newly entered player-inventory slots to NeoFavoriteItems' own lock toggle path instead of Mouse Tweaks' click semantics.
@@ -132,8 +132,8 @@ Common source code lives under `common/src/main/java/mycraft/yuyears/neofavorite
 
 - `domain`: `LogicalSlotIndex`, `InteractionType`, `InteractionDecision`
 - `domain`：`LogicalSlotIndex`、`InteractionType`、`InteractionDecision`
-- `application`: `InteractionGuardService`, `ServerFavoriteService`, `ClientFavoriteSyncService`, `QuarkSortingCompatService`
-- `application`：`InteractionGuardService`、`ServerFavoriteService`、`ClientFavoriteSyncService`、`QuarkSortingCompatService`
+- `application`: `InteractionGuardService`, `ServerFavoriteService`, `ClientFavoriteSyncService`, `InventorySortingCompatService`
+- `application`：`InteractionGuardService`、`ServerFavoriteService`、`ClientFavoriteSyncService`、`InventorySortingCompatService`
 - `integration`: `SlotMappingService`
 - `integration`：`SlotMappingService`
 - `persistence`: `DataPersistenceManager`

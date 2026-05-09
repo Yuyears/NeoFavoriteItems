@@ -12,7 +12,6 @@ import java.util.Set;
 public class NeoForgeCompatMixinPlugin implements IMixinConfigPlugin {
     
     private static final String SOPHISTICATED_SORTER_MOD_ID = "sophisticatedsorter";
-    private static final String SOPHISTICATED_CORE_MOD_ID = "sophisticatedcore";
     private static final String QUARK_MOD_ID = "quark";
     
     @Override
@@ -32,11 +31,6 @@ public class NeoForgeCompatMixinPlugin implements IMixinConfigPlugin {
             return isModLoaded(SOPHISTICATED_SORTER_MOD_ID);
         }
         
-        // Check if SophisticatedCoreInventoryHelperMixin should be applied
-        if (mixinClassName.endsWith("SophisticatedCoreInventoryHelperMixin")) {
-            return isModLoaded(SOPHISTICATED_CORE_MOD_ID);
-        }
-
         if (mixinClassName.endsWith("SophisticatedStorageScreenBaseMixin")) {
             return true;
         }
@@ -47,6 +41,10 @@ public class NeoForgeCompatMixinPlugin implements IMixinConfigPlugin {
 
         if (mixinClassName.endsWith("QuarkEasyTransferringClientMixin")) {
             return isModLoaded(QUARK_MOD_ID);
+        }
+
+        if (mixinClassName.endsWith("InvTweaksSortingMixin")) {
+            return true;
         }
 
         if (mixinClassName.endsWith("AppEngMenuMixin")) {

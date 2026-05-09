@@ -125,6 +125,9 @@ public final class ServerFavoriteService {
         if (player == null || slotId < 0 || slotId >= menu.slots.size()) {
             return false;
         }
+        if (isSophisticatedStorageNonPlayerSlot(menu, slotId)) {
+            return false;
+        }
 
         Slot slot = menu.slots.get(slotId);
         int inventoryIndex = resolvePlayerInventoryIndex(slot, player);
@@ -376,6 +379,37 @@ public final class ServerFavoriteService {
             return resolveItemHandlerInventoryIndex(handler, slot.getContainerSlot(), inventory);
         }
         return -1;
+    }
+
+    private static boolean isSophisticatedStorageNonPlayerSlot(AbstractContainerMenu menu, int slotId) {
+        if (menu == null || !isInstanceOf(menu, "net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase")) {
+            return false;
+        }
+
+        Integer storageSlotsSize = invokeIntNoArg(menu, "getNumberOfStorageInventorySlots");
+        if (storageSlotsSize == null) {
+            return false;
+        }
+
+        int firstPlayerSlot = storageSlotsSize;
+        int afterPlayerSlots = firstPlayerSlot + 36;
+        return slotId < firstPlayerSlot || slotId >= afterPlayerSlots;
+    }
+
+    private static boolean isInstanceOf(Object target, String className) {
+        Class<?> type = target.getClass();
+        while (type != null) {
+            if (type.getName().equals(className)) {
+                return true;
+            }
+            type = type.getSuperclass();
+        }
+        return false;
+    }
+
+    private static Integer invokeIntNoArg(Object target, String methodName) {
+        Object value = invokeNoArg(target, methodName);
+        return value instanceof Integer integer ? integer : null;
     }
 
     private static int resolveItemHandlerInventoryIndex(Object handler, int slot, Inventory inventory) {

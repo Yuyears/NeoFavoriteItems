@@ -7,9 +7,9 @@
   "mixins": [
     "AppEngMenuMixin",
     "AppEngStorageMenuMixin",
+    "InvTweaksSortingMixin",
     "QuarkChangeHotbarMessageMixin",
     "QuarkSortingHandlerMixin",
-    "SophisticatedCoreInventoryHelperMixin",
     "SophisticatedSorterCoreUtilsMixin"
   ],
   "client": [
