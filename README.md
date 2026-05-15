@@ -241,18 +241,12 @@ Key bindings are managed through Minecraft Controls and are not written to the m
 
 ## 文档
 
-- `docs/index.md`: documentation map and naming rules
-- `docs/index.md`：文档地图和命名规范
-- `docs/architecture.md`: current architecture, layer responsibilities, and runtime flows
-- `docs/architecture.md`：当前架构、分层职责和关键运行流程
-- `docs/roadmap.md`: prioritized remaining work and validation items
-- `docs/roadmap.md`：按优先级整理的剩余工作和验证项
-- `docs/reports/test-report.md`: unit test summary and JaCoCo coverage snapshot
-- `docs/reports/test-report.md`：单元测试摘要和 JaCoCo 覆盖率快照
-- `docs/reports/verification-report.md`: fix verification notes and integration validation summary
-- `docs/reports/verification-report.md`：问题修复验证说明与集成验证摘要
-- `docs/work-items/`: temporary stage plans for tasks that span multiple conversations
-- `docs/work-items/`：跨多次对话的临时阶段计划
+- `docs/00-guide-documentation.md`: documentation catalog and naming rules
+- `docs/00-guide-documentation.md`：文档目录和命名规范
+- `docs/10-design-architecture.md`: current architecture, layer responsibilities, and runtime flows
+- `docs/10-design-architecture.md`：当前架构、分层职责和关键运行流程
+- `docs/20-plan-roadmap.md`: prioritized remaining work and validation items
+- `docs/20-plan-roadmap.md`：按优先级整理的剩余工作和验证项
 - `README.md`: user and developer entrypoint
 - `README.md`：面向使用和开发入口的简要说明
 

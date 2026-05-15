@@ -364,18 +364,12 @@ Location: `common/.../render`
 - 物品移动策略已有配置入口，旁路状态下的复杂移动追踪仍需继续完善。
 - Visual feedback and actual sound playback still need implementation.
 - 视觉反馈和音效实际播放仍需补齐。
-- Automated unit tests now cover favorites state, client sync, drop guard, config loading, persistence, and reflection cache behavior.
-- 现已建立自动化单元测试，覆盖收藏状态、客户端同步、丢弃拦截、配置加载、持久化和反射缓存行为。
-- Interaction decision tests now cover locked incoming targets for offhand swaps and armor quick-move equipment.
-- 交互决策测试现已覆盖副手交换和护甲 Shift 装备中的锁定目标槽放入判定。
-- Interaction decision tests also cover locked quick-move source removal and bypass behavior.
-- 交互决策测试也已覆盖锁定槽作为快速移动来源时的取出拒绝，以及旁路键放行行为。
-- Locked empty slot fallback selection is unit-tested for hotbar priority, main-inventory fallback, locked-slot skipping, and no-slot cases.
-- 锁定空槽回退选择已通过单元测试覆盖快捷栏优先、主背包回退、跳过锁定槽和无可用槽场景。
-- AE2 compatibility is intentionally common-abstraction based. The NeoForge AE2 terminal scenario has been validated for space-left-click `MOVE_REGION` into and out of locked player inventory slots; Fabric and Forge still need runtime checks.
-- AE2 兼容刻意基于公共抽象层实现。NeoForge 的 AE2 终端场景已验证空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出；Fabric 和 Forge 仍需运行时验证。
-- Sorter locked-slot compatibility is unit-tested through the common locked-slot merge helper. Quark hotbar changer favorite-state movement is covered by common unit tests and NeoForge build verification. Runtime validation with Quark and Inventory Tweaks ReFoxed is still recommended.
-- 整理锁槽兼容已通过 common 锁槽合并 helper 的单元测试覆盖。Quark 快捷栏切换中的收藏状态跟随移动已由 common 单元测试与 NeoForge 构建验证覆盖。仍建议在 NeoForge + Quark 和 Inventory Tweaks ReFoxed 环境中实机复测。
+- Automated coverage details belong in `30-report-tests.md`.
+- 自动化覆盖细节归入 `30-report-tests.md`。
+- Runtime validation status belongs in `31-report-verification.md`.
+- 运行时验证状态归入 `31-report-verification.md`。
+- AE2 compatibility is intentionally common-abstraction based, and sorter compatibility should continue to use each sorter mod's locked-slot concept where available.
+- AE2 兼容刻意基于公共抽象层实现；整理兼容应继续优先复用整理模组自身的锁槽概念。
 - NeoForge Sophisticated empty-slot drag marking is a known compatibility limitation in modpacks where Mouse Tweaks does not emit drag-enter samples for those empty slots; single-click empty-slot toggling remains supported.
 - NeoForge 的 Sophisticated 空槽拖动标记在 Mouse Tweaks 不为这些空槽发出拖动进入采样的整合包中属于已知兼容限制；空槽单击切换仍受支持。
 

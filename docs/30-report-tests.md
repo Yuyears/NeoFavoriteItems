@@ -10,8 +10,8 @@ Date: 2026-05-10
 
 ## 用途
 
-- This document records the automated test scope, coverage snapshot, build verification, and persistence-specific validation points for the current delivery.
-- 本文档记录当前交付对应的自动化测试范围、覆盖率快照、构建验证结果，以及与持久化相关的专项验证点。
+- This document records automated test scope, coverage snapshots, build verification, and compile/build evidence for the current delivery.
+- 本文档记录当前交付对应的自动化测试范围、覆盖率快照、构建验证结果，以及编译/构建证据。
 
 ## Automated Tests
 
@@ -47,26 +47,26 @@ Date: 2026-05-10
   - 锁定空槽放入回退选择会优先空且未锁定的快捷栏槽，其次主背包槽，并会跳过锁定目标和覆盖无可用槽场景
 - AE2 compatibility note:
 - AE2 兼容说明：
-  - AE2 menu-layer hooks are compile/build verified. NeoForge in-game validation has covered terminal space-left-click `MOVE_REGION` into and out of locked player inventory slots.
-  - AE2 菜单层钩子已通过编译/构建验证。NeoForge 实机验证已覆盖终端空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出。
-  - Fabric and Forge AE2 runtime behavior still require manual validation because AE2 is an optional runtime dependency and terminal behavior is not covered by common unit tests.
-  - Fabric、Forge 的 AE2 运行时行为仍需手工验证，因为 AE2 是可选运行时依赖，且具体终端行为不在 common 单元测试覆盖范围内。
+  - AE2 menu-layer hooks are compile/build verified.
+  - AE2 菜单层钩子已通过编译/构建验证。
+  - Optional-runtime behavior is not covered by common unit tests; manual evidence belongs in `31-report-verification.md`.
+  - 可选运行时行为不在 common 单元测试覆盖范围内；手工验证证据归入 `31-report-verification.md`。
 - JustDireThings compatibility note:
 - JustDireThings 兼容说明：
   - Forge/NeoForge item-handler wrapper guards now leave read APIs transparent and protect only mutation APIs.
   - Forge/NeoForge item-handler 包装器守卫现在保持读取 API 透明，只保护变更 API。
   - Forge/NeoForge slot resolvers now recognize player inventory `SlotItemHandler(InvWrapper/RangedWrapper)` slots for overlay rendering and early click guards.
   - Forge/NeoForge 槽位解析器现在会识别玩家背包 `SlotItemHandler(InvWrapper/RangedWrapper)` 槽位，以支持 Overlay 渲染和提前点击拦截。
-  - These paths are compile-verified; in-game JDT screen validation is still recommended.
-  - 这些路径已通过编译验证，仍建议进行 JDT 界面实机复测。
+  - These paths are compile-verified.
+  - 这些路径已通过编译验证。
 - Sorting compatibility note:
 - 整理兼容说明：
   - NeoForge Quark sorting compatibility and Inventory Tweaks ReFoxed player-sort compatibility both use the common favorite-slot merge helper covered by `InventorySortingCompatServiceTest`.
   - NeoForge Quark 排序兼容与 Inventory Tweaks ReFoxed 玩家背包整理兼容都复用 common 收藏锁槽合并 helper，并由 `InventorySortingCompatServiceTest` 覆盖。
   - NeoForge Quark hotbar changer compatibility is covered by `InventorySortingCompatServiceTest` for favorite-state swaps between hotbar and main-inventory rows.
   - NeoForge Quark 快捷栏切换兼容已由 `InventorySortingCompatServiceTest` 覆盖快捷栏与主背包行之间的收藏状态交换。
-  - In-game NeoForge + Quark and NeoForge + Inventory Tweaks ReFoxed validation is still recommended because optional sorter runtime dependencies are not part of common unit tests.
-  - 仍建议进行 NeoForge + Quark 与 NeoForge + Inventory Tweaks ReFoxed 实机验证，因为这些可选整理模组运行时依赖不属于 common 单元测试范围。
+  - Optional sorter runtime dependencies are not part of common unit tests; manual evidence belongs in `31-report-verification.md`.
+  - 可选整理模组运行时依赖不属于 common 单元测试范围；手工验证证据归入 `31-report-verification.md`。
 - Sophisticated Backpacks compatibility note:
 - Sophisticated Backpacks 兼容说明：
   - NeoForge Sophisticated Backpacks screens use a dedicated `StorageScreenBase.findSlot(x, y)` container mouse state machine, including a coordinate fallback for player-inventory slots when the backpack screen does not expose empty slots through its own lookup.
@@ -89,8 +89,8 @@ Date: 2026-05-10
   - NeoForge 针对整合包中 Sophisticated 空槽点击到不了 `ScreenEvent` 或界面 `mouseClicked` 的情况提供低层 `MouseHandler` 按下入口。存在 Mouse Tweaks 时，该入口只预激活/切换按下目标，不取消原始按下，因此保留 Mouse Tweaks 拖动初始化。
   - Current runtime limitation: Sophisticated empty-slot single-click toggling works through the low-level press path, but empty-slot drag marking is not guaranteed when Mouse Tweaks does not emit drag-enter samples for those empty slots.
   - 当前运行限制：Sophisticated 空槽单击切换可通过低层按下路径工作，但如果 Mouse Tweaks 不为这些空槽发出拖动进入采样，空槽拖动标记不作保证。
-  - This client mixin path is compile-verified; in-game NeoForge + Sophisticated Backpacks validation is still recommended with the user modpack.
-  - 该客户端 Mixin 路径已通过编译验证；仍建议在用户整合包中进行 NeoForge + Sophisticated Backpacks 实机复测。
+  - This client mixin path is compile-verified.
+  - 该客户端 Mixin 路径已通过编译验证。
 - Overlay rendering note:
 - Overlay 渲染说明：
   - `ConfigManagerTest` verifies that the removed `renderForegroundContrastBackdrop` option is no longer generated and is stripped during config repair.
@@ -193,45 +193,31 @@ Date: 2026-05-10
 - Result: passed
 - 结果：通过
 
-## Persistence Validation Focus
+## Automated Persistence Coverage
 
-## 持久化专项验证
+## 自动化持久化覆盖
 
-- Verified that client-only storage resolves to `favoriteitems/<sanitized-server-address>/players/<uuid>.dat`
-- 已验证单端客户端存储路径为 `favoriteitems/<净化后的服务器地址>/players/<uuid>.dat`
-- Verified that dual-install storage resolves to `<world>/data/neo_favorite_items/players/<uuid>.dat`
-- 已验证双端安装存储路径为 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`
-- Verified that legacy `itemfavorites/...` data is migrated into the new directory and the old file is removed after a successful read
-- 已验证旧 `itemfavorites/...` 数据在成功读取后会迁移到新目录，并删除旧文件
-- Verified that player-login loads populate the cache, in-play cache updates avoid immediate file writes, and full-save flush preserves player favorite sets
-- 已验证玩家登录读取会填充缓存，游戏过程缓存更新不会立即写文件，完整保存回路能够保持玩家收藏状态
+- Client-only storage resolves to `favoriteitems/<sanitized-server-address>/players/<uuid>.dat`.
+- 单端客户端存储路径解析为 `favoriteitems/<净化后的服务器地址>/players/<uuid>.dat`。
+- Dual-install storage resolves to `<world>/data/neo_favorite_items/players/<uuid>.dat`.
+- 双端安装存储路径解析为 `<世界目录>/data/neo_favorite_items/players/<uuid>.dat`。
+- Legacy `itemfavorites/...` data is migrated into the new directory and the old file is removed after a successful read.
+- 旧 `itemfavorites/...` 数据会在成功读取后迁移到新目录，并删除旧文件。
+- Player-login loads populate the cache, in-play cache updates avoid immediate file writes, and full-save flush preserves player favorite sets.
+- 玩家登录读取会填充缓存，游戏过程缓存更新不会立即写文件，完整保存回路能够保持玩家收藏状态。
 
-## Manual Runtime Validation
+## Runtime Validation Boundary
 
-## 手工运行验证
+## 运行时验证边界
 
-- NeoForge dedicated-server installation modes passed:
-- NeoForge 真实专用服务端安装模式已通过：
-  - client-only
-  - 仅客户端安装
-  - server-only
-  - 仅服务端安装
-  - both-sides-installed
-  - 双端均安装
-- NeoForge high-risk interaction checks passed:
-- NeoForge 高风险交互检查已通过：
-  - normal drop and bypass-key drop behavior
-  - 普通丢弃与按住旁路键时的行为
-  - GUI and GUI-outside offhand swap with locked empty and non-empty offhand slots
-  - GUI 内外副手交换，覆盖锁定空副手槽和锁定非空副手槽
-  - shift-click equippable armor into locked empty armor slots
-  - 锁定空护甲槽 Shift 点击可装备护甲
-  - AE2 terminal space-left-click `MOVE_REGION` into and out of locked player inventory slots
-  - AE2 终端空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出
+- Runtime/manual validation results are tracked in `31-report-verification.md`.
+- 运行时/手工验证结果统一记录在 `31-report-verification.md`。
+- This test report may mention runtime gaps only to explain why a behavior is not covered by automated tests.
+- 本测试报告只在解释自动化测试无法覆盖某行为时提及运行时缺口。
 
 ## Notes
 
 ## 说明
 
-- These results cover automated verification in the current workspace plus the NeoForge manual runtime checks listed above. Fabric and Forge still need in-game multiplayer matrix testing.
-- 以上结果覆盖当前工作区内的自动化验证，以及上方列出的 NeoForge 手工运行验证。Fabric 和 Forge 仍需实际游戏中的多人联机矩阵测试。
+- This document covers automated verification in the current workspace. Runtime validation status is maintained in `31-report-verification.md`.
+- 本文档覆盖当前工作区内的自动化验证。运行时验证状态维护在 `31-report-verification.md`。
