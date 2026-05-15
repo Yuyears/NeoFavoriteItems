@@ -67,6 +67,16 @@ class InteractionGuardServiceTest {
     }
 
     @Test
+    void lockedEmptySlotRejectsCursorPlacementWhenConfigDisallowsIt() {
+        ConfigManager.getInstance().getConfig().general.allowItemsIntoLockedEmptySlots = false;
+        FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(9), true);
+
+        assertTrue(InteractionGuardService.getInstance()
+            .evaluate(9, InteractionType.CLICK, false, false)
+            .denied());
+    }
+
+    @Test
     void lockedSourceQuickMoveAllowsBypass() {
         FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(9), true);
 

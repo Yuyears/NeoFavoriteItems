@@ -7,6 +7,7 @@ import mycraft.yuyears.neofavoriteitems.domain.InteractionDecision;
 import mycraft.yuyears.neofavoriteitems.domain.InteractionType;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
@@ -304,6 +305,60 @@ public final class ServerFavoriteService {
         return false;
     }
 
+    public static boolean shouldRerouteInventorySet(Inventory inventory, int inventoryIndex, ItemStack incomingStack) {
+        if (!isServerPlayerInventoryIndex(inventory, inventoryIndex)) {
+            return false;
+        }
+
+        Player player = inventory.player;
+        if (isInventoryGuardBypassed(player)) {
+            return false;
+        }
+
+        ItemStack currentStack = inventory.getItem(inventoryIndex);
+        if (!currentStack.isEmpty() || incomingStack == null || incomingStack.isEmpty()) {
+            return false;
+        }
+
+        FavoritesManager.getInstance().setPlayer(player.getUUID());
+        InteractionDecision decision = InteractionGuardService.getInstance().evaluateIncomingItem(
+            inventoryIndex,
+            InteractionType.QUICK_MOVE,
+            isBypassKeyHeld(player),
+            true
+        );
+        return decision.denied()
+            && tryRerouteDeniedIncomingStack(inventory, inventoryIndex, currentStack, incomingStack, decision);
+    }
+
+    public static boolean shouldRerouteMainHandSet(Player player, InteractionHand hand, ItemStack incomingStack) {
+        if (player == null || hand != InteractionHand.MAIN_HAND) {
+            return false;
+        }
+        Inventory inventory = player.getInventory();
+        if (!isServerPlayerInventoryIndex(inventory, inventory.selected)) {
+            return false;
+        }
+        if (isInventoryGuardBypassed(player)) {
+            return false;
+        }
+
+        ItemStack currentStack = inventory.getItem(inventory.selected);
+        if (!currentStack.isEmpty() || incomingStack == null || incomingStack.isEmpty()) {
+            return false;
+        }
+
+        FavoritesManager.getInstance().setPlayer(player.getUUID());
+        InteractionDecision decision = InteractionGuardService.getInstance().evaluateIncomingItem(
+            inventory.selected,
+            InteractionType.QUICK_MOVE,
+            isBypassKeyHeld(player),
+            true
+        );
+        return decision.denied()
+            && tryRerouteDeniedIncomingStack(inventory, inventory.selected, currentStack, incomingStack, decision);
+    }
+
     public static boolean shouldPreventInventoryReceive(Inventory inventory, int inventoryIndex, ItemStack incomingStack) {
         if (!isServerPlayerInventoryIndex(inventory, inventoryIndex) || incomingStack.isEmpty()) {
             return false;
@@ -319,6 +374,52 @@ public final class ServerFavoriteService {
             ));
         }
         return shouldPreventInventorySet(inventory, inventoryIndex, expectedStack);
+    }
+
+    private static boolean tryRerouteDeniedIncomingStack(Inventory inventory, int inventoryIndex, ItemStack currentStack, ItemStack incomingStack, InteractionDecision decision) {
+        if (inventory == null
+            || inventory.player == null
+            || currentStack == null
+            || !currentStack.isEmpty()
+            || incomingStack == null
+            || incomingStack.isEmpty()) {
+            return false;
+        }
+
+        Player player = inventory.player;
+        int fallbackSlot = LockedEmptySlotFallback.findEmptyUnlockedFallbackSlot(
+            slot -> inventory.getItem(slot).isEmpty(),
+            slot -> isIncomingTargetLocked(player, slot)
+        );
+        ItemStack stackToMove = incomingStack.copy();
+        if (fallbackSlot >= 0) {
+            runWithInventoryGuardsBypassed(player, () -> inventory.setItem(fallbackSlot, stackToMove));
+            incomingStack.setCount(0);
+            DebugLogger.debug(
+                "Server rerouted incoming stack away from locked empty slot: player={} blockedSlot={} fallbackSlot={} reason={}",
+                player.getName().getString(),
+                inventoryIndex,
+                fallbackSlot,
+                decision.reason()
+            );
+            return true;
+        }
+
+        if (player.drop(stackToMove, false) != null) {
+            incomingStack.setCount(0);
+            DebugLogger.debug(
+                "Server dropped incoming stack away from locked empty slot: player={} blockedSlot={} reason={}",
+                player.getName().getString(),
+                inventoryIndex,
+                decision.reason()
+            );
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isIncomingTargetLocked(Player player, int inventoryIndex) {
+        return evaluateIncomingItem(player, inventoryIndex, InteractionType.QUICK_MOVE, true).denied();
     }
 
     public static boolean shouldProtectInventorySlotForExternalMove(Inventory inventory, int inventoryIndex) {

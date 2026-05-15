@@ -2,9 +2,9 @@
 
 # 测试报告
 
-Date: 2026-05-05
+Date: 2026-05-10
 
-日期：2026-05-05
+日期：2026-05-10
 
 ## Purpose
 
@@ -32,6 +32,7 @@ Date: 2026-05-05
   - `ReflectionHelperTest`
   - `PlatformFavoriteSupportTest`
   - `InventorySortingCompatServiceTest`
+  - `LockedEmptySlotFallbackTest`
 - Interaction coverage additions in this round:
 - 本轮新增的交互覆盖点：
   - locked empty offhand rejects incoming GUI/GUI-outside swap targets
@@ -42,6 +43,8 @@ Date: 2026-05-05
   - 锁定槽作为快速移动来源时拒绝取出
   - bypass key still allows incoming items when configured
   - 按配置启用旁路键时，旁路键仍可放行放入和来源取出行为
+  - locked empty slot fallback selection prefers empty unlocked hotbar slots, falls back to main inventory, skips locked targets, and reports no-slot cases
+  - 锁定空槽放入回退选择会优先空且未锁定的快捷栏槽，其次主背包槽，并会跳过锁定目标和覆盖无可用槽场景
 - AE2 compatibility note:
 - AE2 兼容说明：
   - AE2 menu-layer hooks are compile/build verified. NeoForge in-game validation has covered terminal space-left-click `MOVE_REGION` into and out of locked player inventory slots.
@@ -78,6 +81,8 @@ Date: 2026-05-05
   - NeoForge 现在会直接钩住 `StorageScreenBase.slotClicked`，因为 SophisticatedCore 覆盖了原版 `AbstractContainerScreen.slotClicked` 方法。
   - `StorageScreenBase.slotClicked` and vanilla `AbstractContainerScreen.slotClicked` only cancel leaked `PICKUP`/`QUICK_MOVE` inventory actions while Alt is held; they do not toggle state.
   - 按住 Alt 时，`StorageScreenBase.slotClicked` 与原版 `AbstractContainerScreen.slotClicked` 只会取消漏进来的 `PICKUP`/`QUICK_MOVE` 库存动作，不会切换状态。
+  - NeoForge locked-slot GUI protection uses official `ScreenEvent.MouseButtonPressed.Pre` and `ScreenEvent.MouseButtonReleased.Pre`; release guarding covers creative inventory cursor placement into locked empty player slots.
+  - NeoForge 锁槽 GUI 保护使用官方 `ScreenEvent.MouseButtonPressed.Pre` 与 `ScreenEvent.MouseButtonReleased.Pre`；释放阶段守卫覆盖创造物品栏中光标物品放入锁定空玩家槽的路径。
   - Server-side Sophisticated menu clicks now distinguish storage-owned slots from the embedded 36 player-inventory slots before resolving item-handler-backed player indices, preventing memory/storage slots from being pseudo-locked by matching player inventory index numbers.
   - 服务端 Sophisticated 菜单点击现在会先区分存储自身槽与内嵌的 36 个玩家背包槽，再解析 item-handler-backed 玩家索引，避免记忆/存储槽因为槽号碰巧对应玩家背包索引而出现伪锁定。
   - NeoForge has a low-level `MouseHandler` press entry for modpack cases where Sophisticated empty-slot clicks do not reach `ScreenEvent` or screen `mouseClicked`. When Mouse Tweaks is present, this entry primes/toggles the press target without canceling the raw press so Mouse Tweaks drag initialization is preserved.
@@ -140,6 +145,20 @@ Date: 2026-05-05
 - 最新本地验证：
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：通过
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after locked-empty-slot fallback routing tests were added.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：锁定空槽回退路由测试加入后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after adding the three-loader `Player.setItemInHand` reroute mixins.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：加入三端 `Player.setItemInHand` 回退 Mixin 后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the locked-empty-slot fallback implementation and documentation update.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：锁定空槽回退实现与文档更新后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after changing lock/bypass key polling to read the current key binding instead of relying on reflective fallback paths.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：锁定键/旁路键轮询改为读取当前按键绑定后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after separating direct-write fallback from GUI cursor/Slot placement guards.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：直接写入回退与 GUI 光标/Slot 放入守卫分离后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :neoforge:compileJava`: passed after adding NeoForge official mouse-release guarding for creative cursor placement.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :neoforge:compileJava`：为 NeoForge 创造物品栏光标放入补充官方鼠标释放守卫后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the NeoForge mouse-release guard and documentation update.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：NeoForge 鼠标释放守卫与文档更新后通过。
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`: passed
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`：通过
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:processResources`: passed after rerunning outside the sandbox because the first sandboxed run could not initialize Gradle's Windows native-platform library.

@@ -24,7 +24,9 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.IExtensionPoint;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.loading.FMLLoader;
@@ -56,6 +58,8 @@ public class NeoFavoriteItemsForge {
         modBus.addListener(this::clientSetup);
         modBus.addListener(this::registerKeyBindings);
         modBus.addListener(this::addGuiOverlayLayers);
+        modBus.addListener(ForgeFavoriteItemsConfig::onModConfig);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ForgeFavoriteItemsConfig.SPEC, NeoFavoriteItemsConstants.CONFIG_FILE_NAME);
         ForgeFavoriteNetworking.registerPackets();
         
         SOUNDS.register(modBus);
@@ -70,7 +74,7 @@ public class NeoFavoriteItemsForge {
         NeoFavoriteItemsMod.getInstance().onClientInitialize();
         
         var gameDirectory = FMLLoader.getGamePath();
-        PlatformFavoriteSupport.initializeClient(gameDirectory);
+        PlatformFavoriteSupport.initializeClient(gameDirectory, false);
         
         // 初始化Overlay渲染器
         overlayRenderer = new ForgeOverlayRenderer();
@@ -110,7 +114,8 @@ public class NeoFavoriteItemsForge {
     public void onServerStarting(ServerStartingEvent event) {
         PlatformFavoriteSupport.initializeServer(
             event.getServer().getServerDirectory(),
-            event.getServer().getWorldPath(LevelResource.ROOT)
+            event.getServer().getWorldPath(LevelResource.ROOT),
+            false
         );
         NeoFavoriteItemsMod.getInstance().onServerInitialize();
     }
@@ -200,31 +205,19 @@ public class NeoFavoriteItemsForge {
             return false;
         }
 
+        InputConstants.Key key = keyMapping.getKey();
+        if (key == null || key == InputConstants.UNKNOWN) {
+            return false;
+        }
+        if (key.getType() != InputConstants.Type.KEYSYM) {
+            return keyMapping.isDown();
+        }
+
         var minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.getWindow() == null) {
             return false;
         }
-
-        InputConstants.Key key = getBoundKey(keyMapping);
-        if (key == null || key == InputConstants.UNKNOWN) {
-            return false;
-        }
         return InputConstants.isKeyDown(minecraft.getWindow().getWindow(), key.getValue());
-    }
-
-    private static InputConstants.Key getBoundKey(net.minecraft.client.KeyMapping keyMapping) {
-        // 优先尝试 getKey() 方法（1.20.5+）
-        InputConstants.Key key = ReflectionHelper.invokeMethod(
-            keyMapping, 
-            "getKey", 
-            InputConstants.Key.class
-        );
-        if (key != null) {
-            return key;
-        }
-
-        // 回退到 key 字段（旧版本）
-        return ReflectionHelper.readField(keyMapping, "key", InputConstants.Key.class);
     }
 
     private static void logKeyStatesIfChanged() {

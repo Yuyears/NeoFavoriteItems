@@ -41,13 +41,16 @@ public class NeoFavoriteItemsFabricClient implements ClientModInitializer {
             return false;
         }
 
-        var client = Minecraft.getInstance();
-        if (client == null || client.getWindow() == null) {
-            return false;
-        }
-
         InputConstants.Key key = ((KeyMappingAccessor) keyMapping).neoFavoriteItems$getKey();
         if (key == null || key == InputConstants.UNKNOWN) {
+            return false;
+        }
+        if (key.getType() != InputConstants.Type.KEYSYM) {
+            return keyMapping.isDown();
+        }
+
+        var client = Minecraft.getInstance();
+        if (client == null || client.getWindow() == null) {
             return false;
         }
         return InputConstants.isKeyDown(client.getWindow().getWindow(), key.getValue());

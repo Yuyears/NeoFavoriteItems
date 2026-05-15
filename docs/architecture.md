@@ -2,9 +2,9 @@
 
 # Neo Favorite Items 架构说明
 
-Last updated: 2026-05-05
+Last updated: 2026-05-10
 
-最后更新：2026-05-05
+最后更新：2026-05-10
 
 This document records the current project structure and implementation boundaries. It describes the repository as it exists now, not an older migration draft.
 
@@ -99,6 +99,8 @@ Location: `common/.../application`
 - `InteractionGuardService.evaluateIncomingItem`：为复合移动提供目标槽语义，使锁定槽位能在原版移除来源物品前拒绝放入
 - `ServerFavoriteService`: handles server-side toggles, validation, revisions, bypass state, and server interaction protection
 - `ServerFavoriteService`：处理服务端收藏切换、校验、修订号、旁路状态和服务端交互保护
+- `LockedEmptySlotFallback`: selects the safe fallback slot for incoming stacks blocked by a locked empty target, preferring hotbar slots before main-inventory slots
+- `LockedEmptySlotFallback`：为被锁定空目标槽拒绝的放入物品选择安全回退槽，优先快捷栏，其次主背包
 - `ClientFavoriteSyncService`: applies full and incremental syncs, rejects stale revisions, and detects revision gaps
 - `ClientFavoriteSyncService`：应用客户端全量/增量同步、过滤过期修订并检测同步缺口
 - `ClientDropGuard`: decides whether a selected hotbar stack drop should be blocked before the client plays drop animation
@@ -264,14 +266,20 @@ Location: `common/.../render`
 24. NeoForge 的 Quark 快捷栏切换兼容会把每次 Quark `Z` 键行交换视为原子物品交换：通用库存写入守卫只在该交换范围内旁路，收藏状态会在两个玩家背包索引之间交换，随后缓存持久化并向客户端发送全量收藏同步。
 25. The guard deliberately does not hide `Slot.getItem`, `Inventory.getItem`, item-handler `getStackInSlot`, or item-handler slot-limit reads, because read interception can break menu synchronization, rendering, and third-party inspection logic.
 26. 守卫刻意不隐藏 `Slot.getItem`、`Inventory.getItem`、item-handler `getStackInSlot` 或 item-handler 槽位上限读取，因为读取拦截可能破坏菜单同步、渲染和第三方检查逻辑。
-27. Bypass-key state is polled on the client and synced to the server.
-28. 旁路键状态由客户端按键轮询同步到服务端。
-29. When the lock-operation key is held, the state machine has explicit exits: `beginPress` activates the operation and toggles the press target, `toggleEnteredSlot` handles Mouse Tweaks drag-enter targets, `toggleLeakedSlotClick` handles Sophisticated leaked click actions, and `consumeActiveDrag` only suppresses leaked vanilla drag while active.
-30. 按住锁定操作键时，状态机有明确出口：`beginPress` 激活操作并切换按下目标，`toggleEnteredSlot` 处理 Mouse Tweaks 拖动进入目标，`toggleLeakedSlotClick` 处理 Sophisticated 漏出的点击动作，`consumeActiveDrag` 只在 active 时吞掉漏出的原版拖动。
-31. Mouse Tweaks compatibility on all three loaders refreshes Mouse Tweaks' screen bookkeeping, borrows its `getSlotUnderMouse` and `oldSelectedSlot` slot-enter detection, then consumes the Alt drag event before Mouse Tweaks can run its own click semantics. Newly entered slots are handed to this mod's lock-operation toggle exit, keeping Mouse Tweaks optional without inheriting its empty-slot, carried-stack, shift, or config rules.
-32. 三个平台的 Mouse Tweaks 兼容都会先刷新 Mouse Tweaks 的界面账本，借用它的 `getSlotUnderMouse` 与 `oldSelectedSlot` 槽位进入检测，然后在 Mouse Tweaks 执行自身点击语义前消费 Alt 拖动事件。新进入的槽位会交给本模组的锁定操作切换出口，因此 Mouse Tweaks 仍是可选兼容，但不会继承它的空槽、光标物品、Shift 或配置规则。
-33. In NeoForge Sophisticated screens, empty-slot single clicks may be recovered through the low-level press entry when other GUI/input mods suppress higher-level events. Empty-slot drag marking is not guaranteed because it depends on Mouse Tweaks emitting slot-enter samples for those Sophisticated empty slots.
-34. 在 NeoForge 的 Sophisticated 系列界面中，如果其他 GUI/输入模组压掉高层事件，空槽单击可由低层按下入口恢复。空槽拖动标记不作保证，因为它依赖 Mouse Tweaks 是否为这些 Sophisticated 空槽发出槽位进入采样。
+27. Direct external writes into a locked empty player slot are not silently canceled after the source item has already been removed. Dedicated `Inventory.setItem` and main-hand `Player.setItemInHand` reroute entries move the incoming stack to the first empty unlocked hotbar slot, then the first empty unlocked main-inventory slot, and drop it when no fallback slot exists.
+28. 对已锁定空玩家槽的外部直接写入不会在来源物品已被移除后静默取消。专用的 `Inventory.setItem` 与主手 `Player.setItemInHand` 回退入口会把 incoming stack 改放到第一个空且未锁定的快捷栏槽，再改放到第一个空且未锁定的主背包槽；没有回退槽时掉落。
+29. GUI cursor placement and normal `Slot` APIs remain pure guards: `mayPlace`, `safeInsert`, `set`, and `setByPlayer` reject locked empty slots without rerouting the carried stack. This preserves the expected locked-slot experience and avoids duplicating cursor stacks.
+30. GUI 光标放入和普通 `Slot` API 仍保持纯拦截：`mayPlace`、`safeInsert`、`set` 与 `setByPlayer` 会拒绝锁定空槽，但不会改道光标物品。这样保留锁槽体验，并避免复制光标物品。
+31. NeoForge GUI mouse guarding uses official `ScreenEvent.MouseButtonPressed.Pre` and `ScreenEvent.MouseButtonReleased.Pre` hooks. The release hook covers creative inventory cursor placement, where vanilla can defer the `PICKUP` slot action until mouse release.
+32. NeoForge GUI 鼠标守卫使用官方 `ScreenEvent.MouseButtonPressed.Pre` 与 `ScreenEvent.MouseButtonReleased.Pre` 事件。释放阶段守卫覆盖创造物品栏光标放入路径，因为原版可能把 `PICKUP` 槽位动作延迟到鼠标释放时执行。
+33. Bypass-key state is polled on the client and synced to the server.
+34. 旁路键状态由客户端按键轮询同步到服务端。
+35. When the lock-operation key is held, the state machine has explicit exits: `beginPress` activates the operation and toggles the press target, `toggleEnteredSlot` handles Mouse Tweaks drag-enter targets, `toggleLeakedSlotClick` handles Sophisticated leaked click actions, and `consumeActiveDrag` only suppresses leaked vanilla drag while active.
+36. 按住锁定操作键时，状态机有明确出口：`beginPress` 激活操作并切换按下目标，`toggleEnteredSlot` 处理 Mouse Tweaks 拖动进入目标，`toggleLeakedSlotClick` 处理 Sophisticated 漏出的点击动作，`consumeActiveDrag` 只在 active 时吞掉漏出的原版拖动。
+37. Mouse Tweaks compatibility on all three loaders refreshes Mouse Tweaks' screen bookkeeping, borrows its `getSlotUnderMouse` and `oldSelectedSlot` slot-enter detection, then consumes the Alt drag event before Mouse Tweaks can run its own click semantics. Newly entered slots are handed to this mod's lock-operation toggle exit, keeping Mouse Tweaks optional without inheriting its empty-slot, carried-stack, shift, or config rules.
+38. 三个平台的 Mouse Tweaks 兼容都会先刷新 Mouse Tweaks 的界面账本，借用它的 `getSlotUnderMouse` 与 `oldSelectedSlot` 槽位进入检测，然后在 Mouse Tweaks 执行自身点击语义前消费 Alt 拖动事件。新进入的槽位会交给本模组的锁定操作切换出口，因此 Mouse Tweaks 仍是可选兼容，但不会继承它的空槽、光标物品、Shift 或配置规则。
+39. In NeoForge Sophisticated screens, empty-slot single clicks may be recovered through the low-level press entry when other GUI/input mods suppress higher-level events. Empty-slot drag marking is not guaranteed because it depends on Mouse Tweaks emitting slot-enter samples for those Sophisticated empty slots.
+40. 在 NeoForge 的 Sophisticated 系列界面中，如果其他 GUI/输入模组压掉高层事件，空槽单击可由低层按下入口恢复。空槽拖动标记不作保证，因为它依赖 Mouse Tweaks 是否为这些 Sophisticated 空槽发出槽位进入采样。
 
 ### Installation Modes
 
@@ -362,6 +370,8 @@ Location: `common/.../render`
 - 交互决策测试现已覆盖副手交换和护甲 Shift 装备中的锁定目标槽放入判定。
 - Interaction decision tests also cover locked quick-move source removal and bypass behavior.
 - 交互决策测试也已覆盖锁定槽作为快速移动来源时的取出拒绝，以及旁路键放行行为。
+- Locked empty slot fallback selection is unit-tested for hotbar priority, main-inventory fallback, locked-slot skipping, and no-slot cases.
+- 锁定空槽回退选择已通过单元测试覆盖快捷栏优先、主背包回退、跳过锁定槽和无可用槽场景。
 - AE2 compatibility is intentionally common-abstraction based. The NeoForge AE2 terminal scenario has been validated for space-left-click `MOVE_REGION` into and out of locked player inventory slots; Fabric and Forge still need runtime checks.
 - AE2 兼容刻意基于公共抽象层实现。NeoForge 的 AE2 终端场景已验证空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出；Fabric 和 Forge 仍需运行时验证。
 - Sorter locked-slot compatibility is unit-tested through the common locked-slot merge helper. Quark hotbar changer favorite-state movement is covered by common unit tests and NeoForge build verification. Runtime validation with Quark and Inventory Tweaks ReFoxed is still recommended.

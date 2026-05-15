@@ -253,5 +253,5 @@ Date: 2026-05-05
 
 ## 说明
 
-- This document is a delivery-facing verification summary. It complements `TEST_REPORT.md`, which focuses on automated evidence and coverage metrics.
-- 本文档是面向交付的修复验证摘要，它与 `TEST_REPORT.md` 互补，后者更侧重自动化证据和覆盖率指标。
+- This document is a delivery-facing verification summary. It complements `test-report.md`, which focuses on automated evidence and coverage metrics.
+- 本文档是面向交付的修复验证摘要，它与 `test-report.md` 互补，后者更侧重自动化证据和覆盖率指标。

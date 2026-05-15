@@ -198,6 +198,11 @@ public class ConfigManager {
         return config;
     }
 
+    public void applyPlatformConfig(NeoFavoriteItemsConfig config) {
+        this.config = config;
+        loadIssues.clear();
+    }
+
     public List<String> getLoadIssues() {
         return List.copyOf(loadIssues);
     }
@@ -321,13 +326,13 @@ public class ConfigManager {
             case "lockedStyle" -> config.overlay.lockedStyle = parseOverlayStyle(value);
             case "holdingKeyLockedStyle" -> config.overlay.holdingKeyLockedStyle = parseOverlayStyle(value);
             case "highlightStyle" -> config.overlay.highlightStyle = parseOverlayStyle(value);
-            case "overlayColor" -> config.overlay.lockedOverlayColor = parseColor(value);
+            case "overlayColor" -> config.overlay.lockedOverlayColor = parseColorValue(value);
             case "overlayOpacity" -> config.overlay.lockedOverlayOpacity = Float.parseFloat(value);
-            case "lockedOverlayColor" -> config.overlay.lockedOverlayColor = parseColor(value);
+            case "lockedOverlayColor" -> config.overlay.lockedOverlayColor = parseColorValue(value);
             case "lockedOverlayOpacity" -> config.overlay.lockedOverlayOpacity = Float.parseFloat(value);
-            case "lockableHighlightColor" -> config.overlay.lockableHighlightColor = parseColor(value);
+            case "lockableHighlightColor" -> config.overlay.lockableHighlightColor = parseColorValue(value);
             case "lockableHighlightOpacity" -> config.overlay.lockableHighlightOpacity = Float.parseFloat(value);
-            case "unlockableHighlightColor" -> config.overlay.unlockableHighlightColor = parseColor(value);
+            case "unlockableHighlightColor" -> config.overlay.unlockableHighlightColor = parseColorValue(value);
             case "unlockableHighlightOpacity" -> config.overlay.unlockableHighlightOpacity = Float.parseFloat(value);
             case "colorOverlayOpacity" -> config.overlay.colorOverlayOpacity = Float.parseFloat(value);
             case "bypassOverlayOpacityMultiplier" -> config.overlay.bypassOverlayOpacityMultiplier = Float.parseFloat(value);
@@ -337,7 +342,7 @@ public class ConfigManager {
         }
     }
 
-    private int parseColor(String value) {
+    public static int parseColorValue(String value) {
         String cleanValue = value.replace("\"", "").trim();
         if (cleanValue.regionMatches(true, 0, "rgba(", 0, 5) && cleanValue.endsWith(")")) {
             return parseRgbaColor(cleanValue);
@@ -358,7 +363,7 @@ public class ConfigManager {
         return parsed <= 0x00FFFFFF ? 0xFF000000 | parsed : parsed;
     }
 
-    private int parseRgbColor(String value) {
+    private static int parseRgbColor(String value) {
         String[] parts = value.substring(4, value.length() - 1).split(",");
         if (parts.length != 3) {
             throw new IllegalArgumentException("RGB color must be rgb(red, green, blue): " + value);
@@ -366,7 +371,7 @@ public class ConfigManager {
         return toArgb(1.0d, parseColorComponent(parts[0]), parseColorComponent(parts[1]), parseColorComponent(parts[2]));
     }
 
-    private int parseRgbaColor(String value) {
+    private static int parseRgbaColor(String value) {
         String[] parts = value.substring(5, value.length() - 1).split(",");
         if (parts.length != 4) {
             throw new IllegalArgumentException("RGBA color must be rgba(red, green, blue, alpha): " + value);
@@ -379,7 +384,7 @@ public class ConfigManager {
         );
     }
 
-    private int parseHexColor(String value, boolean legacyArgb) {
+    private static int parseHexColor(String value, boolean legacyArgb) {
         String hex = value.trim();
         if (hex.length() == 6) {
             int rgb = (int) Long.parseLong(hex, 16);
@@ -399,7 +404,7 @@ public class ConfigManager {
         throw new IllegalArgumentException("Hex color must be #RRGGBB or #RRGGBBAA: " + value);
     }
 
-    private int parseLuvColor(String value) {
+    private static int parseLuvColor(String value) {
         String[] parts = value.substring(4, value.length() - 1).split(",");
         if (parts.length != 3 && parts.length != 4) {
             throw new IllegalArgumentException("Luv color must be luv(L, u, v) or luv(L, u, v, alpha): " + value);
@@ -412,7 +417,7 @@ public class ConfigManager {
         return luvToArgb(l, u, v, alpha);
     }
 
-    private double parseDouble(String value) {
+    private static double parseDouble(String value) {
         return Double.parseDouble(value.trim());
     }
 
@@ -427,7 +432,7 @@ public class ConfigManager {
         throw new IllegalArgumentException("Boolean value must be true or false: " + value);
     }
 
-    private double parseColorComponent(String value) {
+    private static double parseColorComponent(String value) {
         double component = parseDouble(value);
         if (component > 1.0d) {
             component /= 255.0d;
@@ -435,7 +440,7 @@ public class ConfigManager {
         return clamp01(component);
     }
 
-    private double parseAlpha(String value) {
+    private static double parseAlpha(String value) {
         double alpha = parseDouble(value);
         if (alpha > 1.0d) {
             alpha /= 255.0d;
@@ -443,7 +448,7 @@ public class ConfigManager {
         return clamp01(alpha);
     }
 
-    private int luvToArgb(double l, double u, double v, double alpha) {
+    private static int luvToArgb(double l, double u, double v, double alpha) {
         l = clamp(l, 0.0d, 100.0d);
         if (l <= 0.0d) {
             return toArgb(alpha, 0.0d, 0.0d, 0.0d);
@@ -471,7 +476,7 @@ public class ConfigManager {
         return xyzToArgb(alpha, x, y, z);
     }
 
-    private int xyzToArgb(double alpha, double x, double y, double z) {
+    private static int xyzToArgb(double alpha, double x, double y, double z) {
         x /= 100.0d;
         y /= 100.0d;
         z /= 100.0d;
@@ -483,7 +488,7 @@ public class ConfigManager {
         return toArgb(alpha, linearToSrgb(r), linearToSrgb(g), linearToSrgb(b));
     }
 
-    private double linearToSrgb(double value) {
+    private static double linearToSrgb(double value) {
         value = clamp01(value);
         if (value <= 0.0031308d) {
             return 12.92d * value;
@@ -491,7 +496,7 @@ public class ConfigManager {
         return 1.055d * Math.pow(value, 1.0d / 2.4d) - 0.055d;
     }
 
-    private int toArgb(double alpha, double red, double green, double blue) {
+    private static int toArgb(double alpha, double red, double green, double blue) {
         int a = toByte(alpha);
         int r = toByte(red);
         int g = toByte(green);
@@ -499,15 +504,15 @@ public class ConfigManager {
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    private int toByte(double value) {
+    private static int toByte(double value) {
         return (int) Math.round(clamp01(value) * 255.0d);
     }
 
-    private double clamp01(double value) {
+    private static double clamp01(double value) {
         return clamp(value, 0.0d, 1.0d);
     }
 
-    private double clamp(double value, double min, double max) {
+    private static double clamp(double value, double min, double max) {
         if (value < min) {
             return min;
         }

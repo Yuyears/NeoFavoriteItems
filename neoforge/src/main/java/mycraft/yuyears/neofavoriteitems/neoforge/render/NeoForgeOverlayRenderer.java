@@ -98,12 +98,27 @@ public class NeoForgeOverlayRenderer extends OverlayRenderer {
         if (event.getButton() == GLFW.GLFW_MOUSE_BUTTON_LEFT && NeoForgeLockOperationStateMachine.INSTANCE.isActive()) {
             NeoForgeLockOperationStateMachine.INSTANCE.finish();
             event.setCanceled(true);
+            return;
+        }
+
+        if ((event.getButton() == GLFW.GLFW_MOUSE_BUTTON_LEFT || event.getButton() == GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+            && event.getScreen() instanceof AbstractContainerScreen<?> screen) {
+            Slot slot = findSlotAt(screen, event.getMouseX(), event.getMouseY());
+            if (shouldCancelFavoriteSlotInteraction(slot)) {
+                event.setCanceled(true);
+            }
         }
     }
 
     private void guardFavoriteSlotClick(ScreenEvent.MouseButtonPressed.Pre event, Slot slot) {
+        if (shouldCancelFavoriteSlotInteraction(slot)) {
+            event.setCanceled(true);
+        }
+    }
+
+    private boolean shouldCancelFavoriteSlotInteraction(Slot slot) {
         if (slot == null || !isPlayerInventorySlot(slot)) {
-            return;
+            return false;
         }
 
         int inventoryIndex = getContainerSlotIndex(slot);
@@ -116,8 +131,9 @@ public class NeoForgeOverlayRenderer extends OverlayRenderer {
         );
         if (decision.denied()) {
             DebugLogger.debug("NeoForge slot interaction canceled: inventoryIndex={} interactionType={}", inventoryIndex, interactionType);
-            event.setCanceled(true);
+            return true;
         }
+        return false;
     }
 
     private boolean hasShiftDown() {

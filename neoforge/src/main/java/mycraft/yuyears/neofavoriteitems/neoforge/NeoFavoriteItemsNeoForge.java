@@ -15,7 +15,9 @@ import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLLoader;
@@ -38,11 +40,13 @@ public class NeoFavoriteItemsNeoForge {
     
     private NeoForgeOverlayRenderer overlayRenderer;
 
-    public NeoFavoriteItemsNeoForge(IEventBus modBus) {
+    public NeoFavoriteItemsNeoForge(IEventBus modBus, ModContainer modContainer) {
         NeoFavoriteItemsMod.getInstance().initialize();
 
         modBus.addListener(this::setup);
         modBus.addListener(this::registerPayloadHandlers);
+        modBus.addListener(NeoForgeFavoriteItemsConfig::onModConfig);
+        modContainer.registerConfig(ModConfig.Type.COMMON, NeoForgeFavoriteItemsConfig.SPEC, NeoFavoriteItemsConstants.CONFIG_FILE_NAME);
         
         // 仅客户端注册客户端相关监听器
         if (IS_CLIENT) {
@@ -75,7 +79,8 @@ public class NeoFavoriteItemsNeoForge {
         public void onServerStarting(ServerStartingEvent event) {
             PlatformFavoriteSupport.initializeServer(
                 event.getServer().getServerDirectory(),
-                event.getServer().getWorldPath(LevelResource.ROOT)
+                event.getServer().getWorldPath(LevelResource.ROOT),
+                false
             );
             NeoFavoriteItemsMod.getInstance().onServerInitialize();
         }
@@ -137,7 +142,7 @@ public class NeoFavoriteItemsNeoForge {
             NeoFavoriteItemsMod.getInstance().onClientInitialize();
             
             var gameDirectory = FMLLoader.getGamePath();
-            PlatformFavoriteSupport.initializeClient(gameDirectory);
+            PlatformFavoriteSupport.initializeClient(gameDirectory, false);
             
             // 初始化Overlay渲染器
             overlayRenderer = new NeoForgeOverlayRenderer();
@@ -183,31 +188,19 @@ public class NeoFavoriteItemsNeoForge {
                 return false;
             }
 
+            InputConstants.Key key = keyMapping.getKey();
+            if (key == null || key == InputConstants.UNKNOWN) {
+                return false;
+            }
+            if (key.getType() != InputConstants.Type.KEYSYM) {
+                return keyMapping.isDown();
+            }
+
             var minecraft = Minecraft.getInstance();
             if (minecraft == null || minecraft.getWindow() == null) {
                 return false;
             }
-
-            InputConstants.Key key = getBoundKey(keyMapping);
-            if (key == null || key == InputConstants.UNKNOWN) {
-                return false;
-            }
             return InputConstants.isKeyDown(minecraft.getWindow().getWindow(), key.getValue());
-        }
-
-        private static InputConstants.Key getBoundKey(net.minecraft.client.KeyMapping keyMapping) {
-            // 优先尝试 getKey() 方法（1.20.5+）
-            InputConstants.Key key = ReflectionHelper.invokeMethod(
-                keyMapping, 
-                "getKey", 
-                InputConstants.Key.class
-            );
-            if (key != null) {
-                return key;
-            }
-
-            // 回退到 key 字段（旧版本）
-            return ReflectionHelper.readField(keyMapping, "key", InputConstants.Key.class);
         }
 
         private static void logKeyStatesIfChanged() {

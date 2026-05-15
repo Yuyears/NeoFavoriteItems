@@ -1,8 +1,10 @@
-# Neo Favorite Items TODO
+# Neo Favorite Items Roadmap
 
-Last updated: 2026-05-05
+# Neo Favorite Items 路线图
 
-最后更新：2026-05-05
+Last updated: 2026-05-10
+
+最后更新：2026-05-10
 
 ## Checklist Summary
 
@@ -99,6 +101,12 @@ Last updated: 2026-05-05
 - NeoForge 锁定操作状态机整理后明确了出口职责：`beginPress` 切换物理按下目标，`toggleEnteredSlot` 处理 Mouse Tweaks 槽位进入拖动目标，`toggleLeakedSlotClick` 处理 Sophisticated 漏出的点击动作，`consumeActiveDrag` 只吞掉漏出的原版拖动而不采样。
 - Overlay rendering now uses a common `OverlayRenderDescriptor` for style/tint/foreground decisions. The attempted low-alpha contrast backing for ModernUI tooltip blur was removed because ModernUI draws tooltip shadow in the tooltip render state above slot overlays.
 - Overlay 渲染现在使用 common `OverlayRenderDescriptor` 统一描述样式、染色和前景决策。此前尝试的 ModernUI tooltip 低透明度对比底已撤回，因为 ModernUI 会在槽位 Overlay 上方的 tooltip 渲染状态中绘制阴影。
+- Direct external insertion into locked empty selected slots now reroutes the incoming item to the first empty unlocked hotbar slot, then the first empty unlocked main-inventory slot, and drops it if no fallback slot exists. This covers `Inventory.setItem` paths such as Integrated Dynamics Squeezer and main-hand `Player.setItemInHand` paths such as Actually Additions Display Stand.
+- 对锁定空当前槽的外部直接放入现在会把 incoming item 改放到第一个空且未锁定的快捷栏槽，再改放到第一个空且未锁定的主背包槽；没有回退槽时掉落。该路径覆盖 Integrated Dynamics Squeezer 这类 `Inventory.setItem` 调用，以及 Actually Additions Display Stand 这类主手 `Player.setItemInHand` 调用。
+- Locked empty slot fallback is separated from GUI cursor placement: `Slot` mutation guards still only reject the carried stack, while the fallback path is reserved for direct inventory writes and main-hand replacement.
+- 锁定空槽回退已与 GUI 光标放入分离：`Slot` 变更守卫仍只拒绝光标物品，回退路径仅用于直接背包写入和主手替换。
+- NeoForge cursor placement into locked empty slots now also guards the official mouse-release screen event, covering creative inventory placement paths that defer `PICKUP` handling until release without adding a dedicated creative-screen mixin.
+- NeoForge 锁定空槽的光标放入现在也会守卫官方鼠标释放界面事件，覆盖创造物品栏把 `PICKUP` 处理延迟到释放阶段的路径，并且不新增专用创造界面 Mixin。
 
 ## Priority Roadmap
 

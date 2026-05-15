@@ -27,7 +27,9 @@ public abstract class InventoryMixin {
 
     @Inject(method = "setItem", at = @At("HEAD"), cancellable = true)
     private void neoFavoriteItems$guardLockedSlotSet(int inventoryIndex, ItemStack stack, CallbackInfo ci) {
-        if (ServerFavoriteService.shouldPreventInventorySet((Inventory) (Object) this, inventoryIndex, stack)) {
+        Inventory inventory = (Inventory) (Object) this;
+        if (ServerFavoriteService.shouldRerouteInventorySet(inventory, inventoryIndex, stack)
+            || ServerFavoriteService.shouldPreventInventorySet(inventory, inventoryIndex, stack)) {
             ci.cancel();
         }
     }

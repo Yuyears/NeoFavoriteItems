@@ -51,6 +51,8 @@
 - 复合移动现在会同时保护操作两端：锁定槽位在物品被取出时视为受保护来源，在物品被放入时视为受保护目标。该规则覆盖 GUI 内外副手交换，以及 Shift 点击装备进入已锁定护甲/副手槽。
 - Slot-level guards also cover standard `Slot` APIs such as safe insert, safe take, remove, and set operations so custom menus that use Minecraft slot semantics are protected without per-screen compatibility code.
 - 槽位级守卫还覆盖 `safeInsert`、`safeTake`、`remove` 和 `set` 等标准 `Slot` API，因此使用 Minecraft 槽位语义的自定义菜单无需逐个界面适配也能受到保护。
+- When an external block tries to place an item into a locked empty selected slot, the server reroutes the item to an empty unlocked hotbar slot, then an empty unlocked main-inventory slot, and finally drops it if no safe slot exists.
+- 当外部方块尝试把物品放入已锁定的空当前槽时，服务端会先改放到空且未锁定的快捷栏槽，再改放到空且未锁定的主背包槽；若都没有可用位置，则把物品掉落到地上。
 - Forge/NeoForge item-handler wrappers for player inventory no longer hide locked stacks from read APIs, so custom GUIs such as JustDireThings still render the actual player items while extraction, insertion, and direct writes remain guarded.
 - Forge/NeoForge 的玩家背包 item-handler 包装器不再在读取 API 中隐藏锁定物品，因此 JustDireThings 等自定义 GUI 仍会显示真实玩家物品，同时提取、放入和直接写入仍会被拦截。
 - Forge/NeoForge slot resolution also recognizes player slots exposed as `SlotItemHandler(InvWrapper/RangedWrapper)`, enabling overlays and early click guards in item-handler-backed GUIs.
@@ -132,8 +134,8 @@ Common source code lives under `common/src/main/java/mycraft/yuyears/neofavorite
 
 - `domain`: `LogicalSlotIndex`, `InteractionType`, `InteractionDecision`
 - `domain`：`LogicalSlotIndex`、`InteractionType`、`InteractionDecision`
-- `application`: `InteractionGuardService`, `ServerFavoriteService`, `ClientFavoriteSyncService`, `InventorySortingCompatService`
-- `application`：`InteractionGuardService`、`ServerFavoriteService`、`ClientFavoriteSyncService`、`InventorySortingCompatService`
+- `application`: `InteractionGuardService`, `ServerFavoriteService`, `ClientFavoriteSyncService`, `InventorySortingCompatService`, `LockedEmptySlotFallback`
+- `application`：`InteractionGuardService`、`ServerFavoriteService`、`ClientFavoriteSyncService`、`InventorySortingCompatService`、`LockedEmptySlotFallback`
 - `integration`: `SlotMappingService`
 - `integration`：`SlotMappingService`
 - `persistence`: `DataPersistenceManager`
@@ -239,14 +241,18 @@ Key bindings are managed through Minecraft Controls and are not written to the m
 
 ## 文档
 
-- `ARCHITECTURE_DESIGN.md`: current architecture, layer responsibilities, and runtime flows
-- `ARCHITECTURE_DESIGN.md`：当前架构、分层职责和关键运行流程
-- `TEST_REPORT.md`: unit test summary and JaCoCo coverage snapshot
-- `TEST_REPORT.md`：单元测试摘要和 JaCoCo 覆盖率快照
-- `VERIFICATION_REPORT.md`: fix verification notes and integration validation summary
-- `VERIFICATION_REPORT.md`：问题修复验证说明与集成验证摘要
-- `TODO.md`: remaining work and validation items
-- `TODO.md`：仍需完成或验证的事项
+- `docs/index.md`: documentation map and naming rules
+- `docs/index.md`：文档地图和命名规范
+- `docs/architecture.md`: current architecture, layer responsibilities, and runtime flows
+- `docs/architecture.md`：当前架构、分层职责和关键运行流程
+- `docs/roadmap.md`: prioritized remaining work and validation items
+- `docs/roadmap.md`：按优先级整理的剩余工作和验证项
+- `docs/reports/test-report.md`: unit test summary and JaCoCo coverage snapshot
+- `docs/reports/test-report.md`：单元测试摘要和 JaCoCo 覆盖率快照
+- `docs/reports/verification-report.md`: fix verification notes and integration validation summary
+- `docs/reports/verification-report.md`：问题修复验证说明与集成验证摘要
+- `docs/work-items/`: temporary stage plans for tasks that span multiple conversations
+- `docs/work-items/`：跨多次对话的临时阶段计划
 - `README.md`: user and developer entrypoint
 - `README.md`：面向使用和开发入口的简要说明
 

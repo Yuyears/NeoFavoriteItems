@@ -28,7 +28,13 @@ public final class PlatformFavoriteSupport {
     private PlatformFavoriteSupport() {}
 
     public static void initializeClient(Path gameDirectory) {
-        ConfigManager.getInstance().initialize(gameDirectory.resolve("config"));
+        initializeClient(gameDirectory, true);
+    }
+
+    public static void initializeClient(Path gameDirectory, boolean initializeLocalConfig) {
+        if (initializeLocalConfig) {
+            ConfigManager.getInstance().initialize(gameDirectory.resolve("config"));
+        }
         DataPersistenceManager.getInstance().initialize(gameDirectory, null, false);
     }
 
@@ -37,7 +43,14 @@ public final class PlatformFavoriteSupport {
     }
 
     public static void initializeServer(Path gameDirectory, Path worldDirectory) {
+        initializeServer(gameDirectory, worldDirectory, true);
+    }
+
+    public static void initializeServer(Path gameDirectory, Path worldDirectory, boolean initializeLocalConfig) {
         DebugLogger.debug("Platform server persistence init: gameDirectory={} worldDirectory={}", gameDirectory, worldDirectory);
+        if (initializeLocalConfig) {
+            ConfigManager.getInstance().initialize(gameDirectory.resolve("config"));
+        }
         DataPersistenceManager.getInstance().initialize(gameDirectory, worldDirectory, true);
     }
 
