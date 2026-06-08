@@ -9,8 +9,10 @@ dependencies {
         officialMojangMappings()
     })
 
+    compileOnly("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testCompileOnly("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
 }
 
 tasks.test {

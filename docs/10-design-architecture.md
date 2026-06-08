@@ -2,9 +2,9 @@
 
 # Neo Favorite Items 架构说明
 
-Last updated: 2026-05-10
+Last updated: 2026-06-08
 
-最后更新：2026-05-10
+最后更新：2026-06-08
 
 This document records the current project structure and implementation boundaries. It describes the repository as it exists now, not an older migration draft.
 
@@ -52,14 +52,23 @@ common/
 fabric/
   Fabric entrypoints, client entrypoint, network payloads, slot resolving, mixins, Fabric renderer
   Fabric 入口、客户端入口、网络 payload、槽位解析、Mixin、Fabric 渲染器
+  src/main/java/.../fabric/mixin/compat/
+    Optional third-party compatibility mixins
+    可选第三方软联动 Mixin
 
 forge/
   Forge entrypoint, network payloads, mixins, Forge events/key bindings/renderer
   Forge 入口、网络 payload、Mixin、Forge 事件/按键/渲染器
+  src/main/java/.../forge/mixin/compat/
+    Optional third-party compatibility mixins
+    可选第三方软联动 Mixin
 
 neoforge/
   NeoForge entrypoint, network payloads, mixins, NeoForge events/key bindings/renderer
   NeoForge 入口、网络 payload、Mixin、NeoForge 事件/按键/渲染器
+  src/main/java/.../neoforge/mixin/compat/
+    Optional third-party compatibility mixins
+    可选第三方软联动 Mixin
 ```
 
 ## Layer Responsibilities
@@ -99,6 +108,8 @@ Location: `common/.../application`
 - `InteractionGuardService.evaluateIncomingItem`：为复合移动提供目标槽语义，使锁定槽位能在原版移除来源物品前拒绝放入
 - `ServerFavoriteService`: handles server-side toggles, validation, revisions, bypass state, and server interaction protection
 - `ServerFavoriteService`：处理服务端收藏切换、校验、修订号、旁路状态和服务端交互保护
+- `ScopedPlayerOperationService`: owns nestable per-thread player operation scopes used by server inventory guard bypass and death-drop preservation
+- `ScopedPlayerOperationService`：管理可嵌套的逐线程玩家操作作用域，供服务端库存守卫旁路和死亡掉落保留使用
 - `LockedEmptySlotFallback`: selects the safe fallback slot for incoming stacks blocked by a locked empty target, preferring hotbar slots before main-inventory slots
 - `LockedEmptySlotFallback`：为被锁定空目标槽拒绝的放入物品选择安全回退槽，优先快捷栏，其次主背包
 - `ClientFavoriteSyncService`: applies full and incremental syncs, rejects stale revisions, and detects revision gaps
@@ -107,6 +118,10 @@ Location: `common/.../application`
 - `ClientDropGuard`：决定是否应在客户端播放丢弃动画前阻止当前手持快捷栏物品被丢弃
 - `InventorySortingCompatService`: merges favorite player-inventory slots into third-party sorter locked-slot lists before sorters clear and rewrite inventory ranges; it also owns the common favorite-state swap helper used by Quark's hotbar changer compatibility
 - `InventorySortingCompatService`：在第三方整理模组清空并重写排序范围前，把已收藏玩家背包槽合并进整理模组的锁槽列表；同时提供 Quark 快捷栏切换兼容所用的收藏状态交换 helper
+- `ClientSortCompatService`: rewrites ClientSort collect/sort/transfer/stack-fill arrays at both ClientSort schema-validation and operation entrypoints. Collect filters locked slots including locked empty slots. Transfer and stack fill filter locked source and target arrays because ClientSort uses destination `safeInsert(srcStack)`, which can shrink the source stack without calling source-slot removal APIs. Sort preserves ClientSort's target-order semantics: it fixes locked slots, filters locked slots out of the sorted-source list and target-slot list, then pairs the remaining sources and targets in ClientSort's original target order so unlocked items stay compact and continuous around locked holes. It emits debug diagnostics only when a ClientSort array is actually rewritten.
+- `ClientSortCompatService`：在 ClientSort schema 校验和实际操作入口改写 collect/sort/transfer/stack-fill 数组。collect 会过滤锁定槽（包含锁定空槽）。transfer 与 stack fill 会同时过滤锁定来源数组和目标数组，因为 ClientSort 使用目标槽 `safeInsert(srcStack)`，可能不经过来源槽移除 API 就缩减来源 stack。sort 会保留 ClientSort 的目标顺序语义：固定锁槽，把锁槽分别从已排序来源列表和目标槽列表中剔除，再按 ClientSort 原目标顺序重新配对剩余来源与目标，使未锁物品围绕锁定空洞保持紧凑连续。只有实际改写 ClientSort 数组时才输出 debug 诊断。
+- `BetterExperienceCompatService`: detects whether Better Experience fast storage is about to use a locked player-inventory stack as its source, without replacing the mod's container search or insertion behavior.
+- `BetterExperienceCompatService`：只检测 Better Experience 一键存储是否正要把已锁玩家背包 stack 作为来源，不替换该模组的容器搜索或放入逻辑。
 
 ### Integration
 
@@ -138,8 +153,16 @@ Location: `common/.../persistence`
 
 ### 配置层
 
-- `ConfigManager` loads the current config into `NeoFavoriteItemsConfig`, records malformed lines, unknown entries, and invalid values, then rewrites the file when repair is needed.
-- `ConfigManager` 会把当前配置读取到 `NeoFavoriteItemsConfig`，记录格式错误行、未知配置项和非法值，并在需要修复时重写配置文件。
+- `ConfigManager` loads split common/client config files into one `NeoFavoriteItemsConfig`, records malformed lines, unknown entries, and invalid values, then rewrites the affected file when repair is needed.
+- `ConfigManager` 会把拆分后的 common/client 配置文件读取到同一个 `NeoFavoriteItemsConfig`，记录格式错误行、未知配置项和非法值，并在需要修复时重写受影响的文件。
+- Generated config files carry paired English and Simplified Chinese comments for behavior-sensitive options, including locked-empty-slot pickup, bypass key scope, slot movement, death preservation, and client-only presentation settings.
+- 生成的配置文件会为行为敏感配置提供中英双语注释，包括锁定空槽拾取、旁路键作用范围、槽位移动、死亡保留以及仅客户端表现配置。
+- `neo-favorite-items-common.toml` contains server-authoritative or rule-affecting sections: `general`, `lockBehavior`, `slotBehavior`, `deathBehavior`, and `debug`.
+- `neo-favorite-items-common.toml` 包含服务端权威或影响规则的配置段：`general`、`lockBehavior`、`slotBehavior`、`deathBehavior` 与 `debug`。
+- `neo-favorite-items-client.toml` contains client-preferred presentation and feedback sections: `overlay` and `feedback`.
+- `neo-favorite-items-client.toml` 包含客户端优先生效的显示与反馈配置段：`overlay` 与 `feedback`。
+- Legacy `neo-favorite-items.toml` is read only as a one-time migration source when either split file is missing, then deleted after the split files are written successfully.
+- 旧版 `neo-favorite-items.toml` 只在任一拆分文件缺失时作为一次性迁移来源读取；拆分文件成功写出后会删除旧文件。
 - Readable values are preserved during repair; unreadable or missing entries are regenerated from defaults.
 - 修复配置时会保留能读取的值；无法读取或缺失的配置项按默认值重新生成。
 
@@ -180,8 +203,8 @@ Location: `common/.../render`
 - Forge/NeoForge 还会在玩家背包 item-handler 包装器（`InvWrapper` 与 `RangedWrapper`）的变更边界进行保护，例如有效性检查、提取、放入和直接写入。`getStackInSlot` 与 `getSlotLimit` 等读取 API 不再被改写，以保证基于 item handler 的自定义 GUI 继续显示真实玩家背包内容。
 - Forge/NeoForge slot resolvers map `SlotItemHandler` instances backed by `InvWrapper` or `RangedWrapper` back to player inventory indices. This covers JustDireThings-style screens where player slots are item-handler slots rather than vanilla `Slot(playerInventory, ...)` instances.
 - Forge/NeoForge 的槽位解析器会把由 `InvWrapper` 或 `RangedWrapper` 支撑的 `SlotItemHandler` 映射回玩家背包索引。该路径覆盖 JustDireThings 这类把玩家槽实现为 item-handler 槽，而不是原版 `Slot(playerInventory, ...)` 的界面。
-- Optional compatibility mixins are isolated in non-required compat configs. AE2 compatibility targets shared abstractions (`AEBaseMenu` and `MEStorageMenu`) and avoids early `ModList`/class-presence decisions, following the Mouse Tweaks-style runtime mixin application pattern.
-- 可选兼容 Mixin 隔离在非 required 的 compat 配置中。AE2 兼容目标限定在公共抽象（`AEBaseMenu` 与 `MEStorageMenu`），并避免过早依赖 `ModList`/类存在性判断，采用更接近 Mouse Tweaks 的运行时 Mixin 应用方式。
+- Optional compatibility mixins are isolated in non-required compat configs and the per-loader `mixin/compat` packages. Compatibility mixin classes use the `<ModOrFeature><TargetOrScenario>CompatMixin` naming pattern, such as `Ae2MenuCompatMixin`, `MouseTweaksMainCompatMixin`, and `ClientSortSortHandlerCompatMixin`. AE2 compatibility targets shared abstractions (`AEBaseMenu` and `MEStorageMenu`) and avoids early `ModList`/class-presence decisions, following the Mouse Tweaks-style runtime mixin application pattern.
+- 可选兼容 Mixin 隔离在非 required 的 compat 配置和各平台 `mixin/compat` 包中。兼容 Mixin 类使用 `<模组或功能><目标或场景>CompatMixin` 命名模式，例如 `Ae2MenuCompatMixin`、`MouseTweaksMainCompatMixin` 与 `ClientSortSortHandlerCompatMixin`。AE2 兼容目标限定在公共抽象（`AEBaseMenu` 与 `MEStorageMenu`），并避免过早依赖 `ModList`/类存在性判断，采用更接近 Mouse Tweaks 的运行时 Mixin 应用方式。
 
 ### Forge
 
@@ -264,22 +287,28 @@ Location: `common/.../render`
 22. 整理兼容会在可用时把已收藏玩家背包槽交给整理模组自身的锁槽机制。NeoForge 目前以这种方式覆盖 Quark 背包整理和 Inventory Tweaks ReFoxed 服务端玩家背包整理。
 23. NeoForge Quark hotbar changer compatibility treats each Quark `Z` key row swap as an atomic item swap: generic inventory set guards are bypassed only for that swap, favorite state is swapped between the two player inventory indices, persistence is cached, and the client receives a full favorite sync.
 24. NeoForge 的 Quark 快捷栏切换兼容会把每次 Quark `Z` 键行交换视为原子物品交换：通用库存写入守卫只在该交换范围内旁路，收藏状态会在两个玩家背包索引之间交换，随后缓存持久化并向客户端发送全量收藏同步。
-25. The guard deliberately does not hide `Slot.getItem`, `Inventory.getItem`, item-handler `getStackInSlot`, or item-handler slot-limit reads, because read interception can break menu synchronization, rendering, and third-party inspection logic.
-26. 守卫刻意不隐藏 `Slot.getItem`、`Inventory.getItem`、item-handler `getStackInSlot` 或 item-handler 槽位上限读取，因为读取拦截可能破坏菜单同步、渲染和第三方检查逻辑。
-27. Direct external writes into a locked empty player slot are not silently canceled after the source item has already been removed. Dedicated `Inventory.setItem` and main-hand `Player.setItemInHand` reroute entries move the incoming stack to the first empty unlocked hotbar slot, then the first empty unlocked main-inventory slot, and drop it when no fallback slot exists.
-28. 对已锁定空玩家槽的外部直接写入不会在来源物品已被移除后静默取消。专用的 `Inventory.setItem` 与主手 `Player.setItemInHand` 回退入口会把 incoming stack 改放到第一个空且未锁定的快捷栏槽，再改放到第一个空且未锁定的主背包槽；没有回退槽时掉落。
-29. GUI cursor placement and normal `Slot` APIs remain pure guards: `mayPlace`, `safeInsert`, `set`, and `setByPlayer` reject locked empty slots without rerouting the carried stack. This preserves the expected locked-slot experience and avoids duplicating cursor stacks.
-30. GUI 光标放入和普通 `Slot` API 仍保持纯拦截：`mayPlace`、`safeInsert`、`set` 与 `setByPlayer` 会拒绝锁定空槽，但不会改道光标物品。这样保留锁槽体验，并避免复制光标物品。
-31. NeoForge GUI mouse guarding uses official `ScreenEvent.MouseButtonPressed.Pre` and `ScreenEvent.MouseButtonReleased.Pre` hooks. The release hook covers creative inventory cursor placement, where vanilla can defer the `PICKUP` slot action until mouse release.
-32. NeoForge GUI 鼠标守卫使用官方 `ScreenEvent.MouseButtonPressed.Pre` 与 `ScreenEvent.MouseButtonReleased.Pre` 事件。释放阶段守卫覆盖创造物品栏光标放入路径，因为原版可能把 `PICKUP` 槽位动作延迟到鼠标释放时执行。
-33. Bypass-key state is polled on the client and synced to the server.
-34. 旁路键状态由客户端按键轮询同步到服务端。
-35. When the lock-operation key is held, the state machine has explicit exits: `beginPress` activates the operation and toggles the press target, `toggleEnteredSlot` handles Mouse Tweaks drag-enter targets, `toggleLeakedSlotClick` handles Sophisticated leaked click actions, and `consumeActiveDrag` only suppresses leaked vanilla drag while active.
-36. 按住锁定操作键时，状态机有明确出口：`beginPress` 激活操作并切换按下目标，`toggleEnteredSlot` 处理 Mouse Tweaks 拖动进入目标，`toggleLeakedSlotClick` 处理 Sophisticated 漏出的点击动作，`consumeActiveDrag` 只在 active 时吞掉漏出的原版拖动。
-37. Mouse Tweaks compatibility on all three loaders refreshes Mouse Tweaks' screen bookkeeping, borrows its `getSlotUnderMouse` and `oldSelectedSlot` slot-enter detection, then consumes the Alt drag event before Mouse Tweaks can run its own click semantics. Newly entered slots are handed to this mod's lock-operation toggle exit, keeping Mouse Tweaks optional without inheriting its empty-slot, carried-stack, shift, or config rules.
-38. 三个平台的 Mouse Tweaks 兼容都会先刷新 Mouse Tweaks 的界面账本，借用它的 `getSlotUnderMouse` 与 `oldSelectedSlot` 槽位进入检测，然后在 Mouse Tweaks 执行自身点击语义前消费 Alt 拖动事件。新进入的槽位会交给本模组的锁定操作切换出口，因此 Mouse Tweaks 仍是可选兼容，但不会继承它的空槽、光标物品、Shift 或配置规则。
-39. In NeoForge Sophisticated screens, empty-slot single clicks may be recovered through the low-level press entry when other GUI/input mods suppress higher-level events. Empty-slot drag marking is not guaranteed because it depends on Mouse Tweaks emitting slot-enter samples for those Sophisticated empty slots.
-40. 在 NeoForge 的 Sophisticated 系列界面中，如果其他 GUI/输入模组压掉高层事件，空槽单击可由低层按下入口恢复。空槽拖动标记不作保证，因为它依赖 Mouse Tweaks 是否为这些 Sophisticated 空槽发出槽位进入采样。
+25. ClientSort compatibility rewrites ClientSort slot arrays at validation and operation boundaries instead of globally bypassing `mayPickup`, `mayPlace`, or `canPlaceItem`: collect requests drop locked player-inventory menu slots, including empty locked slots that ClientSort probes with a synthetic placement item; transfer and stack-fill requests drop locked slots from both source and target arrays before ClientSort can shrink a source stack through destination `safeInsert`; sort requests preserve ClientSort's one-to-one mapping by fixing locked slots and re-pairing the remaining sorted sources with remaining targets in ClientSort's target order. This keeps ClientSort's own schema validation satisfied without freezing the whole inventory when one large sort cycle contains a locked slot, without leaving avoidable gaps in unlocked target slots, and without letting ClientSort move locked stacks.
+26. ClientSort 兼容会在 ClientSort 校验和操作边界改写槽位数组，而不是全局旁路 `mayPickup`、`mayPlace` 或 `canPlaceItem`：collect 请求会移除锁定玩家背包 menu slot，包括 ClientSort 使用合成测试物品探测的锁定空槽；transfer 与 stack-fill 请求会在 ClientSort 通过目标槽 `safeInsert` 缩减来源 stack 前，从来源和目标数组同时移除锁定槽；sort 请求会固定锁槽，并按 ClientSort 的目标顺序把剩余已排序来源重新配对到剩余目标槽。这样既满足 ClientSort 自身 schema 校验，也避免一个大型排序 cycle 含有锁槽时冻结整个背包整理，避免未锁目标槽出现可避免的空洞，并且不会让 ClientSort 移动锁槽物品。
+27. Better Experience fast-storage compatibility is intentionally narrow: it only skips Better Experience's per-stack transfer call when the source `ItemStack` object is the same object stored in a locked player-inventory slot. Nearby container discovery and target insertion remain Better Experience behavior.
+28. Better Experience 一键存储兼容刻意保持窄范围：只有当来源 `ItemStack` 对象就是已锁玩家背包槽内的同一对象时，才跳过 Better Experience 的单次 stack 转移调用。附近容器发现与目标放入仍保持 Better Experience 原逻辑。
+29. The guard deliberately does not hide `Slot.getItem`, `Inventory.getItem`, item-handler `getStackInSlot`, or item-handler slot-limit reads, because read interception can break menu synchronization, rendering, and third-party inspection logic.
+30. 守卫刻意不隐藏 `Slot.getItem`、`Inventory.getItem`、item-handler `getStackInSlot` 或 item-handler 槽位上限读取，因为读取拦截可能破坏菜单同步、渲染和第三方检查逻辑。
+31. Direct external writes into a locked empty player slot are not silently canceled after the source item has already been removed. Dedicated `Inventory.setItem` and main-hand `Player.setItemInHand` reroute entries move the incoming stack to the first empty unlocked hotbar slot, then the first empty unlocked main-inventory slot, and drop it when no fallback slot exists.
+32. 对已锁定空玩家槽的外部直接写入不会在来源物品已被移除后静默取消。专用的 `Inventory.setItem` 与主手 `Player.setItemInHand` 回退入口会把 incoming stack 改放到第一个空且未锁定的快捷栏槽，再改放到第一个空且未锁定的主背包槽；没有回退槽时掉落。
+33. Ground-item pickup and other vanilla `Inventory.add(...)` paths do not wait until `setItem` to reject locked empty slots. Instead, `Inventory.getFreeSlot()` is adjusted on the server so locked empty main-inventory slots are skipped when `allowItemsIntoLockedEmptySlots=false`; vanilla then inserts into the next available unlocked empty slot, or keeps the incoming stack unconsumed when no valid free slot exists.
+34. 地面掉落物拾取和其他原版 `Inventory.add(...)` 路径不会等到 `setItem` 阶段才拒绝锁定空槽。服务端会修正 `Inventory.getFreeSlot()`，使 `allowItemsIntoLockedEmptySlots=false` 时跳过已锁定的空主背包槽；随后原版会把物品放入下一个可用未锁空槽，若没有有效空槽则保留 incoming stack 不被消耗。
+35. GUI cursor placement and normal `Slot` APIs remain pure guards: `mayPlace`, `safeInsert`, `set`, and `setByPlayer` reject locked empty slots without rerouting the carried stack. This preserves the expected locked-slot experience and avoids duplicating cursor stacks.
+36. GUI 光标放入和普通 `Slot` API 仍保持纯拦截：`mayPlace`、`safeInsert`、`set` 与 `setByPlayer` 会拒绝锁定空槽，但不会改道光标物品。这样保留锁槽体验，并避免复制光标物品。
+37. NeoForge GUI mouse guarding uses official `ScreenEvent.MouseButtonPressed.Pre` and `ScreenEvent.MouseButtonReleased.Pre` hooks. The release hook covers creative inventory cursor placement, where vanilla can defer the `PICKUP` slot action until mouse release.
+38. NeoForge GUI 鼠标守卫使用官方 `ScreenEvent.MouseButtonPressed.Pre` 与 `ScreenEvent.MouseButtonReleased.Pre` 事件。释放阶段守卫覆盖创造物品栏光标放入路径，因为原版可能把 `PICKUP` 槽位动作延迟到鼠标释放时执行。
+39. Bypass-key state is polled on the client and synced to the server.
+40. 旁路键状态由客户端按键轮询同步到服务端。
+41. When the lock-operation key is held, the state machine has explicit exits: `beginPress` activates the operation and toggles the press target, `toggleEnteredSlot` handles Mouse Tweaks drag-enter targets, `toggleLeakedSlotClick` handles Sophisticated leaked click actions, and `consumeActiveDrag` only suppresses leaked vanilla drag while active.
+42. 按住锁定操作键时，状态机有明确出口：`beginPress` 激活操作并切换按下目标，`toggleEnteredSlot` 处理 Mouse Tweaks 拖动进入目标，`toggleLeakedSlotClick` 处理 Sophisticated 漏出的点击动作，`consumeActiveDrag` 只在 active 时吞掉漏出的原版拖动。
+43. Mouse Tweaks compatibility on all three loaders refreshes Mouse Tweaks' screen bookkeeping, borrows its `getSlotUnderMouse` and `oldSelectedSlot` slot-enter detection, then consumes the Alt drag event before Mouse Tweaks can run its own click semantics. Newly entered slots are handed to this mod's lock-operation toggle exit, keeping Mouse Tweaks optional without inheriting its empty-slot, carried-stack, shift, or config rules.
+44. 三个平台的 Mouse Tweaks 兼容都会先刷新 Mouse Tweaks 的界面账本，借用它的 `getSlotUnderMouse` 与 `oldSelectedSlot` 槽位进入检测，然后在 Mouse Tweaks 执行自身点击语义前消费 Alt 拖动事件。新进入的槽位会交给本模组的锁定操作切换出口，因此 Mouse Tweaks 仍是可选兼容，但不会继承它的空槽、光标物品、Shift 或配置规则。
+45. In NeoForge Sophisticated screens, empty-slot single clicks may be recovered through the low-level press entry when other GUI/input mods suppress higher-level events. Empty-slot drag marking is not guaranteed because it depends on Mouse Tweaks emitting slot-enter samples for those Sophisticated empty slots.
+46. 在 NeoForge 的 Sophisticated 系列界面中，如果其他 GUI/输入模组压掉高层事件，空槽单击可由低层按下入口恢复。空槽拖动标记不作保证，因为它依赖 Mouse Tweaks 是否为这些 Sophisticated 空槽发出槽位进入采样。
 
 ### Installation Modes
 
@@ -319,10 +348,16 @@ Location: `common/.../render`
 
 1. Loader player-clone/copy events route death lifecycle handling into `PlatformFavoriteSupport`.
 2. 三个平台的玩家 clone/copy 事件会把死亡生命周期处理路由到 `PlatformFavoriteSupport`。
-3. When `keepInventory=true`, the new player inventory is restored from the old player inventory under a scoped server inventory-guard bypass. This prevents lock guards from treating vanilla respawn restoration as a user item move.
-4. `keepInventory=true` 时，新玩家背包会在有作用域的服务端背包守卫绕过上下文中从旧玩家背包恢复，避免锁槽守卫把原版重生恢复误判为玩家物品移动。
-5. When `keepInventory=false`, favorite state is cleared and saved for that player, because the locked items have left the player inventory through death drops.
-6. `keepInventory=false` 时，该玩家收藏状态会被清空并保存，因为锁定物品已经通过死亡掉落离开玩家背包。
+3. Loader `ServerPlayer.restoreFrom` mixins ask `ServerFavoriteService` whether the respawn inventory-copy scope should be treated as an internal inventory operation before vanilla copies items.
+4. 三个平台的 `ServerPlayer.restoreFrom` Mixin 会在原版复制物品前询问 `ServerFavoriteService`，判断本次重生库存复制是否应被视为内部库存操作。
+5. The bypass policy combines runtime preservation state and the death config: it is enabled only on the server, and only when `keepEverything`, the world's `keepInventory` gamerule, or `deathBehavior.preserveLockedSlotContents` indicates that some inventory content should survive.
+6. 绕过策略会综合运行时保留状态与死亡配置：仅服务端、且 `keepEverything`、世界规则 `keepInventory` 或 `deathBehavior.preserveLockedSlotContents` 表明存在需要保留的背包内容时才启用。
+7. With vanilla inventory preservation (`keepInventory=true` or `keepEverything=true`), vanilla restoration and the loader clone/copy fallback run under the same scoped guard bypass and restore the full old inventory.
+8. 原版背包保留（`keepInventory=true` 或 `keepEverything=true`）时，原版恢复与平台 clone/copy 兜底恢复都会处于同一个作用域守卫绕过中，并恢复完整旧背包。
+9. With `deathBehavior.preserveLockedSlotContents=true` and `keepInventory=false`, the death-drop scope is opened around `Player.dropEquipment` so it covers the player override's `Inventory.dropAll()` call. Locked non-empty player-inventory stacks are temporarily removed before vanilla `Inventory.dropAll()` runs, then restored after it returns, so vanilla and loader death-drop events still see their normal flow while locked stacks remain available for clone/copy restoration.
+10. 当 `deathBehavior.preserveLockedSlotContents=true` 且 `keepInventory=false` 时，死亡掉落作用域会包住 `Player.dropEquipment`，确保覆盖玩家 override 中的 `Inventory.dropAll()` 调用。非空锁定玩家背包栈会在原版 `Inventory.dropAll()` 执行前被临时移出，并在返回后恢复，因此原版与加载器死亡掉落事件仍保持正常流程，同时锁定栈仍可供 clone/copy 恢复。
+11. When runtime state does not preserve inventory and the death config is disabled, no bypass or death-drop preservation marker is applied; favorite state is cleared and saved for that player, because the locked items have left the player inventory through death drops.
+12. 运行时不保留背包且死亡配置关闭时，不会打绕过或死亡掉落保留标识；该玩家收藏状态会被清空并保存，因为锁定物品已经通过死亡掉落离开玩家背包。
 
 ### Hotbar Drop Guard
 
@@ -372,6 +407,8 @@ Location: `common/.../render`
 - AE2 兼容刻意基于公共抽象层实现；整理兼容应继续优先复用整理模组自身的锁槽概念。
 - NeoForge Sophisticated empty-slot drag marking is a known compatibility limitation in modpacks where Mouse Tweaks does not emit drag-enter samples for those empty slots; single-click empty-slot toggling remains supported.
 - NeoForge 的 Sophisticated 空槽拖动标记在 Mouse Tweaks 不为这些空槽发出拖动进入采样的整合包中属于已知兼容限制；空槽单击切换仍受支持。
+- The inspected nearby-container quick-stack behavior for the Confluence modpack is provided by the Better Experience addon, so compatibility is attached to Better Experience's fast-storage source stack boundary.
+- 当前排查到的汇流整合包附近容器一键存储行为由附属 Better Experience 提供，因此兼容挂在 Better Experience 一键存储的来源 stack 边界。
 
 ## Maintenance Rules
 
@@ -385,6 +422,10 @@ Location: `common/.../render`
 - 优先选择安全的语义 API 边界，再考虑模组特定兼容；除非后续修复能证明同步影响可控，否则不要全局隐藏 `getItem` 读取。
 - Prefer sorter locked-slot integration over replacing third-party container insertion algorithms. Third-party storage/container-owned slots must stay outside NeoFavoriteItems' lock enforcement unless they are resolved to the player's own `Inventory`.
 - 优先通过整理模组自身的锁槽机制做兼容，避免替换第三方容器插入算法。第三方存储/容器自身槽位必须保持在 NeoFavoriteItems 锁定约束之外，除非能解析为玩家自己的 `Inventory`。
+- Put third-party compatibility mixins under the loader's `mixin/compat` package, register them only in the non-required `*.compat.mixins.json`, and name them with the `<ModOrFeature><TargetOrScenario>CompatMixin` pattern.
+- 第三方兼容 Mixin 必须放在对应平台的 `mixin/compat` 包中，只注册到非 required 的 `*.compat.mixins.json`，并使用 `<模组或功能><目标或场景>CompatMixin` 命名模式。
+- In Forge/NeoForge compat mixin plugins, prefer `LoadingModList.get().getModFileById(modId)` during early loading and use `ModList.get().isLoaded(modId)` only as a later fallback. Fabric compat can use Fabric Loader or class-provider presence checks.
+- Forge/NeoForge 兼容 Mixin plugin 中，早期加载阶段优先使用 `LoadingModList.get().getModFileById(modId)`，只把 `ModList.get().isLoaded(modId)` 作为后续回退。Fabric 兼容可使用 Fabric Loader 或 class-provider 存在性检查。
 - When adding an Overlay style, update:
 - 新增 Overlay 样式时，同时更新：
   - `NeoFavoriteItemsConfig.OverlayStyle`

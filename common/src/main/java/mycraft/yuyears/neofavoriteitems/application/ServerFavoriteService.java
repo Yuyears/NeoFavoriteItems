@@ -17,18 +17,19 @@ import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Equipable;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameRules;
 
 import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntPredicate;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 public final class ServerFavoriteService {
     private static final Map<UUID, Long> revisionsByPlayer = new ConcurrentHashMap<>();
     private static final Map<UUID, Boolean> bypassStateByPlayer = new ConcurrentHashMap<>();
-    private static final ThreadLocal<Set<UUID>> inventoryGuardBypassPlayers = ThreadLocal.withInitial(java.util.HashSet::new);
 
     private ServerFavoriteService() {}
 
@@ -108,18 +109,114 @@ public final class ServerFavoriteService {
             return;
         }
 
-        Set<UUID> bypassedPlayers = inventoryGuardBypassPlayers.get();
-        boolean added = bypassedPlayers.add(player.getUUID());
+        beginInventoryGuardBypass(player.getUUID());
         try {
             action.run();
         } finally {
-            if (added) {
-                bypassedPlayers.remove(player.getUUID());
-            }
-            if (bypassedPlayers.isEmpty()) {
-                inventoryGuardBypassPlayers.remove();
-            }
+            endInventoryGuardBypass(player.getUUID());
         }
+    }
+
+    public static void beginRespawnInventoryRestoreBypass(Player newPlayer, boolean keepEverything) {
+        if (shouldBypassRespawnInventoryRestore(newPlayer, keepEverything)) {
+            beginInventoryGuardBypass(newPlayer.getUUID());
+            DebugLogger.debug(
+                "Server began respawn inventory restore bypass: player={} keepEverything={} keepInventory={} preserveLockedSlotContents={}",
+                newPlayer.getName().getString(),
+                keepEverything,
+                newPlayer.level().getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY),
+                ConfigManager.getInstance().getConfig().deathBehavior.preserveLockedSlotContents
+            );
+        }
+    }
+
+    public static void endRespawnInventoryRestoreBypass(Player newPlayer, boolean keepEverything) {
+        if (shouldBypassRespawnInventoryRestore(newPlayer, keepEverything)) {
+            endInventoryGuardBypass(newPlayer.getUUID());
+            DebugLogger.debug(
+                "Server ended respawn inventory restore bypass: player={} keepEverything={} keepInventory={} preserveLockedSlotContents={}",
+                newPlayer.getName().getString(),
+                keepEverything,
+                newPlayer.level().getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY),
+                ConfigManager.getInstance().getConfig().deathBehavior.preserveLockedSlotContents
+            );
+        }
+    }
+
+    public static boolean shouldBypassRespawnInventoryRestore(Player player, boolean keepEverything) {
+        return player != null
+            && shouldBypassRespawnInventoryRestore(
+                player.level().isClientSide(),
+                keepEverything,
+                player.level().getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY),
+                ConfigManager.getInstance().getConfig().deathBehavior.preserveLockedSlotContents
+            );
+    }
+
+    public static void beginDeathDropPreservation(Player player) {
+        if (shouldPreserveLockedSlotContentsAfterDeath(player)) {
+            beginDeathDropPreservation(player.getUUID());
+            DebugLogger.debug(
+                "Server began death drop preservation: player={}",
+                player.getName().getString()
+            );
+        }
+    }
+
+    public static void endDeathDropPreservation(Player player) {
+        if (shouldPreserveLockedSlotContentsAfterDeath(player)) {
+            endDeathDropPreservation(player.getUUID());
+            DebugLogger.debug(
+                "Server ended death drop preservation: player={}",
+                player.getName().getString()
+            );
+        }
+    }
+
+    public static boolean shouldPreserveInventorySlotOnDeath(Inventory inventory, int inventoryIndex) {
+        if (!isServerPlayerInventoryIndex(inventory, inventoryIndex)
+            || inventory.getItem(inventoryIndex).isEmpty()
+            || !isDeathDropPreservationActive(inventory.player)) {
+            return false;
+        }
+
+        FavoritesManager.getInstance().setPlayer(inventory.player.getUUID());
+        return SlotMappingService.fromPlayerInventoryIndex(inventoryIndex)
+            .map(FavoritesManager.getInstance()::isSlotFavorite)
+            .orElse(false);
+    }
+
+    public static void restorePreservedLockedSlotsAfterDeath(Player originalPlayer, Player newPlayer) {
+        if (originalPlayer == null || newPlayer == null || newPlayer.level().isClientSide()) {
+            return;
+        }
+
+        FavoritesManager.getStateService().setPlayer(newPlayer.getUUID());
+        Set<Integer> favoriteSlots = FavoritesManager.getStateService().getFavoriteSlots();
+        runWithInventoryGuardsBypassed(newPlayer, () -> {
+            Inventory originalInventory = originalPlayer.getInventory();
+            Inventory newInventory = newPlayer.getInventory();
+            for (int inventoryIndex : favoriteSlots) {
+                if (!SlotMappingService.isPlayerInventoryIndex(inventoryIndex)) {
+                    continue;
+                }
+                ItemStack originalStack = originalInventory.getItem(inventoryIndex);
+                if (!originalStack.isEmpty()) {
+                    newInventory.setItem(inventoryIndex, originalStack.copy());
+                }
+            }
+        });
+        DebugLogger.debug(
+            "Server restored preserved locked death slots: player={} slots={}",
+            newPlayer.getName().getString(),
+            favoriteSlots
+        );
+    }
+
+    public static boolean shouldPreserveLockedSlotContentsAfterDeath(Player player) {
+        return player != null
+            && !player.level().isClientSide()
+            && ConfigManager.getInstance().getConfig().deathBehavior.preserveLockedSlotContents;
     }
 
     public static boolean shouldCancelMenuClick(AbstractContainerMenu menu, Player player, int slotId, int button, ClickType clickType) {
@@ -376,6 +473,27 @@ public final class ServerFavoriteService {
         return shouldPreventInventorySet(inventory, inventoryIndex, expectedStack);
     }
 
+    public static int resolveFreeSlotForIncomingItem(Inventory inventory, int firstFreeSlot) {
+        if (!isServerPlayerMainInventoryIndex(inventory, firstFreeSlot)
+            || !shouldSkipLockedEmptySlotForIncomingItem(inventory, firstFreeSlot)) {
+            return firstFreeSlot;
+        }
+
+        int resolvedSlot = resolveFreeSlotForIncomingItem(
+            firstFreeSlot,
+            Inventory.INVENTORY_SIZE,
+            slot -> inventory.getItem(slot).isEmpty(),
+            slot -> shouldSkipLockedEmptySlotForIncomingItem(inventory, slot)
+        );
+        DebugLogger.debug(
+            "Server skipped locked empty slot for incoming item: player={} firstFreeSlot={} resolvedSlot={}",
+            inventory.player.getName().getString(),
+            firstFreeSlot,
+            resolvedSlot
+        );
+        return resolvedSlot;
+    }
+
     private static boolean tryRerouteDeniedIncomingStack(Inventory inventory, int inventoryIndex, ItemStack currentStack, ItemStack incomingStack, InteractionDecision decision) {
         if (inventory == null
             || inventory.player == null
@@ -416,6 +534,46 @@ public final class ServerFavoriteService {
             return true;
         }
         return false;
+    }
+
+    static int resolveFreeSlotForIncomingItem(
+        int firstFreeSlot,
+        int inventorySize,
+        IntPredicate isEmptySlot,
+        IntPredicate shouldSkipSlot
+    ) {
+        if (firstFreeSlot < 0 || firstFreeSlot >= inventorySize || !isEmptySlot.test(firstFreeSlot) || !shouldSkipSlot.test(firstFreeSlot)) {
+            return firstFreeSlot;
+        }
+        for (int slot = firstFreeSlot + 1; slot < inventorySize; slot++) {
+            if (isEmptySlot.test(slot) && !shouldSkipSlot.test(slot)) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean shouldSkipLockedEmptySlotForIncomingItem(Inventory inventory, int inventoryIndex) {
+        if (!isServerPlayerMainInventoryIndex(inventory, inventoryIndex)
+            || !inventory.getItem(inventoryIndex).isEmpty()
+            || isInventoryGuardBypassed(inventory.player)) {
+            return false;
+        }
+
+        var config = ConfigManager.getInstance().getConfig();
+        if (!config.general.lockEmptySlots
+            || config.general.autoUnlockEmptySlots
+            || config.general.allowItemsIntoLockedEmptySlots) {
+            return false;
+        }
+        if (isBypassKeyHeld(inventory.player) && config.lockBehavior.allowBypassWithKey) {
+            return false;
+        }
+
+        FavoritesManager.getInstance().setPlayer(inventory.player.getUUID());
+        return SlotMappingService.fromPlayerInventoryIndex(inventoryIndex)
+            .map(FavoritesManager.getInstance()::isSlotFavorite)
+            .orElse(false);
     }
 
     private static boolean isIncomingTargetLocked(Player player, int inventoryIndex) {
@@ -464,6 +622,12 @@ public final class ServerFavoriteService {
             && inventory.player != null
             && !inventory.player.level().isClientSide()
             && SlotMappingService.isPlayerInventoryIndex(inventoryIndex);
+    }
+
+    private static boolean isServerPlayerMainInventoryIndex(Inventory inventory, int inventoryIndex) {
+        return isServerPlayerInventoryIndex(inventory, inventoryIndex)
+            && inventoryIndex >= 0
+            && inventoryIndex < Inventory.INVENTORY_SIZE;
     }
 
     private static int resolvePlayerInventoryIndex(Slot slot, Player player) {
@@ -563,8 +727,45 @@ public final class ServerFavoriteService {
         return bypassStateByPlayer.getOrDefault(player.getUUID(), false);
     }
 
+    static boolean isInventoryGuardBypassed(UUID playerId) {
+        return ScopedPlayerOperationService.isInventoryGuardBypassed(playerId);
+    }
+
     private static boolean isInventoryGuardBypassed(Player player) {
-        return player != null && inventoryGuardBypassPlayers.get().contains(player.getUUID());
+        return player != null && isInventoryGuardBypassed(player.getUUID());
+    }
+
+    static boolean shouldBypassRespawnInventoryRestore(
+        boolean clientSide,
+        boolean keepEverything,
+        boolean keepInventory,
+        boolean preserveLockedSlotContents
+    ) {
+        return !clientSide && (keepEverything || keepInventory || preserveLockedSlotContents);
+    }
+
+    static void beginInventoryGuardBypass(UUID playerId) {
+        ScopedPlayerOperationService.beginInventoryGuardBypass(playerId);
+    }
+
+    static void endInventoryGuardBypass(UUID playerId) {
+        ScopedPlayerOperationService.endInventoryGuardBypass(playerId);
+    }
+
+    static boolean isDeathDropPreservationActive(UUID playerId) {
+        return ScopedPlayerOperationService.isDeathDropPreservationActive(playerId);
+    }
+
+    private static boolean isDeathDropPreservationActive(Player player) {
+        return player != null && isDeathDropPreservationActive(player.getUUID());
+    }
+
+    static void beginDeathDropPreservation(UUID playerId) {
+        ScopedPlayerOperationService.beginDeathDropPreservation(playerId);
+    }
+
+    static void endDeathDropPreservation(UUID playerId) {
+        ScopedPlayerOperationService.endDeathDropPreservation(playerId);
     }
 
     private static InteractionDecision evaluateExistingItem(Player player, int inventoryIndex, InteractionType type, boolean hasItem) {

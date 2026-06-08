@@ -4,7 +4,7 @@ package mycraft.yuyears.neofavoriteitems;
 public class NeoFavoriteItemsMod {
     public static final String MOD_ID = "neo_favorite_items";
     public static final String MOD_NAME = "Neo Favorite Items";
-    public static final String MOD_VERSION = "0.0.1-alpha";
+    public static final String MOD_VERSION = "0.0.2-alpha";
 
     private static NeoFavoriteItemsMod instance;
     private boolean serverPresent;

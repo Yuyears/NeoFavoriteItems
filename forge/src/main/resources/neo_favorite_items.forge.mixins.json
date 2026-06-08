@@ -6,9 +6,12 @@
   "mixins": [
     "AbstractContainerMenuMixin",
     "InventoryMixin",
+    "LivingEntityMixin",
+    "PlayerDropEquipmentMixin",
     "PlayerMixin",
     "InvWrapperMixin",
     "RangedWrapperMixin",
+    "ServerPlayerMixin",
     "ServerGamePacketListenerImplMixin",
     "SlotMixin"
   ],

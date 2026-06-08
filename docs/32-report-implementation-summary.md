@@ -2,9 +2,9 @@
 
 # 实现摘要
 
-Last updated: 2026-05-10
+Last updated: 2026-06-08
 
-最后更新：2026-05-10
+最后更新：2026-06-08
 
 ## Purpose
 
@@ -25,6 +25,10 @@ Last updated: 2026-05-10
 - 统一逻辑槽位模型：`LogicalSlotIndex`
 - Config system with English and Simplified Chinese comments
 - 配置系统和中英文配置注释
+- Config files are split into `neo-favorite-items-common.toml` for server/rule-affecting options and `neo-favorite-items-client.toml` for client presentation/feedback options; legacy `neo-favorite-items.toml` is migrated once and deleted after successful split-file generation.
+- 配置文件已拆分为服务端/规则项使用的 `neo-favorite-items-common.toml` 与客户端显示/反馈项使用的 `neo-favorite-items-client.toml`；旧 `neo-favorite-items.toml` 会一次性迁移，并在拆分文件成功生成后删除。
+- Generated config templates now include paired English and Simplified Chinese explanations for behavior-sensitive options such as locked-empty-slot pickup, bypass-key scope, slot movement, death preservation, and client-only presentation settings.
+- 生成的配置模板现在为行为敏感选项补充了中英双语说明，例如锁定空槽拾取、旁路键作用范围、槽位移动、死亡保留和仅客户端表现设置。
 - Favorite state management and basic persistence
 - 收藏状态管理和基础持久化
 - Fabric, Forge, and NeoForge entrypoints with client key binding registration
@@ -57,8 +61,10 @@ Last updated: 2026-05-10
 - NeoForge 交互实机验证已覆盖：普通丢弃、按住旁路键丢弃、GUI 内外副手交换（覆盖锁定空副手槽和锁定非空副手槽）、锁定空护甲槽 Shift 点击可装备护甲，以及 AE2 终端空格+左键 `MOVE_REGION` 对锁定玩家背包槽的放入与取出。
 - Gradle result-copy task no longer breaks focused `:common:test` runs under configuration-on-demand.
 - Gradle 构建结果复制任务不再破坏 configure-on-demand 下聚焦执行的 `:common:test`。
-- Death lifecycle handling now preserves locked slot contents through `keepInventory=true` respawns and clears favorite state after `keepInventory=false` death drops.
-- 死亡生命周期处理现在会在 `keepInventory=true` 重生时保留锁定槽内容，并在 `keepInventory=false` 死亡掉落后清空收藏状态。
+- Death lifecycle handling now marks vanilla `ServerPlayer.restoreFrom` inventory restoration as an internal scoped operation whenever `keepEverything`, the world `keepInventory` gamerule, or `[deathBehavior] preserveLockedSlotContents` requires inventory preservation. The death-drop preservation marker is opened around `Player.dropEquipment`, covering the player inventory `dropAll()` call; locked stacks are temporarily removed before vanilla `dropAll()` and restored afterward so third-party death-drop listeners stay on the normal loader event path while the original player still carries the locked stacks for respawn restoration.
+- 死亡生命周期处理现在会在 `keepEverything`、世界规则 `keepInventory` 或 `[deathBehavior] preserveLockedSlotContents` 要求保留背包内容时，把原版 `ServerPlayer.restoreFrom` 背包恢复标记为内部作用域操作。死亡掉落保留标识会包住 `Player.dropEquipment`，覆盖玩家背包 `dropAll()` 调用；锁定栈会在原版 `dropAll()` 前被临时移出并在之后恢复，使第三方死亡掉落监听器保持在正常加载器事件路径上，同时原玩家仍携带锁定栈供重生恢复。
+- Scoped player operation bookkeeping has been extracted into `ScopedPlayerOperationService`, leaving `ServerFavoriteService` as the stable server-facing facade used by loader mixins and networking code.
+- 玩家操作作用域计数已抽入 `ScopedPlayerOperationService`，`ServerFavoriteService` 继续作为平台 Mixin 与网络代码使用的稳定服务端 facade。
 - Server-authoritative persistence now resolves to the active world directory and migrates then deletes old files from the previous game-directory `data/neo_favorite_items` root.
 - 服务端权威持久化现在解析到当前世界目录，并会迁移随后删除旧游戏根目录 `data/neo_favorite_items` 下的文件。
 - NeoForge Quark sorting compatibility now augments Quark's sorting-locked slot list with favorite player-inventory slots.
@@ -75,7 +81,21 @@ Last updated: 2026-05-10
 - Overlay 渲染现在使用 common `OverlayRenderDescriptor` 统一描述样式、染色和前景决策。此前尝试的 ModernUI tooltip 低透明度对比底已撤回，因为 ModernUI 会在槽位 Overlay 上方的 tooltip 渲染状态中绘制阴影。
 - Direct external insertion into locked empty selected slots now reroutes the incoming item to the first empty unlocked hotbar slot, then the first empty unlocked main-inventory slot, and drops it if no fallback slot exists. This covers `Inventory.setItem` paths such as Integrated Dynamics Squeezer and main-hand `Player.setItemInHand` paths such as Actually Additions Display Stand.
 - 对锁定空当前槽的外部直接放入现在会把 incoming item 改放到第一个空且未锁定的快捷栏槽，再改放到第一个空且未锁定的主背包槽；没有回退槽时掉落。该路径覆盖 Integrated Dynamics Squeezer 这类 `Inventory.setItem` 调用，以及 Actually Additions Display Stand 这类主手 `Player.setItemInHand` 调用。
+- Vanilla incoming-item insertion now corrects server-side `Inventory.getFreeSlot()` results before `Inventory.add(...)` consumes a stack. Locked empty main-inventory slots are skipped when `allowItemsIntoLockedEmptySlots=false`, so picked-up ground items move to another valid empty slot or remain unpicked when none exists.
+- 原版 incoming item 放入现在会在 `Inventory.add(...)` 消耗 stack 前修正服务端 `Inventory.getFreeSlot()` 结果。`allowItemsIntoLockedEmptySlots=false` 时会跳过锁定空主背包槽，因此拾取的地面掉落物会进入其他有效空槽；没有有效空槽时则保持未拾取。
 - Locked empty slot fallback is separated from GUI cursor placement: `Slot` mutation guards still only reject the carried stack, while the fallback path is reserved for direct inventory writes and main-hand replacement.
 - 锁定空槽回退已与 GUI 光标放入分离：`Slot` 变更守卫仍只拒绝光标物品，回退路径仅用于直接背包写入和主手替换。
 - NeoForge cursor placement into locked empty slots now also guards the official mouse-release screen event, covering creative inventory placement paths that defer `PICKUP` handling until release without adding a dedicated creative-screen mixin.
 - NeoForge 锁定空槽的光标放入现在也会守卫官方鼠标释放界面事件，覆盖创造物品栏把 `PICKUP` 处理延迟到释放阶段的路径，并且不新增专用创造界面 Mixin。
+- Third-party soft-compatibility mixins are now grouped under each loader's `mixin/compat` package, loaded only by non-required compat mixin configs, and named with the `<ModOrFeature><TargetOrScenario>CompatMixin` convention.
+- 第三方软联动 Mixin 现在统一放在各平台 `mixin/compat` 包中，只由非 required 的兼容 Mixin 配置加载，并统一使用 `<模组或功能><目标或场景>CompatMixin` 命名约定。
+- Unregistered historical `SophisticatedInventoryHelperCompatMixin` classes were removed because current protection favors lower-level mutation guards and targeted Sophisticated Sorter/screen compatibility over replacing SophisticatedCore's broad inventory helper.
+- 未注册的历史 `SophisticatedInventoryHelperCompatMixin` 已删除，因为当前保护策略优先使用更低层的变更守卫和有针对性的 Sophisticated Sorter/界面兼容，而不是替换 SophisticatedCore 的宽泛库存 helper。
+- Forge and NeoForge compat mixin plugins now check early-discovered mod files through `LoadingModList` before falling back to runtime `ModList`.
+- Forge 与 NeoForge 兼容 Mixin plugin 现在会先通过 `LoadingModList` 检查早期发现的模组文件，再回退到运行期 `ModList`。
+- Gradle cache defaults are project-local through `gradle.bat` (`.gradle-home`), while `GRADLE_USER_HOME` and `GRADLE_HOME` remain available for local overrides. Common, Forge, and NeoForge compile classpaths include Fabric loader as compile-only annotation metadata so javac can resolve `net.fabricmc.api.EnvType` from referenced annotated classes without packaging Fabric loader into non-Fabric jars. Forge config registration now uses the constructor-injected `FMLJavaModLoadingContext` instead of deprecated static lookup.
+- Gradle 缓存默认通过 `gradle.bat` 指向项目内 `.gradle-home`，同时保留 `GRADLE_USER_HOME` 与 `GRADLE_HOME` 供本地覆盖。common、Forge 与 NeoForge 编译 classpath 以 compile-only 方式包含 Fabric loader 注解元数据，使 javac 能解析被引用注解类中的 `net.fabricmc.api.EnvType`，但不会把 Fabric loader 打入非 Fabric 产物。Forge 配置注册现在使用构造函数注入的 `FMLJavaModLoadingContext`，不再使用已弃用的静态查找。
+- ClientSort compatibility now uses optional three-loader mixins on ClientSort's schema validator and operation entrypoints: collect skips locked player-inventory menu slots, including locked empty slots that ClientSort would otherwise reject through placement checks; transfer and stack-fill filter locked source and target slots so destination `safeInsert(srcStack)` cannot shrink a locked source stack; sort fixes locked slots in place and re-pairs remaining sorted sources with remaining target slots in ClientSort's target order. The common logic is covered by `ClientSortCompatServiceTest`, and debug diagnostics are emitted when arrays are rewritten.
+- ClientSort 兼容现在通过三端可选 Mixin 作用于 ClientSort 的 schema validator 与操作入口：collect 会跳过锁定玩家背包 menu slot，包括 ClientSort 原本会通过放入校验拒绝的锁定空槽；transfer 与 stack-fill 会过滤锁定来源槽和目标槽，避免目标槽 `safeInsert(srcStack)` 缩减锁定来源 stack；sort 会固定锁槽，并按 ClientSort 的目标顺序把剩余已排序来源重新配对到剩余目标槽。公共逻辑由 `ClientSortCompatServiceTest` 覆盖，数组被改写时会输出 debug 诊断。
+- Better Experience fast-storage compatibility is added on NeoForge with a deliberately narrow source-slot guard: when its `StorageManager.saveAll(Player)` is about to transfer an `ItemStack` object that is still the exact stack stored in a locked player-inventory slot, that one transfer call is skipped.
+- NeoForge 新增 Better Experience 一键存储兼容，并刻意保持为窄范围来源槽保护：当其 `StorageManager.saveAll(Player)` 正要转移的 `ItemStack` 对象仍是已锁玩家背包槽中的同一 stack 时，只跳过这一笔转移调用。

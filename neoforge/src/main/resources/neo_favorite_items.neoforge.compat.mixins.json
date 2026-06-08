@@ -1,20 +1,27 @@
 {
   "required": false,
   "minVersion": "0.8",
-  "package": "mycraft.yuyears.neofavoriteitems.neoforge.mixin",
+  "package": "mycraft.yuyears.neofavoriteitems.neoforge.mixin.compat",
   "compatibilityLevel": "JAVA_21",
-  "plugin": "mycraft.yuyears.neofavoriteitems.neoforge.mixin.NeoForgeCompatMixinPlugin",
+  "plugin": "mycraft.yuyears.neofavoriteitems.neoforge.mixin.compat.NeoForgeCompatMixinPlugin",
   "mixins": [
-    "AppEngMenuMixin",
-    "AppEngStorageMenuMixin",
-    "InvTweaksSortingMixin",
-    "QuarkChangeHotbarMessageMixin",
-    "QuarkSortingHandlerMixin",
-    "SophisticatedSorterCoreUtilsMixin"
+    "Ae2MenuCompatMixin",
+    "Ae2StorageMenuCompatMixin",
+    "BetterExperienceStorageManagerCompatMixin",
+    "ClientSortCollectHandlerCompatMixin",
+    "ClientSortSchemaValidatorCompatMixin",
+    "ClientSortSortHandlerCompatMixin",
+    "ClientSortStackFillHandlerCompatMixin",
+    "ClientSortTransferHandlerCompatMixin",
+    "InventoryTweaksSortingCompatMixin",
+    "QuarkHotbarChangeCompatMixin",
+    "QuarkSortingHandlerCompatMixin",
+    "SophisticatedSorterCoreUtilsCompatMixin"
   ],
   "client": [
-    "QuarkEasyTransferringClientMixin",
-    "SophisticatedStorageScreenBaseMixin"
+    "MouseTweaksMainCompatMixin",
+    "QuarkEasyTransferringClientCompatMixin",
+    "SophisticatedStorageScreenCompatMixin"
   ],
   "server": [],
   "injectors": {

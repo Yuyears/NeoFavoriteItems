@@ -1,16 +1,21 @@
 {
   "required": false,
   "minVersion": "0.8",
-  "package": "mycraft.yuyears.neofavoriteitems.forge.mixin",
+  "package": "mycraft.yuyears.neofavoriteitems.forge.mixin.compat",
   "compatibilityLevel": "JAVA_21",
-  "plugin": "mycraft.yuyears.neofavoriteitems.forge.mixin.ForgeCompatMixinPlugin",
+  "plugin": "mycraft.yuyears.neofavoriteitems.forge.mixin.compat.ForgeCompatMixinPlugin",
   "mixins": [
-    "AppEngMenuMixin",
-    "AppEngStorageMenuMixin",
-    "SophisticatedSorterCoreUtilsMixin"
+    "Ae2MenuCompatMixin",
+    "Ae2StorageMenuCompatMixin",
+    "ClientSortCollectHandlerCompatMixin",
+    "ClientSortSchemaValidatorCompatMixin",
+    "ClientSortSortHandlerCompatMixin",
+    "ClientSortStackFillHandlerCompatMixin",
+    "ClientSortTransferHandlerCompatMixin",
+    "SophisticatedSorterCoreUtilsCompatMixin"
   ],
   "client": [
-    "MouseTweaksMainMixin"
+    "MouseTweaksMainCompatMixin"
   ],
   "server": [],
   "injectors": {

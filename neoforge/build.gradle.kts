@@ -12,7 +12,6 @@ configurations.configureEach {
     exclude(group = "net.fabricmc", module = "fabric-log4j-util")
     // 排除 Fabric API，避免编译时找不到 EnvType 类的警告
     exclude(group = "net.fabricmc.fabric-api")
-    exclude(group = "net.fabricmc", module = "fabric-loader")
 }
 
 dependencies {
@@ -22,6 +21,7 @@ dependencies {
     })
 
     add("neoForge", "net.neoforged:neoforge:${property("neoforge_version")}")
+    compileOnly("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
 }
 
 sourceSets.main {

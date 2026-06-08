@@ -114,8 +114,13 @@ public final class PlatformFavoriteSupport {
                 newPlayer.getInventory().replaceWith(originalPlayer.getInventory())
             );
             DataPersistenceManager.getInstance().cacheData(playerUUID);
-        } else {
+        } else if (originalPlayer != null && ServerFavoriteService.shouldPreserveLockedSlotContentsAfterDeath(newPlayer)) {
+            ServerFavoriteService.restorePreservedLockedSlotsAfterDeath(originalPlayer, newPlayer);
+            DataPersistenceManager.getInstance().cacheData(playerUUID);
+        } else if (!keepInventory) {
             FavoritesManager.getStateService().clearFavorites();
+            DataPersistenceManager.getInstance().cacheData(playerUUID);
+        } else {
             DataPersistenceManager.getInstance().cacheData(playerUUID);
         }
 

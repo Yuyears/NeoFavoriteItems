@@ -8,8 +8,8 @@
 - Mod ID：`neo_favorite_items`
 - Package: `mycraft.yuyears.neofavoriteitems`
 - 包名：`mycraft.yuyears.neofavoriteitems`
-- Version: `0.0.1-beta-hotfix-build2`
-- 版本：`0.0.1-beta-hotfix-build2`
+- Version: `0.0.2-alpha`
+- 版本：`0.0.2-alpha`
 - Java: 21
 - Java：21
 - Build system: Gradle Kotlin DSL + Architectury Loom
@@ -61,6 +61,8 @@
 - 安装 AE2 时，AE2 终端的 `MOVE_REGION` 会通过 AE2 公共菜单抽象层处理，覆盖空格+左键转移，而不需要逐个终端界面适配。
 - Inventory sorting compatibility uses each sorter mod's own locked-slot concept when available: Quark and Inventory Tweaks ReFoxed receive favorite player-inventory slots as sorting-locked slots so sorting skips them instead of clearing or reordering them.
 - 整理模组兼容会优先复用整理模组自身的锁槽概念：Quark 与 Inventory Tweaks ReFoxed 会在排序前收到已收藏玩家背包槽作为排序锁槽，使排序跳过这些槽位，而不是清空或重排它们。
+- Better Experience fast storage on NeoForge skips only locked player-inventory source stacks, leaving its nearby-container and target insertion logic unchanged.
+- NeoForge 上的 Better Experience 一键存储只跳过已锁玩家背包来源 stack，附近容器搜索和目标放入逻辑保持该模组原样。
 - NeoForge Quark hotbar changer swaps are handled separately from sorting: when Quark's `Z` hotbar switch exchanges hotbar slots with main-inventory rows, the item exchange bypasses the generic lock guard and the favorite state moves with the exchanged stack.
 - NeoForge 的 Quark 快捷栏切换会与排序分开处理：当 Quark 的 `Z` 键快捷栏切换在快捷栏与主背包行之间交换物品时，该物品交换会绕过通用锁槽守卫，并让收藏状态跟随被交换的物品移动。
 - Mouse Tweaks-style drag clicks are supported on all three loaders. The compatibility layer borrows Mouse Tweaks' slot-enter detection, then routes newly entered player-inventory slots to NeoFavoriteItems' own lock toggle path instead of Mouse Tweaks' click semantics.
@@ -99,10 +101,12 @@
   - 世界/服务端关闭：对缓存玩家数据执行一次最终保存收尾。
 - Death handling follows vanilla inventory semantics:
 - 死亡处理遵循原版背包语义：
-  - When `keepInventory=true`, the server copies the old player inventory into the respawned player while bypassing lock guards for that lifecycle copy.
-  - `keepInventory=true` 时，服务端会在该生命周期复制中绕过锁槽守卫，把旧玩家背包复制到重生后的玩家。
-  - When `keepInventory=false`, favorite slots are cleared and saved because the items left the player inventory through death drops.
-  - `keepInventory=false` 时，由于物品通过死亡掉落离开玩家背包，收藏槽位会被清空并保存。
+  - When `keepInventory=true`, the server marks respawn inventory restoration as an internal scoped operation, then copies the old player inventory into the respawned player while lock guards honor that marker.
+  - `keepInventory=true` 时，服务端会把重生库存恢复标记为内部作用域操作，随后在锁槽守卫识别该标识并放行的情况下，把旧玩家背包复制到重生后的玩家。
+  - By default, when `keepInventory=false`, favorite slots are cleared and saved because the items left the player inventory through death drops.
+  - 默认情况下，`keepInventory=false` 时，由于物品通过死亡掉落离开玩家背包，收藏槽位会被清空并保存。
+  - When `[deathBehavior] preserveLockedSlotContents=true`, non-empty locked player-inventory slots are temporarily hidden from vanilla death drops and restored to the respawned player even if `keepInventory=false`.
+  - 当 `[deathBehavior] preserveLockedSlotContents=true` 时，即使 `keepInventory=false`，非空锁定玩家背包槽也会被临时从原版死亡掉落中隐藏，并恢复到重生后的玩家。
 - Server-only installation keeps login compatible with unmodded clients by checking the target player's advertised payload/channel support before sending sync packets.
 - 仅服务端安装时，服务端会在发送同步包前检查目标玩家连接声明的 payload/channel 支持，从而保持未安装客户端的登录兼容性。
 - Config files and in-game text provide English and Simplified Chinese resources.
@@ -134,8 +138,8 @@ Common source code lives under `common/src/main/java/mycraft/yuyears/neofavorite
 
 - `domain`: `LogicalSlotIndex`, `InteractionType`, `InteractionDecision`
 - `domain`：`LogicalSlotIndex`、`InteractionType`、`InteractionDecision`
-- `application`: `InteractionGuardService`, `ServerFavoriteService`, `ClientFavoriteSyncService`, `InventorySortingCompatService`, `LockedEmptySlotFallback`
-- `application`：`InteractionGuardService`、`ServerFavoriteService`、`ClientFavoriteSyncService`、`InventorySortingCompatService`、`LockedEmptySlotFallback`
+- `application`: `InteractionGuardService`, `ServerFavoriteService`, `ScopedPlayerOperationService`, `ClientFavoriteSyncService`, `InventorySortingCompatService`, `LockedEmptySlotFallback`
+- `application`：`InteractionGuardService`、`ServerFavoriteService`、`ScopedPlayerOperationService`、`ClientFavoriteSyncService`、`InventorySortingCompatService`、`LockedEmptySlotFallback`
 - `integration`: `SlotMappingService`
 - `integration`：`SlotMappingService`
 - `persistence`: `DataPersistenceManager`
@@ -148,6 +152,10 @@ Common source code lives under `common/src/main/java/mycraft/yuyears/neofavorite
 Common resources live under `common/src/main/resources/assets/neo_favorite_items`; loader modules merge these resources during `processResources`.
 
 公共资源位于 `common/src/main/resources/assets/neo_favorite_items`，平台模块会在 `processResources` 阶段合并这些资源。
+
+Third-party soft-compatibility mixins live under each loader's `mixin/compat` package and are loaded only from the non-required `*.compat.mixins.json` files. Compatibility mixin classes use `<ModOrFeature><TargetOrScenario>CompatMixin`, for example `Ae2MenuCompatMixin`.
+
+第三方软联动 Mixin 位于各平台的 `mixin/compat` 包中，并且只通过非 required 的 `*.compat.mixins.json` 加载。兼容 Mixin 类使用 `<模组或功能><目标或场景>CompatMixin` 命名，例如 `Ae2MenuCompatMixin`。
 
 ## Build
 
@@ -173,10 +181,10 @@ Build outputs:
 
 构建产物：
 
-- `fabric/build/libs/neo_favorite_items-fabric-0.0.1-beta-hotfix-<build_number>.jar`
-- `forge/build/libs/neo_favorite_items-forge-0.0.1-beta-hotfix-<build_number>.jar`
-- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.1-beta-hotfix-<build_number>.jar`
-- `build/result/neo_favorite_items-<loader>-0.0.1-beta-hotfix-<build_number>.jar`
+- `fabric/build/libs/neo_favorite_items-fabric-0.0.2-alpha-<build_number>.jar`
+- `forge/build/libs/neo_favorite_items-forge-0.0.2-alpha-<build_number>.jar`
+- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.2-alpha-<build_number>.jar`
+- `build/result/neo_favorite_items-<loader>-0.0.2-alpha-<build_number>.jar`
 
 `build_number` is stored in `gradle.properties` and automatically increments when running `build`, `assemble`, `jar`, or `remapJar` tasks. When `mod_version` changes, the next increment resets the build number to `build1`. It does not increment for `compileJava`, `runClient`, `help`, or `--dry-run`. Use `-Pskip_build_number_increment=true` when a release rebuild must keep the current build number.
 
@@ -185,6 +193,10 @@ Build outputs:
 The result-copy task uses lazy task-path dependencies so focused commands such as `.\gradle.bat :common:test` work with Gradle configuration-on-demand.
 
 构建结果复制任务使用惰性任务路径依赖，因此 `.\gradle.bat :common:test` 等聚焦命令可在 Gradle configure-on-demand 下正常运行。
+
+`.\gradle.bat` defaults `GRADLE_USER_HOME` to the project-local `.gradle-home` cache. Developers can override it with the `GRADLE_USER_HOME` environment variable, and can override the Gradle installation with `GRADLE_HOME`.
+
+`.\gradle.bat` 默认把 `GRADLE_USER_HOME` 指向项目内 `.gradle-home` 缓存。开发者可通过 `GRADLE_USER_HOME` 环境变量改用本地自定义缓存，也可通过 `GRADLE_HOME` 指定 Gradle 安装。
 
 ## Development Runs
 
@@ -205,33 +217,46 @@ The first run generates:
 首次运行后会生成：
 
 ```text
-config/neo-favorite-items.toml
+config/neo-favorite-items-common.toml
+config/neo-favorite-items-client.toml
 ```
 
 Main configuration groups:
 
 主要配置分组：
 
+- `neo-favorite-items-common.toml`: server-authoritative or rule-affecting options. On a server, these values are the source of truth for lock behavior.
+- `neo-favorite-items-common.toml`：服务端权威或影响规则的配置。服务端存在时，这些值是锁定行为的准则。
 - `general`: empty-slot locking, automatic empty-slot unlock, whether items may enter locked empty slots
 - `general`：空槽锁定、空槽自动解锁、是否允许物品进入锁定空槽
   - `autoUnlockEmptySlots=true` prevents empty slots from keeping favorite locks; `lockEmptySlots` only allows empty-slot locks when automatic empty unlock is disabled.
   - `autoUnlockEmptySlots=true` 时空槽不会保留收藏锁定；`lockEmptySlots` 只在关闭自动空槽解锁时才允许锁空槽。
   - `allowItemsIntoLockedEmptySlots` only applies when empty-slot locks are actually kept.
   - `allowItemsIntoLockedEmptySlots` 只在空槽锁定确实会被保留时生效。
+  - When `allowItemsIntoLockedEmptySlots=false`, vanilla pickup/free-slot selection skips locked empty main-inventory slots before the dropped stack is consumed.
+  - 当 `allowItemsIntoLockedEmptySlots=false` 时，原版拾取/空槽选择会在消耗掉落 stack 前跳过锁定空主背包槽。
 - `lockBehavior`: guard rules for interaction types and bypass-key behavior
 - `lockBehavior`：不同交互类型的拦截策略和旁路键行为
 - `slotBehavior`: whether favorite state follows items or stays at slot positions
 - `slotBehavior`：收藏状态随物品移动或固定在槽位
+- `deathBehavior`: whether locked slot contents survive death even when `keepInventory=false`
+- `deathBehavior`：是否在 `keepInventory=false` 时仍让锁定槽内容随死亡重生保留
+- `debug`: diagnostic logging switch
+- `debug`：诊断日志开关
+- `neo-favorite-items-client.toml`: client-preferred presentation and feedback options.
+- `neo-favorite-items-client.toml`：客户端优先生效的显示和反馈配置。
 - `overlay`: overlay style, color, opacity, and foreground rendering switches
 - `overlay`：Overlay 样式、颜色、透明度和前景渲染开关
 - `feedback`: text and sound feedback settings
 - `feedback`：文本、音效等反馈设置
-- `debug`: diagnostic logging switch
-- `debug`：诊断日志开关
 
 When the config file is missing, the mod generates a complete default file. When an existing config has malformed lines, unknown keys, invalid values, or missing entries, readable values are kept in memory and the file is regenerated with those values plus defaults for unreadable or missing entries.
 
 当配置文件不存在时，模组会生成完整默认配置。若已有配置存在格式错误、未知配置项、非法值或缺失项，能读取的值会先保留，随后用这些值加上未读取项的默认值重新生成配置文件。
+
+Existing single-file `config/neo-favorite-items.toml` configs are read once as a migration source, split into the new common/client files, and then removed after the migration succeeds.
+
+已有的单文件 `config/neo-favorite-items.toml` 会作为迁移来源读取一次，拆分写入新的 common/client 文件；迁移成功后会删除旧文件。
 
 Key bindings are managed through Minecraft Controls and are not written to the mod config file.
 

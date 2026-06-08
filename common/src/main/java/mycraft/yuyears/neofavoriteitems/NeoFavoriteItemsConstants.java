@@ -1,6 +1,8 @@
 package mycraft.yuyears.neofavoriteitems;
 
 public final class NeoFavoriteItemsConstants {
+    public static final String COMMON_CONFIG_FILE_NAME = "neo-favorite-items-common.toml";
+    public static final String CLIENT_CONFIG_FILE_NAME = "neo-favorite-items-client.toml";
     public static final String CONFIG_FILE_NAME = "neo-favorite-items.toml";
     public static final String KEY_CATEGORY = "category.neo_favorite_items";
     public static final String LOCK_OPERATION_KEY_ID = "key.neo_favorite_items.lock_operation";

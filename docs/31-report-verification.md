@@ -2,9 +2,9 @@
 
 # 修复验证报告
 
-Date: 2026-05-05
+Date: 2026-06-08
 
-日期：2026-05-05
+日期：2026-06-08
 
 ## Purpose
 
@@ -59,8 +59,8 @@ Date: 2026-05-05
 40. Forge/NeoForge 的 `InvWrapper` 与 `RangedWrapper` 守卫不再通过读取 API 隐藏锁定玩家背包物品，修复 JustDireThings 等自定义 GUI 中锁定槽显示为空的问题。
 41. Forge/NeoForge slot resolvers now recognize `SlotItemHandler` instances backed by player-inventory `InvWrapper` or `RangedWrapper`, so overlays and early click guards apply in JustDireThings-style GUIs.
 42. Forge/NeoForge 槽位解析器现在能识别由玩家背包 `InvWrapper` 或 `RangedWrapper` 支撑的 `SlotItemHandler`，因此 JustDireThings 风格 GUI 中也会渲染 Overlay 并提前拦截点击。
-43. Death respawn handling now distinguishes vanilla lifecycle copies from player item movement: `keepInventory=true` restores the old inventory under a scoped guard bypass, while `keepInventory=false` clears and saves favorite state.
-44. 死亡重生处理现在会区分原版生命周期复制和玩家物品移动：`keepInventory=true` 时在有作用域的守卫绕过中恢复旧背包，`keepInventory=false` 时清空并保存收藏状态。
+43. Death respawn handling now distinguishes vanilla lifecycle copies from player item movement: vanilla inventory preservation restores the old inventory under a scoped guard bypass, while normal `keepInventory=false` deaths clear and save favorite state unless the death-preservation config is enabled.
+44. 死亡重生处理现在会区分原版生命周期复制和玩家物品移动：原版背包保留会在有作用域的守卫绕过中恢复旧背包；普通 `keepInventory=false` 死亡会清空并保存收藏状态，除非启用死亡保留配置。
 45. Server-authoritative persistence now uses the active world directory instead of the game directory, and legacy files under `<game>/data/neo_favorite_items` are migrated once then deleted after successful read.
 46. 服务端权威持久化现在使用当前世界目录而不是游戏目录；旧 `<游戏目录>/data/neo_favorite_items` 文件会在首次成功读取后迁移并删除。
 47. NeoForge Quark sorting compatibility now augments Quark's sorting-locked slot list with favorite player-inventory slots before Quark clears and rewrites the sorted range.
@@ -81,6 +81,22 @@ Date: 2026-05-05
 62. Overlay 渲染现在使用 common `OverlayRenderDescriptor` 统一描述样式、染色、透明度和前景位置决策。
 63. ModernUI rounded tooltip shadow is generated inside its tooltip shader/render state above normal slot overlays; the removed contrast backing should no longer be present in configs or renderer code.
 64. ModernUI 圆角 tooltip 阴影由其 tooltip shader/render state 在普通槽位 Overlay 上方生成；已移除的对比底不应再出现在配置或渲染代码中。
+65. Death respawn inventory restoration now has a loader-level `ServerPlayer.restoreFrom` internal operation marker controlled by a common policy that combines `keepEverything`, the world `keepInventory` gamerule, and `[deathBehavior] preserveLockedSlotContents`.
+66. 死亡重生库存恢复现在拥有加载器层 `ServerPlayer.restoreFrom` 内部操作标识，并由 common 策略综合 `keepEverything`、世界规则 `keepInventory` 与 `[deathBehavior] preserveLockedSlotContents` 后决定是否启用。
+67. `[deathBehavior] preserveLockedSlotContents` can preserve locked slot contents even when `keepInventory=false`: death drops skip non-empty locked player slots and respawn clone/copy restores only those locked slot contents.
+68. `[deathBehavior] preserveLockedSlotContents` 可以在 `keepInventory=false` 时保留锁定槽内容：死亡掉落会跳过非空锁定玩家槽，重生 clone/copy 只恢复这些锁定槽内容。
+69. Preserved death drops now keep the vanilla `Inventory.dropAll()` path active by temporarily hiding locked stacks before the call and restoring them after return, which avoids leaving NeoForge `LivingDropsEvent` listeners such as Curios on a non-vanilla drop path.
+70. 保留型死亡掉落现在通过在调用前临时隐藏锁定栈、返回后恢复来保持原版 `Inventory.dropAll()` 路径继续执行，避免让 Curios 等 NeoForge `LivingDropsEvent` 监听器处在非原版掉落路径上。
+71. Configuration is now split into `neo-favorite-items-common.toml` for server/rule-affecting options and `neo-favorite-items-client.toml` for client presentation/feedback options. Legacy `neo-favorite-items.toml` is read only as a migration source and deleted after successful split-file generation.
+72. 配置现在拆分为用于服务端/规则项的 `neo-favorite-items-common.toml` 和用于客户端显示/反馈项的 `neo-favorite-items-client.toml`。旧 `neo-favorite-items.toml` 只作为迁移来源读取，并会在拆分文件成功生成后删除。
+73. Third-party soft-compatibility mixins are now isolated under `mixin/compat`, registered only from non-required compat configs, and renamed with the `CompatMixin` suffix convention.
+74. 第三方软联动 Mixin 现在隔离在 `mixin/compat` 下，只从非 required 兼容配置注册，并统一使用 `CompatMixin` 后缀命名约定。
+75. Unregistered SophisticatedCore inventory-helper compatibility mixins were removed; Forge/NeoForge compat plugins now prefer early `LoadingModList` mod-file checks before runtime `ModList` fallback.
+76. 未注册的 SophisticatedCore 库存 helper 兼容 Mixin 已删除；Forge/NeoForge 兼容 plugin 现在优先使用早期 `LoadingModList` 模组文件检查，再回退到运行期 `ModList`。
+77. ClientSort collect/sort/transfer/stack-fill compatibility now rewrites slot arrays at ClientSort schema-validation and operation boundaries: locked collect slots are filtered, transfer and stack-fill source/target arrays are filtered, and sort mappings keep locked slots fixed while re-pairing remaining sorted sources with remaining targets in ClientSort's target order.
+78. ClientSort collect/sort/transfer/stack-fill 兼容现在会在 ClientSort schema 校验与实际操作边界改写槽位数组：锁定 collect 槽会被过滤，transfer 与 stack-fill 的来源/目标数组都会过滤锁槽，sort 映射会固定锁槽，并按 ClientSort 的目标顺序把剩余已排序来源重新配对到剩余目标槽。
+79. Better Experience provides the inspected Confluence modpack nearby-container quick-stack action. NeoForge compatibility now only skips Better Experience's per-stack transfer call when the source stack belongs to a locked player-inventory slot; container discovery and target insertion remain owned by Better Experience.
+80. 已排查到汇流整合包附近容器一键存储动作由 Better Experience 提供。NeoForge 兼容现在只在来源 stack 属于已锁玩家背包槽时跳过 Better Experience 的单次 stack 转移调用；容器发现和目标放入仍由 Better Experience 自身处理。
 
 ## Integration Validation Summary
 
@@ -152,6 +168,18 @@ Date: 2026-05-05
   - 在 NeoForge 上，Quark `Z` 键快捷栏行交换即使一侧已锁定也会交换两边物品，因为该交换会被视为一次有意物品移动，而不是一次应被阻止的锁槽放入。
   - Favorite state follows the exchanged stack between hotbar slots `0..8` and main-inventory rows `9..35`, then the updated favorite set is synchronized to the client.
   - 收藏状态会随被交换物品在快捷栏 `0..8` 与主背包行 `9..35` 之间移动，随后更新后的收藏集合会同步给客户端。
+- ClientSort expectation:
+- ClientSort 预期：
+  - ClientSort collect should no longer fail with "invalid payload data" when the selected player-inventory range includes locked slots; those slots are omitted at ClientSort validation and collect-operation entrypoints.
+  - 当 ClientSort collect 选择范围包含锁定玩家槽时，不应再因“载荷数据无效”失败；这些槽会在 ClientSort 校验和 collect 操作入口被移除。
+  - Locked empty slots are part of this expectation because ClientSort validates empty slots through placement checks before collecting.
+  - 锁定空槽同样属于该预期范围，因为 ClientSort 会在 collect 前通过放入校验验证空槽可访问性。
+  - When debug logging is enabled, rewritten ClientSort collect/sort arrays should produce `ClientSort collect filtered locked slots` or `ClientSort sort stabilized locked slots` diagnostics.
+  - 启用 debug 日志时，ClientSort collect/sort 数组被改写应产生 `ClientSort collect filtered locked slots` 或 `ClientSort sort stabilized locked slots` 诊断。
+  - ClientSort sort should keep locked slots unchanged while compacting unlocked sorted sources into unlocked target slots in ClientSort's target order; the rewritten mapping must remain a valid one-to-one source/destination permutation.
+  - ClientSort sort 应保持锁定槽不变，同时按 ClientSort 的目标顺序把未锁已排序来源压入未锁目标槽；改写后的映射必须仍是有效的一一 source/destination permutation。
+  - ClientSort transfer, match-transfer, and stack-fill must not remove from or insert into locked player inventory slots. This is enforced by filtering both source and target arrays, because ClientSort's implementation can mutate source stacks through destination `safeInsert(srcStack)`.
+  - ClientSort transfer、同类移动与 stack-fill 不得从锁定玩家槽取出，也不得向锁定玩家槽放入。该限制通过同时过滤来源和目标数组实现，因为 ClientSort 实现会通过目标槽 `safeInsert(srcStack)` 直接改变来源 stack。
 - Sophisticated Backpacks click expectation:
 - Sophisticated Backpacks 点击预期：
   - On NeoForge, Alt-left-click lock operations in Sophisticated Backpacks screens are handled by the dedicated container mouse state machine before the screen can emit `PICKUP` or `QUICK_MOVE` inventory actions.
@@ -168,10 +196,14 @@ Date: 2026-05-05
   - 锁定切换后原 quick-move 点击会被取消，因此物品不应被背包界面移动。
 - Death lifecycle expectation:
 - 死亡生命周期预期：
-  - `keepInventory=true` keeps locked slot contents through respawn because vanilla inventory restoration is not blocked by lock guards.
-  - `keepInventory=true` 时锁定槽内容会随重生保留，因为原版背包恢复不会再被锁槽守卫拦截。
-  - `keepInventory=false` clears favorite state after death drops so empty/changed slots are not left locked unexpectedly.
-  - `keepInventory=false` 时死亡掉落后会清空收藏状态，避免空槽或变化后的槽位继续意外锁定。
+  - `keepInventory=true` or `restoreFrom keepEverything=true` keeps inventory contents through respawn because vanilla inventory restoration is marked as an internal scoped operation before lock guards or locked-empty-slot rerouting see its writes.
+  - `keepInventory=true` 或 `restoreFrom keepEverything=true` 会让背包内容随重生保留，因为原版背包恢复会在锁槽守卫或锁定空槽回退看到写入前被标记为内部作用域操作。
+  - With `[deathBehavior] preserveLockedSlotContents=true`, `keepInventory=false` death drops skip non-empty locked player-inventory slots, and clone/copy restores only those locked slots to the respawned player.
+  - 当 `[deathBehavior] preserveLockedSlotContents=true` 时，`keepInventory=false` 的死亡掉落会跳过非空锁定玩家背包槽，clone/copy 只把这些锁定槽恢复到重生后的玩家。
+  - The skip is implemented by temporarily removing locked stacks around vanilla `Inventory.dropAll()`, not by canceling `dropAll()`, so loader/mod death-drop listeners should continue to receive the normal death-drop event path.
+  - 该跳过行为通过围绕原版 `Inventory.dropAll()` 临时移出锁定栈实现，而不是取消 `dropAll()`，因此加载器/模组的死亡掉落监听器应继续收到正常死亡掉落事件路径。
+  - With `[deathBehavior] preserveLockedSlotContents=false`, `keepInventory=false` clears favorite state after death drops so empty/changed slots are not left locked unexpectedly.
+  - 当 `[deathBehavior] preserveLockedSlotContents=false` 时，`keepInventory=false` 死亡掉落后会清空收藏状态，避免空槽或变化后的槽位继续意外锁定。
 - Persistence expectation:
 - 持久化预期：
   - Dual-install singleplayer and dedicated-server saves are stored in `<world>/data/neo_favorite_items/players/<uuid>.dat`.
@@ -238,6 +270,10 @@ Date: 2026-05-05
 - NeoForge 仍需实机验证 Quark 排序遇到已锁玩家主背包槽时的行为。
 - NeoForge in-game validation of Quark hotbar changer (`Z`) swaps with locked hotbar and main-inventory slots.
 - NeoForge 仍需实机验证 Quark 快捷栏切换（`Z`）在锁定快捷栏和主背包槽时的交换行为。
+- In-game validation of ClientSort collect and sort on the loaders where ClientSort is installed.
+- 在安装 ClientSort 的加载器上实机验证 ClientSort collect 与 sort。
+- Better Experience fast-storage compatibility still needs in-game validation with a locked source slot next to a matching nearby container stack.
+- Better Experience 一键存储兼容仍需实机验证：玩家已锁来源槽旁边存在可合并的附近容器同类 stack 时，锁槽物品不应被拿走。
 - NeoForge in-game validation of Sophisticated Backpacks Alt-left-click slot locking after the `QUICK_MOVE` click-path fix.
 - NeoForge 仍需实机验证 Sophisticated Backpacks 在修复 `QUICK_MOVE` 点击路径后的 Alt+左键槽位锁定行为。
 - Manual matrix validation for persistence paths and lifecycle timing:

@@ -27,6 +27,10 @@ public class NeoFavoriteItemsConfig {
         public SlotMoveBehavior moveBehavior = SlotMoveBehavior.STAY_AT_POSITION;
     }
 
+    public static class DeathBehavior {
+        public boolean preserveLockedSlotContents = false;
+    }
+
     public static enum OverlayStyle {
         BORDER,
         CLASSIC,
@@ -72,6 +76,7 @@ public class NeoFavoriteItemsConfig {
     public General general = new General();
     public LockBehavior lockBehavior = new LockBehavior();
     public SlotBehavior slotBehavior = new SlotBehavior();
+    public DeathBehavior deathBehavior = new DeathBehavior();
     public Overlay overlay = new Overlay();
     public Feedback feedback = new Feedback();
     public Debug debug = new Debug();

@@ -2,6 +2,7 @@
 package mycraft.yuyears.neofavoriteitems.forge;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
@@ -24,11 +25,11 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.IExtensionPoint;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLLoader;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -49,8 +50,10 @@ public class NeoFavoriteItemsForge {
     private static boolean lastLoggedBypassLockKeyState;
     private ForgeOverlayRenderer overlayRenderer;
 
-    public NeoFavoriteItemsForge(net.minecraftforge.eventbus.api.IEventBus modEventBus) {
+    public NeoFavoriteItemsForge(FMLJavaModLoadingContext loadingContext) {
         NeoFavoriteItemsMod.getInstance().initialize();
+        ConfigManager.getInstance().initialize(FMLLoader.getGamePath().resolve("config"));
+        var modEventBus = loadingContext.getModEventBus();
         modEventBus.register(IExtensionPoint.DisplayTest.IGNORE_SERVER_VERSION);
         
         var modBus = modEventBus;
@@ -59,7 +62,8 @@ public class NeoFavoriteItemsForge {
         modBus.addListener(this::registerKeyBindings);
         modBus.addListener(this::addGuiOverlayLayers);
         modBus.addListener(ForgeFavoriteItemsConfig::onModConfig);
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ForgeFavoriteItemsConfig.SPEC, NeoFavoriteItemsConstants.CONFIG_FILE_NAME);
+        loadingContext.registerConfig(ModConfig.Type.COMMON, ForgeFavoriteItemsConfig.COMMON_SPEC, NeoFavoriteItemsConstants.COMMON_CONFIG_FILE_NAME);
+        loadingContext.registerConfig(ModConfig.Type.CLIENT, ForgeFavoriteItemsConfig.CLIENT_SPEC, NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME);
         ForgeFavoriteNetworking.registerPackets();
         
         SOUNDS.register(modBus);

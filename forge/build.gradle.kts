@@ -20,6 +20,7 @@ dependencies {
     })
 
     add("forge", "net.minecraftforge:forge:${property("minecraft_version")}-${property("forge_version")}")
+    compileOnly("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
 }
 
 loom {

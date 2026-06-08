@@ -2,6 +2,7 @@
 package mycraft.yuyears.neofavoriteitems.neoforge;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
@@ -42,11 +43,13 @@ public class NeoFavoriteItemsNeoForge {
 
     public NeoFavoriteItemsNeoForge(IEventBus modBus, ModContainer modContainer) {
         NeoFavoriteItemsMod.getInstance().initialize();
+        ConfigManager.getInstance().initialize(FMLLoader.getGamePath().resolve("config"));
 
         modBus.addListener(this::setup);
         modBus.addListener(this::registerPayloadHandlers);
         modBus.addListener(NeoForgeFavoriteItemsConfig::onModConfig);
-        modContainer.registerConfig(ModConfig.Type.COMMON, NeoForgeFavoriteItemsConfig.SPEC, NeoFavoriteItemsConstants.CONFIG_FILE_NAME);
+        modContainer.registerConfig(ModConfig.Type.COMMON, NeoForgeFavoriteItemsConfig.COMMON_SPEC, NeoFavoriteItemsConstants.COMMON_CONFIG_FILE_NAME);
+        modContainer.registerConfig(ModConfig.Type.CLIENT, NeoForgeFavoriteItemsConfig.CLIENT_SPEC, NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME);
         
         // 仅客户端注册客户端相关监听器
         if (IS_CLIENT) {

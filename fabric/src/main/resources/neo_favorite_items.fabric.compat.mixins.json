@@ -1,15 +1,20 @@
 {
   "required": false,
   "minVersion": "0.8",
-  "package": "mycraft.yuyears.neofavoriteitems.fabric.mixin",
+  "package": "mycraft.yuyears.neofavoriteitems.fabric.mixin.compat",
   "compatibilityLevel": "JAVA_21",
-  "plugin": "mycraft.yuyears.neofavoriteitems.fabric.mixin.FabricCompatMixinPlugin",
+  "plugin": "mycraft.yuyears.neofavoriteitems.fabric.mixin.compat.FabricCompatMixinPlugin",
   "mixins": [
-    "AppEngMenuMixin",
-    "AppEngStorageMenuMixin"
+    "Ae2MenuCompatMixin",
+    "Ae2StorageMenuCompatMixin",
+    "ClientSortCollectHandlerCompatMixin",
+    "ClientSortSchemaValidatorCompatMixin",
+    "ClientSortSortHandlerCompatMixin",
+    "ClientSortStackFillHandlerCompatMixin",
+    "ClientSortTransferHandlerCompatMixin"
   ],
   "client": [
-    "MouseTweaksMainMixin"
+    "MouseTweaksMainCompatMixin"
   ],
   "server": [],
   "injectors": {

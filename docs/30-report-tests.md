@@ -2,9 +2,9 @@
 
 # 测试报告
 
-Date: 2026-05-10
+Date: 2026-06-08
 
-日期：2026-05-10
+日期：2026-06-08
 
 ## Purpose
 
@@ -31,7 +31,9 @@ Date: 2026-05-10
   - `DataPersistenceManagerTest`
   - `ReflectionHelperTest`
   - `PlatformFavoriteSupportTest`
+  - `ServerFavoriteServiceTest`
   - `InventorySortingCompatServiceTest`
+  - `ClientSortCompatServiceTest`
   - `LockedEmptySlotFallbackTest`
 - Interaction coverage additions in this round:
 - 本轮新增的交互覆盖点：
@@ -61,6 +63,10 @@ Date: 2026-05-10
   - 这些路径已通过编译验证。
 - Sorting compatibility note:
 - 整理兼容说明：
+  - ClientSort collect/sort/transfer/stack-fill compatibility is covered by `ClientSortCompatServiceTest` and three-loader compilation: locked collect slots are filtered, transfer and stack-fill mixins reuse the same locked-slot filtering for source and target arrays, two-slot swaps touching a locked slot become no-op, protected slots are removed from larger sort mappings while remaining sorted sources are re-paired with remaining targets in ClientSort target order, wraparound cycles no longer displace unlocked targets, and arrays are reused when no protection applies.
+  - ClientSort collect/sort/transfer/stack-fill 兼容由 `ClientSortCompatServiceTest` 和三端编译覆盖：锁定 collect 槽会被过滤，transfer 与 stack-fill Mixin 对来源和目标数组复用同一锁槽过滤，触碰锁槽的二元交换会变成 no-op，较大排序映射会剔除受保护槽并按 ClientSort 目标顺序把剩余已排序来源重新配对到剩余目标槽，回绕 cycle 不再错位未锁目标，无保护时复用原数组。
+  - Better Experience fast-storage source-stack identity detection is covered by `BetterExperienceCompatServiceTest`; the NeoForge compat mixin is compile-verified.
+  - Better Experience 一键存储来源 stack 的引用身份检测由 `BetterExperienceCompatServiceTest` 覆盖；NeoForge 兼容 Mixin 已通过编译验证。
   - NeoForge Quark sorting compatibility and Inventory Tweaks ReFoxed player-sort compatibility both use the common favorite-slot merge helper covered by `InventorySortingCompatServiceTest`.
   - NeoForge Quark 排序兼容与 Inventory Tweaks ReFoxed 玩家背包整理兼容都复用 common 收藏锁槽合并 helper，并由 `InventorySortingCompatServiceTest` 覆盖。
   - NeoForge Quark hotbar changer compatibility is covered by `InventorySortingCompatServiceTest` for favorite-state swaps between hotbar and main-inventory rows.
@@ -93,8 +99,10 @@ Date: 2026-05-10
   - 该客户端 Mixin 路径已通过编译验证。
 - Overlay rendering note:
 - Overlay 渲染说明：
-  - `ConfigManagerTest` verifies that the removed `renderForegroundContrastBackdrop` option is no longer generated and is stripped during config repair.
-  - `ConfigManagerTest` 验证已移除的 `renderForegroundContrastBackdrop` 配置项不再生成，并会在配置修复时被清理。
+  - `ConfigManagerTest` verifies split common/client config generation, one-time legacy `neo-favorite-items.toml` migration and deletion, stale legacy-file deletion when split files already exist, and removal of the old `renderForegroundContrastBackdrop` option during client config repair.
+  - `ConfigManagerTest` 验证 common/client 配置拆分生成、旧 `neo-favorite-items.toml` 一次性迁移并删除、拆分文件已存在时删除残留旧文件，以及客户端配置修复时清理旧 `renderForegroundContrastBackdrop` 配置项。
+  - `ConfigManagerTest` also asserts paired English and Simplified Chinese generated comments for locked-empty-slot pickup, death preservation, and client/server responsibility boundaries.
+  - `ConfigManagerTest` 还断言生成配置中包含锁定空槽拾取、死亡保留以及客户端/服务端职责边界的中英双语注释。
   - Fabric, Forge, and NeoForge renderers now consume common `OverlayRenderDescriptor` decisions and are compile-verified.
   - Fabric、Forge、NeoForge 渲染器现在消费 common `OverlayRenderDescriptor` 决策，并已通过编译验证。
   - ModernUI source review shows rounded tooltip shadow is produced by its tooltip shader/render state, so the low-alpha contrast backing was removed instead of kept as an ineffective workaround.
@@ -115,6 +123,30 @@ Date: 2026-05-10
   - 将旧游戏根目录 `data/neo_favorite_items` 下的服务端权威文件迁移到当前世界目录，并验证成功迁移后删除旧文件
   - clearing server data also removes old game-directory server files to avoid future duplicate reads
   - 清理服务端数据时也会删除旧游戏根目录服务端文件，避免后续重复读取
+- Death/respawn guard-bypass coverage:
+- 死亡/重生守卫绕过覆盖点：
+  - internal inventory-guard bypass markers are scoped and nestable
+  - 内部库存守卫绕过标识具备作用域，并支持嵌套
+  - the extracted `ScopedPlayerOperationService` remains covered through the `ServerFavoriteService` facade, preserving existing loader mixin call sites
+  - 抽出的 `ScopedPlayerOperationService` 继续通过 `ServerFavoriteService` facade 被测试覆盖，保持现有平台 Mixin 调用点不变
+  - unmatched bypass cleanup does not accidentally enable bypass
+  - 未匹配的绕过结束不会意外启用绕过
+  - respawn restoration bypass now requires server-side execution plus runtime preservation through `keepEverything`, `keepInventory`, or `deathBehavior.preserveLockedSlotContents`
+  - 重生恢复绕过现在要求服务端执行，并通过 `keepEverything`、`keepInventory` 或 `deathBehavior.preserveLockedSlotContents` 表明存在需要保留的背包内容
+  - death-drop preservation markers are scoped and nestable, matching the internal inventory-guard bypass depth behavior
+  - 死亡掉落保留标识具备作用域并支持嵌套，与内部库存守卫绕过深度行为一致
+  - player death-drop preservation is compile-verified on Fabric, Forge, and NeoForge through an outer `Player.dropEquipment` hook that covers `Inventory.dropAll()`
+  - 玩家死亡掉落保留已通过 Fabric、Forge、NeoForge 编译验证：外层 `Player.dropEquipment` 钩子会覆盖 `Inventory.dropAll()`
+  - preserved death drops now leave vanilla `Inventory.dropAll()` active by temporarily removing locked stacks before the call and restoring them after return, reducing NeoForge death-drop event compatibility risk
+  - 保留型死亡掉落现在会保持原版 `Inventory.dropAll()` 继续执行：调用前临时移出锁定栈、返回后恢复，从而降低 NeoForge 死亡掉落事件兼容风险
+  - config parsing covers generation, repair, and value preservation for `[deathBehavior] preserveLockedSlotContents`
+  - 配置解析覆盖 `[deathBehavior] preserveLockedSlotContents` 的生成、修复和值保留
+- Ground-item pickup and free-slot selection coverage:
+- 地面掉落物拾取与空槽选择覆盖点：
+  - `ServerFavoriteServiceTest` covers free-slot resolution that skips locked empty slots, falls through to the next unlocked empty slot, and returns `-1` when no valid free slot remains.
+  - `ServerFavoriteServiceTest` 覆盖空槽解析：跳过锁定空槽、落到下一个未锁空槽、以及没有有效空槽时返回 `-1`。
+  - Fabric, Forge, and NeoForge compile verification covers the `Inventory.getFreeSlot()` return-value hook that keeps vanilla `Inventory.add(...)` from choosing locked empty slots before pickup consumes the dropped stack.
+  - Fabric、Forge、NeoForge 编译验证覆盖 `Inventory.getFreeSlot()` 返回值钩子，使原版 `Inventory.add(...)` 在拾取消耗掉落 stack 前不会选择锁定空槽。
 
 ## Coverage
 
@@ -143,6 +175,54 @@ Date: 2026-05-10
 
 - Latest local verification:
 - 最新本地验证：
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after adding ClientSort collect/sort payload rewrite tests.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：新增 ClientSort collect/sort payload 改写测试后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after moving ClientSort compatibility to ClientSort schema-validator and operation-entry mixins. A first attempt using MixinExtras failed on Forge because that source set does not include MixinExtras; the final implementation uses vanilla Mixin `@ModifyVariable`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：ClientSort 兼容改为 ClientSort schema validator 与操作入口 Mixin 后通过。首次使用 MixinExtras 的尝试在 Forge 失败，因为该 source set 未包含 MixinExtras；最终实现改用原生 Mixin `@ModifyVariable`。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after ClientSort compatibility and documentation updates.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：ClientSort 兼容与文档更新后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after adding ClientSort locked-empty-slot diagnostics and tightening `@ModifyVariable` slot-array selection.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：加入 ClientSort 锁定空槽诊断并收紧 `@ModifyVariable` 槽位数组选择后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`: passed; reset build metadata from `0.0.1-release/build15` to `0.0.2-alpha/build1` and produced the three loader jars in `build/result`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`：通过；构建元数据从 `0.0.1-release/build15` 重置为 `0.0.2-alpha/build1`，并在 `build/result` 生成三端 jar。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after changing ClientSort sort stabilization from whole-cycle no-op to protected-node removal and unlocked-cycle reconnection.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：ClientSort sort 稳定算法从整环 no-op 改为摘出受保护节点并重连未锁 cycle 后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after the ClientSort sort stabilization refinement.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：ClientSort sort 稳定算法细化后三端编译通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`: passed after the ClientSort sort stabilization refinement; produced `0.0.2-alpha-build2` loader jars in `build/result`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`：ClientSort sort 稳定算法细化后通过；在 `build/result` 生成 `0.0.2-alpha-build2` 三端 jar。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after adding ClientSort transfer and stack-fill source/target filtering mixins.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：加入 ClientSort transfer 与 stack-fill 来源/目标过滤 Mixin 后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`: passed after adding ClientSort transfer and stack-fill filtering; produced `0.0.2-alpha-build3` loader jars in `build/result`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`：加入 ClientSort transfer 与 stack-fill 过滤后通过；在 `build/result` 生成 `0.0.2-alpha-build3` 三端 jar。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after changing ClientSort sort stabilization to re-pair unlocked sorted sources with unlocked targets in ClientSort target order.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：ClientSort sort 稳定算法改为按 ClientSort 目标顺序重新配对未锁已排序来源和未锁目标后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after the ClientSort target-order sort stabilization change.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：ClientSort 目标顺序 sort 稳定算法修改后三端编译通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`: passed after the ClientSort target-order sort stabilization change; produced `0.0.2-alpha-build4` loader jars in `build/result`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`：ClientSort 目标顺序 sort 稳定算法修改后通过；在 `build/result` 生成 `0.0.2-alpha-build4` 三端 jar。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after removing unregistered Sophisticated inventory-helper compat mixins and updating Forge/NeoForge compat plugin mod checks.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：删除未注册 Sophisticated 库存 helper 兼容 Mixin 并更新 Forge/NeoForge 兼容 plugin 模组判断后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after the compat plugin `LoadingModList` fallback change.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：兼容 plugin 改为 `LoadingModList` 优先判断后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after historical compat cleanup and documentation update.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：历史兼容清理与文档更新后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after moving and renaming third-party compatibility mixins under per-loader `mixin/compat` packages.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：第三方兼容 Mixin 迁入各平台 `mixin/compat` 包并统一命名后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after updating compat mixin package names, class names, and config plugin references.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：更新兼容 Mixin 包名、类名和配置 plugin 引用后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the compat mixin layout and naming cleanup plus documentation update.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：兼容 Mixin 目录与命名整理、文档更新后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after adding the scoped internal inventory-operation bypass tests.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：新增内部库存操作作用域绕过测试后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after adding the three-loader `ServerPlayer.restoreFrom` bypass mixins.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：新增三端 `ServerPlayer.restoreFrom` 绕过 Mixin 后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after changing respawn restore bypass to use `keepEverything || keepInventory` instead of only the `restoreFrom` boolean parameter.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：重生恢复绕过条件从仅依赖 `restoreFrom` 布尔参数改为 `keepEverything || keepInventory` 后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`: passed after the respawn restore bypass condition fix; produced `0.0.2-alpha-build5` loader jars in `build/result`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache build`：重生恢复绕过条件修复后通过；在 `build/result` 生成 `0.0.2-alpha-build5` 三端 jar。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the death-respawn bypass implementation and documentation update.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：死亡重生绕过实现与文档更新后通过。
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：通过
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after locked-empty-slot fallback routing tests were added.
@@ -179,6 +259,32 @@ Date: 2026-05-10
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：Sophisticated 服务端菜单伪锁定修复后通过。
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the Sophisticated server menu pseudo-lock fix.
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：Sophisticated 服务端菜单伪锁定修复后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after adding `[deathBehavior] preserveLockedSlotContents`, death-drop preservation scope mixins, and locked-slot-only respawn restoration.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：新增 `[deathBehavior] preserveLockedSlotContents`、死亡掉落保留作用域 Mixin 与仅恢复锁定槽的重生恢复后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after moving the death-drop scope hook to `LivingEntity.dropEquipment`, eliminating the previous remap warning from targeting `ServerPlayer`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：死亡掉落作用域钩子迁移到 `LivingEntity.dropEquipment` 后通过，并消除了此前目标写在 `ServerPlayer` 上导致的 remap 警告。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after adding the outer `Player.dropEquipment` death-drop scope hook so preserved-death `Inventory.dropAll()` sees the active marker.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：新增外层 `Player.dropEquipment` 死亡掉落作用域钩子后通过，使保留死亡路径中的 `Inventory.dropAll()` 能看到 active marker。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after replacing the preserved-death `Inventory.dropAll()` cancellation with temporary locked-stack removal/restoration around the vanilla call.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：将保留型死亡路径中的 `Inventory.dropAll()` 取消改为围绕原版调用临时移出/恢复锁定栈后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache --rerun-tasks :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed with all common unit tests forced to rerun after the preserved-death drop path change.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache --rerun-tasks :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：保留型死亡掉落路径调整后强制重跑 common 单元测试并完成三端编译，通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the preserved-death drop path change and produced Fabric, Forge, and NeoForge jars through `copyLoaderJarsToResult`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：保留型死亡掉落路径调整后通过，并经 `copyLoaderJarsToResult` 生成 Fabric、Forge、NeoForge 产物。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache --rerun-tasks :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after adding compile-only Fabric loader annotations to common/Forge/NeoForge compile classpaths and replacing Forge config registration with constructor-injected `FMLJavaModLoadingContext`; the previous `EnvType.CLIENT` and `ModLoadingContext.get()` warnings no longer appear.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache --rerun-tasks :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：在 common/Forge/NeoForge 编译 classpath 中加入 compile-only Fabric loader 注解，并把 Forge 配置注册改为构造函数注入的 `FMLJavaModLoadingContext` 后通过；此前的 `EnvType.CLIENT` 与 `ModLoadingContext.get()` 警告不再出现。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after warning cleanup and Gradle cache default adjustment. The build still reports Gradle's generic deprecation summary and a Loom/Mixin manifest note from `:common:remapJar`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：警告清理与 Gradle 缓存默认值调整后通过。构建仍报告 Gradle 通用 deprecation 摘要以及 `:common:remapJar` 的 Loom/Mixin manifest 提示。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache --rerun-tasks :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after adding server-side `Inventory.getFreeSlot()` correction for locked empty slots during vanilla incoming-item insertion.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache --rerun-tasks :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava`：为原版 incoming item 放入路径新增服务端 `Inventory.getFreeSlot()` 锁定空槽修正后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the ground-item pickup/free-slot correction and produced refreshed loader jars through `copyLoaderJarsToResult`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：地面掉落物拾取/空槽选择修正后通过，并经 `copyLoaderJarsToResult` 刷新生成三端产物。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after splitting config persistence into common/client files and adding legacy config deletion coverage.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`：配置持久化拆分为 common/client 文件并补充旧配置删除覆盖后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed after registering Forge/NeoForge common and client config specs separately and running legacy migration before platform config registration.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`：Forge/NeoForge 分别注册 common/client 配置 spec，并在平台配置注册前执行旧配置迁移后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed after the config split and migration documentation updates; produced refreshed `0.0.2-alpha-build5` loader jars in `build/result`.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：配置拆分和迁移文档更新后通过；在 `build/result` 刷新生成 `0.0.2-alpha-build5` 三端 jar。
 
 - Command: `.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`
 - 命令：`.\gradle.bat --no-daemon --no-build-cache :fabric:compileJava :forge:compileJava :neoforge:compileJava`

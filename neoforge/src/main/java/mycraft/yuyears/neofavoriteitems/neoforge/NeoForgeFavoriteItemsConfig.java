@@ -9,7 +9,8 @@ import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 final class NeoForgeFavoriteItemsConfig {
-    static final ModConfigSpec SPEC;
+    static final ModConfigSpec COMMON_SPEC;
+    static final ModConfigSpec CLIENT_SPEC;
 
     private static final ModConfigSpec.BooleanValue AUTO_UNLOCK_EMPTY_SLOTS;
     private static final ModConfigSpec.BooleanValue LOCK_EMPTY_SLOTS;
@@ -22,6 +23,9 @@ final class NeoForgeFavoriteItemsConfig {
     private static final ModConfigSpec.BooleanValue PREVENT_SWAP;
     private static final ModConfigSpec.BooleanValue ALLOW_BYPASS_WITH_KEY;
     private static final ModConfigSpec.EnumValue<NeoFavoriteItemsConfig.SlotMoveBehavior> MOVE_BEHAVIOR;
+    private static final ModConfigSpec.BooleanValue PRESERVE_LOCKED_SLOT_CONTENTS;
+    private static final ModConfigSpec.BooleanValue DEBUG_ENABLED;
+
     private static final ModConfigSpec.EnumValue<NeoFavoriteItemsConfig.OverlayStyle> LOCKED_STYLE;
     private static final ModConfigSpec.EnumValue<NeoFavoriteItemsConfig.OverlayStyle> HOLDING_KEY_LOCKED_STYLE;
     private static final ModConfigSpec.EnumValue<NeoFavoriteItemsConfig.OverlayStyle> HIGHLIGHT_STYLE;
@@ -41,79 +45,90 @@ final class NeoForgeFavoriteItemsConfig {
     private static final ModConfigSpec.ConfigValue<String> FEEDBACK_SOUND;
     private static final ModConfigSpec.DoubleValue FEEDBACK_VOLUME;
     private static final ModConfigSpec.DoubleValue FEEDBACK_PITCH;
-    private static final ModConfigSpec.BooleanValue DEBUG_ENABLED;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        ModConfigSpec.Builder commonBuilder = new ModConfigSpec.Builder();
 
-        builder.push("general");
-        AUTO_UNLOCK_EMPTY_SLOTS = builder.comment("Whether to automatically unlock slots when they become empty.")
+        commonBuilder.push("general");
+        AUTO_UNLOCK_EMPTY_SLOTS = commonBuilder.comment("Whether to automatically unlock slots when they become empty.")
             .define("autoUnlockEmptySlots", false);
-        LOCK_EMPTY_SLOTS = builder.comment("Whether to allow locking empty slots.")
+        LOCK_EMPTY_SLOTS = commonBuilder.comment("Whether to allow locking empty slots.")
             .define("lockEmptySlots", true);
-        ALLOW_ITEMS_INTO_LOCKED_EMPTY_SLOTS = builder.comment("Whether to allow items to be placed into locked empty slots.")
+        ALLOW_ITEMS_INTO_LOCKED_EMPTY_SLOTS = commonBuilder.comment("Whether to allow items to be placed into locked empty slots.")
             .define("allowItemsIntoLockedEmptySlots", false);
-        builder.pop();
+        commonBuilder.pop();
 
-        builder.push("lockBehavior");
-        PREVENT_CLICK = builder.define("preventClick", true);
-        PREVENT_DROP = builder.define("preventDrop", true);
-        PREVENT_QUICK_MOVE = builder.define("preventQuickMove", true);
-        PREVENT_SHIFT_CLICK = builder.define("preventShiftClick", true);
-        PREVENT_DRAG = builder.define("preventDrag", true);
-        PREVENT_SWAP = builder.define("preventSwap", true);
-        ALLOW_BYPASS_WITH_KEY = builder.define("allowBypassWithKey", true);
-        builder.pop();
+        commonBuilder.push("lockBehavior");
+        PREVENT_CLICK = commonBuilder.define("preventClick", true);
+        PREVENT_DROP = commonBuilder.define("preventDrop", true);
+        PREVENT_QUICK_MOVE = commonBuilder.define("preventQuickMove", true);
+        PREVENT_SHIFT_CLICK = commonBuilder.define("preventShiftClick", true);
+        PREVENT_DRAG = commonBuilder.define("preventDrag", true);
+        PREVENT_SWAP = commonBuilder.define("preventSwap", true);
+        ALLOW_BYPASS_WITH_KEY = commonBuilder.define("allowBypassWithKey", true);
+        commonBuilder.pop();
 
-        builder.push("slotBehavior");
-        MOVE_BEHAVIOR = builder.defineEnum("moveBehavior", NeoFavoriteItemsConfig.SlotMoveBehavior.STAY_AT_POSITION);
-        builder.pop();
+        commonBuilder.push("slotBehavior");
+        MOVE_BEHAVIOR = commonBuilder.defineEnum("moveBehavior", NeoFavoriteItemsConfig.SlotMoveBehavior.STAY_AT_POSITION);
+        commonBuilder.pop();
 
-        builder.push("overlay");
-        LOCKED_STYLE = builder.defineEnum("lockedStyle", NeoFavoriteItemsConfig.OverlayStyle.MARK);
-        HOLDING_KEY_LOCKED_STYLE = builder.defineEnum("holdingKeyLockedStyle", NeoFavoriteItemsConfig.OverlayStyle.MARK);
-        HIGHLIGHT_STYLE = builder.defineEnum("highlightStyle", NeoFavoriteItemsConfig.OverlayStyle.BORDER);
-        LOCKED_OVERLAY_COLOR = builder.comment("Color as rgba(...), rgb(...), #RRGGBB, #RRGGBBAA, 0xAARRGGBB, or luv(...).")
+        commonBuilder.push("deathBehavior");
+        PRESERVE_LOCKED_SLOT_CONTENTS = commonBuilder.comment("Whether locked slot contents survive death even when keepInventory is false.")
+            .define("preserveLockedSlotContents", false);
+        commonBuilder.pop();
+
+        commonBuilder.push("debug");
+        DEBUG_ENABLED = commonBuilder.define("enabled", false);
+        commonBuilder.pop();
+
+        COMMON_SPEC = commonBuilder.build();
+
+        ModConfigSpec.Builder clientBuilder = new ModConfigSpec.Builder();
+
+        clientBuilder.push("overlay");
+        LOCKED_STYLE = clientBuilder.defineEnum("lockedStyle", NeoFavoriteItemsConfig.OverlayStyle.MARK);
+        HOLDING_KEY_LOCKED_STYLE = clientBuilder.defineEnum("holdingKeyLockedStyle", NeoFavoriteItemsConfig.OverlayStyle.MARK);
+        HIGHLIGHT_STYLE = clientBuilder.defineEnum("highlightStyle", NeoFavoriteItemsConfig.OverlayStyle.BORDER);
+        LOCKED_OVERLAY_COLOR = clientBuilder.comment("Color as rgba(...), rgb(...), #RRGGBB, #RRGGBBAA, 0xAARRGGBB, or luv(...).")
             .define("lockedOverlayColor", "#FF413CFA");
-        LOCKED_OVERLAY_OPACITY = builder.defineInRange("lockedOverlayOpacity", 0.7d, 0.0d, 1.0d);
-        LOCKABLE_HIGHLIGHT_COLOR = builder.define("lockableHighlightColor", "#23E600C8");
-        LOCKABLE_HIGHLIGHT_OPACITY = builder.defineInRange("lockableHighlightOpacity", 0.55d, 0.0d, 1.0d);
-        UNLOCKABLE_HIGHLIGHT_COLOR = builder.define("unlockableHighlightColor", "#FFC335B4");
-        UNLOCKABLE_HIGHLIGHT_OPACITY = builder.defineInRange("unlockableHighlightOpacity", 0.65d, 0.0d, 1.0d);
-        COLOR_OVERLAY_OPACITY = builder.defineInRange("colorOverlayOpacity", 0.35d, 0.0d, 1.0d);
-        BYPASS_OVERLAY_OPACITY_MULTIPLIER = builder.defineInRange("bypassOverlayOpacityMultiplier", 0.35d, 0.0d, 1.0d);
-        RENDER_LOCKED_OVERLAY_IN_FRONT = builder.define("renderLockedOverlayInFront", true);
-        RENDER_LOCKABLE_HIGHLIGHT_IN_FRONT = builder.define("renderLockableHighlightInFront", true);
-        RENDER_UNLOCKABLE_HIGHLIGHT_IN_FRONT = builder.define("renderUnlockableHighlightInFront", true);
-        builder.pop();
+        LOCKED_OVERLAY_OPACITY = clientBuilder.defineInRange("lockedOverlayOpacity", 0.7d, 0.0d, 1.0d);
+        LOCKABLE_HIGHLIGHT_COLOR = clientBuilder.define("lockableHighlightColor", "#23E600C8");
+        LOCKABLE_HIGHLIGHT_OPACITY = clientBuilder.defineInRange("lockableHighlightOpacity", 0.55d, 0.0d, 1.0d);
+        UNLOCKABLE_HIGHLIGHT_COLOR = clientBuilder.define("unlockableHighlightColor", "#FFC335B4");
+        UNLOCKABLE_HIGHLIGHT_OPACITY = clientBuilder.defineInRange("unlockableHighlightOpacity", 0.65d, 0.0d, 1.0d);
+        COLOR_OVERLAY_OPACITY = clientBuilder.defineInRange("colorOverlayOpacity", 0.35d, 0.0d, 1.0d);
+        BYPASS_OVERLAY_OPACITY_MULTIPLIER = clientBuilder.defineInRange("bypassOverlayOpacityMultiplier", 0.35d, 0.0d, 1.0d);
+        RENDER_LOCKED_OVERLAY_IN_FRONT = clientBuilder.define("renderLockedOverlayInFront", true);
+        RENDER_LOCKABLE_HIGHLIGHT_IN_FRONT = clientBuilder.define("renderLockableHighlightInFront", true);
+        RENDER_UNLOCKABLE_HIGHLIGHT_IN_FRONT = clientBuilder.define("renderUnlockableHighlightInFront", true);
+        clientBuilder.pop();
 
-        builder.push("feedback");
-        SHOW_VISUAL_FEEDBACK = builder.define("showVisualFeedback", true);
-        PLAY_SOUND_FEEDBACK = builder.define("playSoundFeedback", true);
-        FEEDBACK_SOUND = builder.define("feedbackSound", "minecraft:block.note_block.hat");
-        FEEDBACK_VOLUME = builder.defineInRange("feedbackVolume", 0.5d, 0.0d, 1.0d);
-        FEEDBACK_PITCH = builder.defineInRange("feedbackPitch", 1.0d, 0.0d, 2.0d);
-        builder.pop();
+        clientBuilder.push("feedback");
+        SHOW_VISUAL_FEEDBACK = clientBuilder.define("showVisualFeedback", true);
+        PLAY_SOUND_FEEDBACK = clientBuilder.define("playSoundFeedback", true);
+        FEEDBACK_SOUND = clientBuilder.define("feedbackSound", "minecraft:block.note_block.hat");
+        FEEDBACK_VOLUME = clientBuilder.defineInRange("feedbackVolume", 0.5d, 0.0d, 1.0d);
+        FEEDBACK_PITCH = clientBuilder.defineInRange("feedbackPitch", 1.0d, 0.0d, 2.0d);
+        clientBuilder.pop();
 
-        builder.push("debug");
-        DEBUG_ENABLED = builder.define("enabled", false);
-        builder.pop();
-
-        SPEC = builder.build();
+        CLIENT_SPEC = clientBuilder.build();
     }
 
     private NeoForgeFavoriteItemsConfig() {}
 
     static void onModConfig(ModConfigEvent event) {
-        if (!NeoFavoriteItemsMod.MOD_ID.equals(event.getConfig().getModId())
-            || event.getConfig().getType() != ModConfig.Type.COMMON) {
+        if (!NeoFavoriteItemsMod.MOD_ID.equals(event.getConfig().getModId())) {
             return;
         }
-        syncToCommonConfig();
+        if (event.getConfig().getType() == ModConfig.Type.COMMON) {
+            syncCommonToCommonConfig();
+        } else if (event.getConfig().getType() == ModConfig.Type.CLIENT) {
+            syncClientToCommonConfig();
+        }
     }
 
-    private static void syncToCommonConfig() {
-        NeoFavoriteItemsConfig config = new NeoFavoriteItemsConfig();
+    private static void syncCommonToCommonConfig() {
+        NeoFavoriteItemsConfig config = ConfigManager.getInstance().getConfig();
         config.general.autoUnlockEmptySlots = AUTO_UNLOCK_EMPTY_SLOTS.get();
         config.general.lockEmptySlots = LOCK_EMPTY_SLOTS.get();
         config.general.allowItemsIntoLockedEmptySlots = ALLOW_ITEMS_INTO_LOCKED_EMPTY_SLOTS.get();
@@ -125,6 +140,12 @@ final class NeoForgeFavoriteItemsConfig {
         config.lockBehavior.preventSwap = PREVENT_SWAP.get();
         config.lockBehavior.allowBypassWithKey = ALLOW_BYPASS_WITH_KEY.get();
         config.slotBehavior.moveBehavior = MOVE_BEHAVIOR.get();
+        config.deathBehavior.preserveLockedSlotContents = PRESERVE_LOCKED_SLOT_CONTENTS.get();
+        config.debug.enabled = DEBUG_ENABLED.get();
+    }
+
+    private static void syncClientToCommonConfig() {
+        NeoFavoriteItemsConfig config = ConfigManager.getInstance().getConfig();
         config.overlay.lockedStyle = LOCKED_STYLE.get();
         config.overlay.holdingKeyLockedStyle = HOLDING_KEY_LOCKED_STYLE.get();
         config.overlay.highlightStyle = HIGHLIGHT_STYLE.get();
@@ -144,8 +165,6 @@ final class NeoForgeFavoriteItemsConfig {
         config.feedback.feedbackSound = FEEDBACK_SOUND.get();
         config.feedback.feedbackVolume = FEEDBACK_VOLUME.get().floatValue();
         config.feedback.feedbackPitch = FEEDBACK_PITCH.get().floatValue();
-        config.debug.enabled = DEBUG_ENABLED.get();
-        ConfigManager.getInstance().applyPlatformConfig(config);
     }
 
     private static int parseColor(String value, String fallback) {

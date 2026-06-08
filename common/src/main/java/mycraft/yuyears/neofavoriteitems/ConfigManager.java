@@ -9,9 +9,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ConfigManager {
-    private static final String CONFIG_COMMENTS = """
-        # Neo Favorite Items Mod Configuration
-        # 新物品收藏模组配置
+    private enum ConfigFileKind {
+        COMMON,
+        CLIENT,
+        LEGACY
+    }
+
+    private static final String COMMON_CONFIG_COMMENTS = """
+        # Neo Favorite Items Common Configuration
+        # 新物品收藏模组通用配置
+        # Server-authoritative or rule-affecting options
+        # 服务端权威或影响规则的配置
         # =====================================
         
         [general]
@@ -33,6 +41,8 @@ public class ConfigManager {
         # 是否允许物品放入已锁定的空槽位
         # Child option of autoUnlockEmptySlots=false + lockEmptySlots=true
         # autoUnlockEmptySlots=false 且 lockEmptySlots=true 时的子级配置
+        # When false, picked-up ground items skip locked empty main-inventory slots and try the next valid slot before the stack is consumed
+        # 为 false 时，拾取地面掉落物会在物品被消耗前跳过已锁定空主背包槽，并尝试放入下一个有效槽位
         allowItemsIntoLockedEmptySlots = %s
         
         [lockBehavior]
@@ -46,10 +56,14 @@ public class ConfigManager {
         
         # Prevent quick moving items from locked slots
         # 阻止从已锁定槽位快速移动物品
+        # Covers server quick-move paths such as container transfers and sorter-style inventory moves
+        # 覆盖服务端快速移动路径，例如容器转移和整理类库存移动
         preventQuickMove = %s
         
         # Prevent shift-clicking items from locked slots
         # 阻止 Shift 点击已锁定槽位
+        # Kept as the explicit Shift-click rule used by the interaction guard
+        # 作为交互守卫使用的显式 Shift 点击规则保留
         preventShiftClick = %s
         
         # Prevent dragging items over locked slots
@@ -62,6 +76,8 @@ public class ConfigManager {
         
         # Allow bypassing lock by holding the bypass key
         # 是否允许按住旁路键临时绕过锁定限制
+        # Applies only to guarded operations that receive the synced bypass-key state
+        # 仅对能收到同步旁路键状态的受守卫操作生效
         allowBypassWithKey = %s
         
         [slotBehavior]
@@ -71,8 +87,33 @@ public class ConfigManager {
         # FOLLOW_ITEM：锁定状态跟随物品移动
         # STAY_AT_POSITION: The favorite status stays at the slot position
         # STAY_AT_POSITION：锁定状态固定在槽位位置
+        # This controls favorite-state movement only; death preservation is configured in [deathBehavior]
+        # 该项只控制收藏状态如何移动；死亡保留由 [deathBehavior] 配置
         moveBehavior = "%s"
+
+        [deathBehavior]
+        # Whether locked slot contents survive death even when keepInventory is false
+        # 是否在 keepInventory=false 时仍让已锁定槽位的内容随死亡重生保留
+        # If true, locked player-inventory slots are skipped during death drops and restored to the respawned player
+        # 如果为 true，死亡掉落会跳过已锁定玩家背包槽，并在重生后恢复到新玩家
+        # This is independent from moveBehavior and combines with the runtime keepInventory gamerule
+        # 该项与 moveBehavior 无关，并会和运行时 keepInventory 游戏规则综合判断
+        preserveLockedSlotContents = %s
         
+        [debug]
+        # Enable extra diagnostic logs for key states, slot clicks, overlays and guard decisions
+        # 是否启用额外诊断日志，用于排查按键状态、槽位点击、覆盖层渲染和交互拦截
+        enabled = %s
+        
+        """;
+
+    private static final String CLIENT_CONFIG_COMMENTS = """
+        # Neo Favorite Items Client Configuration
+        # 新物品收藏模组客户端配置
+        # Visual, feedback, and client-preferred options
+        # 视觉、反馈和客户端优先生效的配置
+        # =====================================
+
         [overlay]
         # Overlay style for locked slots
         # 已锁定槽位的覆盖层样式
@@ -82,6 +123,8 @@ public class ConfigManager {
         
         # Overlay style for locked slots when holding bypass key
         # 按住旁路键时已锁定槽位的覆盖层样式
+        # Used only as a visual hint; server-side lock rules are still controlled by the common config
+        # 仅作为视觉提示；服务端锁定规则仍由 common 配置控制
         holdingKeyLockedStyle = "%s"
 
         # Overlay style shown on lockable slots while holding the lock operation key
@@ -134,6 +177,8 @@ public class ConfigManager {
 
         # Render locked overlays in front of item icons
         # 是否将已锁定槽位覆盖层渲染在物品图标前方
+        # Disable this if a resource pack or UI mod should draw item icons above the lock mark
+        # 如果资源包或 UI 模组需要让物品图标盖在锁定标记上方，可关闭该项
         renderLockedOverlayInFront = %s
 
         # Render lockable highlight overlays in front of item icons
@@ -147,6 +192,8 @@ public class ConfigManager {
         [feedback]
         # Show visual feedback when trying to interact with locked slots
         # 尝试操作已锁定槽位时是否显示视觉反馈
+        # Client-side presentation only; it does not decide whether the server allows an operation
+        # 仅影响客户端表现；不会决定服务端是否允许某次操作
         showVisualFeedback = %s
         
         # Play sound feedback when trying to interact with locked slots
@@ -165,16 +212,13 @@ public class ConfigManager {
         # 声音反馈音高
         feedbackPitch = %s
 
-        [debug]
-        # Enable extra diagnostic logs for key states, slot clicks, overlays and guard decisions
-        # 是否启用额外诊断日志，用于排查按键状态、槽位点击、覆盖层渲染和交互拦截
-        enabled = %s
-        
         """;
 
     private static ConfigManager instance;
     private NeoFavoriteItemsConfig config;
-    private Path configPath;
+    private Path commonConfigPath;
+    private Path clientConfigPath;
+    private Path legacyConfigPath;
     private final List<String> loadIssues;
 
     private ConfigManager() {
@@ -190,7 +234,9 @@ public class ConfigManager {
     }
 
     public void initialize(Path configDir) {
-        this.configPath = configDir.resolve(NeoFavoriteItemsConstants.CONFIG_FILE_NAME);
+        this.commonConfigPath = configDir.resolve(NeoFavoriteItemsConstants.COMMON_CONFIG_FILE_NAME);
+        this.clientConfigPath = configDir.resolve(NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME);
+        this.legacyConfigPath = configDir.resolve(NeoFavoriteItemsConstants.CONFIG_FILE_NAME);
         loadConfig();
     }
 
@@ -210,20 +256,35 @@ public class ConfigManager {
     public void loadConfig() {
         config = new NeoFavoriteItemsConfig();
         loadIssues.clear();
-        if (Files.exists(configPath)) {
-            try {
-                String content = Files.readString(configPath, StandardCharsets.UTF_8);
-                int issuesBeforeParse = loadIssues.size();
-                parseConfig(content);
-                if (loadIssues.size() > issuesBeforeParse || hasMissingConfigEntries(content)) {
-                    saveConfig();
-                }
-            } catch (IOException e) {
-                recordLoadIssue("Failed to read config file " + configPath + "; regenerated readable defaults", e);
-                saveConfig();
-            }
-        } else {
-            saveConfig();
+
+        boolean commonNeedsRewrite = !Files.exists(commonConfigPath);
+        boolean clientNeedsRewrite = !Files.exists(clientConfigPath);
+        boolean legacyExists = Files.exists(legacyConfigPath);
+        boolean legacyMigrationAttempted = legacyExists && (commonNeedsRewrite || clientNeedsRewrite);
+        boolean legacyMigrationRead = false;
+
+        if (legacyMigrationAttempted) {
+            legacyMigrationRead = readLegacyConfigFile();
+        }
+
+        if (Files.exists(commonConfigPath)) {
+            commonNeedsRewrite = readConfigFile(commonConfigPath, ConfigFileKind.COMMON);
+        }
+        if (Files.exists(clientConfigPath)) {
+            clientNeedsRewrite = readConfigFile(clientConfigPath, ConfigFileKind.CLIENT);
+        }
+
+        boolean commonSaved = true;
+        boolean clientSaved = true;
+        if (commonNeedsRewrite) {
+            commonSaved = saveCommonConfig();
+        }
+        if (clientNeedsRewrite) {
+            clientSaved = saveClientConfig();
+        }
+
+        if (legacyExists && (!legacyMigrationAttempted || (legacyMigrationRead && commonSaved && clientSaved))) {
+            deleteLegacyConfig();
         }
 
         if (!loadIssues.isEmpty()) {
@@ -231,7 +292,30 @@ public class ConfigManager {
         }
     }
 
-    private void parseConfig(String content) {
+    private boolean readLegacyConfigFile() {
+        try {
+            String content = Files.readString(legacyConfigPath, StandardCharsets.UTF_8);
+            parseConfig(content, ConfigFileKind.LEGACY);
+            return true;
+        } catch (IOException e) {
+            recordLoadIssue("Failed to read legacy config file " + legacyConfigPath + "; keeping it for manual recovery", e);
+            return false;
+        }
+    }
+
+    private boolean readConfigFile(Path path, ConfigFileKind kind) {
+        try {
+            String content = Files.readString(path, StandardCharsets.UTF_8);
+            int issuesBeforeParse = loadIssues.size();
+            parseConfig(content, kind);
+            return loadIssues.size() > issuesBeforeParse || hasMissingConfigEntries(content, kind);
+        } catch (IOException e) {
+            recordLoadIssue("Failed to read config file " + path + "; regenerated readable defaults", e);
+            return true;
+        }
+    }
+
+    private void parseConfig(String content, ConfigFileKind kind) {
         String[] lines = content.split("\n");
         String currentSection = "";
         
@@ -247,7 +331,7 @@ public class ConfigManager {
                     continue;
                 }
                 currentSection = line.substring(1, line.length() - 1);
-                if (!isKnownSection(currentSection)) {
+                if (!isKnownSection(currentSection, kind)) {
                     recordLoadIssue("Unknown config section: " + currentSection, new IllegalArgumentException(currentSection));
                 }
                 continue;
@@ -257,16 +341,16 @@ public class ConfigManager {
                 String[] parts = line.split("=", 2);
                 String key = parts[0].trim();
                 String value = parts[1].trim();
-                setConfigValue(currentSection, key, value);
+                setConfigValue(currentSection, key, value, kind);
             } else {
                 recordLoadIssue("Malformed config entry: " + line, new IllegalArgumentException(line));
             }
         }
     }
 
-    private void setConfigValue(String section, String key, String value) {
+    private void setConfigValue(String section, String key, String value, ConfigFileKind kind) {
         try {
-            if (!isKnownConfigValue(section, key)) {
+            if (!isKnownConfigValue(section, key, kind)) {
                 recordLoadIssue(
                     "Unknown config value [" + section + "] " + key + "; rewriting config without it",
                     new IllegalArgumentException(key)
@@ -277,6 +361,7 @@ public class ConfigManager {
                 case "general" -> setGeneralValue(key, value);
                 case "lockBehavior" -> setLockBehaviorValue(key, value);
                 case "slotBehavior" -> setSlotBehaviorValue(key, value);
+                case "deathBehavior" -> setDeathBehaviorValue(key, value);
                 case "overlay" -> setOverlayValue(key, value);
                 case "feedback" -> setFeedbackValue(key, value);
                 case "debug" -> setDebugValue(key, value);
@@ -339,6 +424,12 @@ public class ConfigManager {
             case "renderLockedOverlayInFront" -> config.overlay.renderLockedOverlayInFront = parseBoolean(value);
             case "renderLockableHighlightInFront" -> config.overlay.renderLockableHighlightInFront = parseBoolean(value);
             case "renderUnlockableHighlightInFront" -> config.overlay.renderUnlockableHighlightInFront = parseBoolean(value);
+        }
+    }
+
+    private void setDeathBehaviorValue(String key, String value) {
+        if ("preserveLockedSlotContents".equals(key)) {
+            config.deathBehavior.preserveLockedSlotContents = parseBoolean(value);
         }
     }
 
@@ -568,12 +659,40 @@ public class ConfigManager {
     }
 
     public void saveConfig() {
+        saveCommonConfig();
+        saveClientConfig();
+    }
+
+    private boolean saveCommonConfig() {
         try {
-            Files.createDirectories(configPath.getParent());
-            Files.writeString(configPath, renderConfig(config), StandardCharsets.UTF_8);
+            Files.createDirectories(commonConfigPath.getParent());
+            Files.writeString(commonConfigPath, renderCommonConfig(config), StandardCharsets.UTF_8);
+            return true;
         } catch (IOException e) {
-            DebugLogger.error("Failed to write config file: {}", configPath);
-            DebugLogger.error("Config write failure", e);
+            DebugLogger.error("Failed to write common config file: {}", commonConfigPath);
+            DebugLogger.error("Common config write failure", e);
+            return false;
+        }
+    }
+
+    private boolean saveClientConfig() {
+        try {
+            Files.createDirectories(clientConfigPath.getParent());
+            Files.writeString(clientConfigPath, renderClientConfig(config), StandardCharsets.UTF_8);
+            return true;
+        } catch (IOException e) {
+            DebugLogger.error("Failed to write client config file: {}", clientConfigPath);
+            DebugLogger.error("Client config write failure", e);
+            return false;
+        }
+    }
+
+    private void deleteLegacyConfig() {
+        try {
+            Files.deleteIfExists(legacyConfigPath);
+            DebugLogger.debug("Deleted migrated legacy config file: {}", legacyConfigPath);
+        } catch (IOException e) {
+            recordLoadIssue("Failed to delete migrated legacy config file " + legacyConfigPath, e);
         }
     }
 
@@ -582,7 +701,17 @@ public class ConfigManager {
         DebugLogger.warn("{} ({})", message, exception.toString());
     }
 
-    private boolean hasMissingConfigEntries(String content) {
+    private boolean hasMissingConfigEntries(String content, ConfigFileKind kind) {
+        if (kind == ConfigFileKind.CLIENT) {
+            return hasMissingClientConfigEntries(content);
+        }
+        if (kind == ConfigFileKind.COMMON) {
+            return hasMissingCommonConfigEntries(content);
+        }
+        return hasMissingCommonConfigEntries(content) || hasMissingClientConfigEntries(content);
+    }
+
+    private boolean hasMissingCommonConfigEntries(String content) {
         return !content.contains("autoUnlockEmptySlots")
             || !content.contains("lockEmptySlots")
             || !content.contains("allowItemsIntoLockedEmptySlots")
@@ -594,7 +723,14 @@ public class ConfigManager {
             || !content.contains("preventSwap")
             || !content.contains("allowBypassWithKey")
             || !content.contains("moveBehavior")
-            || !content.contains("lockedStyle")
+            || !content.contains("[deathBehavior]")
+            || !content.contains("preserveLockedSlotContents")
+            || !content.contains("[debug]")
+            || !content.contains("enabled");
+    }
+
+    private boolean hasMissingClientConfigEntries(String content) {
+        return !content.contains("lockedStyle")
             || !content.contains("holdingKeyLockedStyle")
             || !content.contains("highlightStyle")
             || !(content.contains("lockedOverlayColor") || content.contains("overlayColor"))
@@ -612,19 +748,21 @@ public class ConfigManager {
             || !content.contains("playSoundFeedback")
             || !content.contains("feedbackSound")
             || !content.contains("feedbackVolume")
-            || !content.contains("feedbackPitch")
-            || !content.contains("[debug]")
-            || !content.contains("enabled");
+            || !content.contains("feedbackPitch");
     }
 
-    private boolean isKnownSection(String section) {
-        return switch (section) {
-            case "general", "lockBehavior", "slotBehavior", "overlay", "feedback", "debug", "keybindings" -> true;
-            default -> false;
+    private boolean isKnownSection(String section, ConfigFileKind kind) {
+        return switch (kind) {
+            case COMMON -> isCommonSection(section);
+            case CLIENT -> isClientSection(section);
+            case LEGACY -> isCommonSection(section) || isClientSection(section) || "keybindings".equals(section);
         };
     }
 
-    private boolean isKnownConfigValue(String section, String key) {
+    private boolean isKnownConfigValue(String section, String key, ConfigFileKind kind) {
+        if (!isKnownSection(section, kind)) {
+            return false;
+        }
         return switch (section) {
             case "general" -> switch (key) {
                 case "lockEmptySlots", "autoUnlockEmptySlots", "allowItemsIntoLockedEmptySlots" -> true;
@@ -636,6 +774,7 @@ public class ConfigManager {
                 default -> false;
             };
             case "slotBehavior" -> "moveBehavior".equals(key);
+            case "deathBehavior" -> "preserveLockedSlotContents".equals(key);
             case "overlay" -> switch (key) {
                 case "lockedStyle", "holdingKeyLockedStyle", "highlightStyle",
                      "overlayColor", "overlayOpacity", "lockedOverlayColor", "lockedOverlayOpacity",
@@ -656,8 +795,22 @@ public class ConfigManager {
         };
     }
 
-    private String renderConfig(NeoFavoriteItemsConfig config) {
-        return CONFIG_COMMENTS.formatted(
+    private boolean isCommonSection(String section) {
+        return switch (section) {
+            case "general", "lockBehavior", "slotBehavior", "deathBehavior", "debug" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isClientSection(String section) {
+        return switch (section) {
+            case "overlay", "feedback" -> true;
+            default -> false;
+        };
+    }
+
+    private String renderCommonConfig(NeoFavoriteItemsConfig config) {
+        return COMMON_CONFIG_COMMENTS.formatted(
             config.general.autoUnlockEmptySlots,
             config.general.lockEmptySlots,
             config.general.allowItemsIntoLockedEmptySlots,
@@ -669,6 +822,13 @@ public class ConfigManager {
             config.lockBehavior.preventSwap,
             config.lockBehavior.allowBypassWithKey,
             config.slotBehavior.moveBehavior.name(),
+            config.deathBehavior.preserveLockedSlotContents,
+            config.debug.enabled
+        );
+    }
+
+    private String renderClientConfig(NeoFavoriteItemsConfig config) {
+        return CLIENT_CONFIG_COMMENTS.formatted(
             config.overlay.lockedStyle.name(),
             config.overlay.holdingKeyLockedStyle.name(),
             config.overlay.highlightStyle.name(),
@@ -687,8 +847,7 @@ public class ConfigManager {
             config.feedback.playSoundFeedback,
             escapeConfigString(config.feedback.feedbackSound),
             floatToConfig(config.feedback.feedbackVolume),
-            floatToConfig(config.feedback.feedbackPitch),
-            config.debug.enabled
+            floatToConfig(config.feedback.feedbackPitch)
         );
     }
 
