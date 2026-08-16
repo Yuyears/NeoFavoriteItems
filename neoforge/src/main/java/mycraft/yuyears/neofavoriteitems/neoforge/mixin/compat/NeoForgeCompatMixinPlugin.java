@@ -15,7 +15,7 @@ public class NeoForgeCompatMixinPlugin implements IMixinConfigPlugin {
     private static final String QUARK_MOD_ID = "quark";
     private static final String CLIENT_SORT_MOD_ID = "clientsort";
     private static final String BETTER_EXPERIENCE_MOD_ID = "better_experience";
-    private static final String RELIQUARY_MOD_ID = "reliquary";
+    private static final String WRENCH_FINDER_MOD_ID = "wrenchfinder";
     
     @Override
     public void onLoad(String mixinPackage) {
@@ -69,8 +69,8 @@ public class NeoForgeCompatMixinPlugin implements IMixinConfigPlugin {
             return isModLoaded(BETTER_EXPERIENCE_MOD_ID);
         }
 
-        if (mixinClassName.endsWith("ReliquaryVoidTearCompatMixin")) {
-            return isModLoaded(RELIQUARY_MOD_ID);
+        if (mixinClassName.endsWith("WrenchFinderDirectMatchCompatMixin")) {
+            return isModLoaded(WRENCH_FINDER_MOD_ID);
         }
         
         // Apply other mixins by default

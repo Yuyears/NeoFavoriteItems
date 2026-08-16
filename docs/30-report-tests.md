@@ -35,7 +35,6 @@ Date: 2026-08-16
   - `InventorySortingCompatServiceTest`
   - `ClientSortCompatServiceTest`
   - `LockedEmptySlotFallbackTest`
-  - `ReliquaryCompatServiceTest`
 - Interaction coverage additions in this round:
 - 本轮新增的交互覆盖点：
   - locked empty offhand rejects incoming GUI/GUI-outside swap targets
@@ -68,8 +67,8 @@ Date: 2026-08-16
   - ClientSort collect/sort/transfer/stack-fill 兼容由 `ClientSortCompatServiceTest` 和三端编译覆盖：锁定 collect 槽会被过滤，transfer 与 stack-fill Mixin 对来源和目标数组复用同一锁槽过滤，触碰锁槽的二元交换会变成 no-op，较大排序映射会剔除受保护槽并按 ClientSort 目标顺序把剩余已排序来源重新配对到剩余目标槽，回绕 cycle 不再错位未锁目标，无保护时复用原数组。
   - Better Experience fast-storage source-stack identity detection is covered by `BetterExperienceCompatServiceTest`; the NeoForge compat mixin is compile-verified.
   - Better Experience 一键存储来源 stack 的引用身份检测由 `BetterExperienceCompatServiceTest` 覆盖；NeoForge 兼容 Mixin 已通过编译验证。
-  - Reliquary Void Tear quantity limiting is covered by `ReliquaryCompatServiceTest`: mixed locked/unlocked totals preserve all locked matches, the mode keep quantity remains unchanged when already sufficient, and `Integer.MAX_VALUE` keep mode does not overflow. The NeoForge mixin's narrow unlocked-stack mutation is compile-verified.
-  - Reliquary 虚空之泪数量限制由 `ReliquaryCompatServiceTest` 覆盖：锁定/未锁混合总数会保留全部同类锁定物品，模式保留量已足够时保持原值，`Integer.MAX_VALUE` 保留模式不会溢出。NeoForge Mixin 的窄范围未锁 stack 修改通过编译验证。
+  - Wrench Finder direct-candidate filtering reuses the external-move lock decision. `InteractionGuardServiceTest` covers locked main-inventory and offhand removal denial plus unlocked-source allowance; the optional NeoForge mixin is compile-verified.
+  - Wrench Finder 直接候选过滤复用外部移动锁判定。`InteractionGuardServiceTest` 覆盖锁定主背包与副手来源拒绝、未锁来源放行；可选 NeoForge Mixin 已通过编译验证。
   - NeoForge Quark sorting compatibility and Inventory Tweaks ReFoxed player-sort compatibility both use the common favorite-slot merge helper covered by `InventorySortingCompatServiceTest`.
   - NeoForge Quark 排序兼容与 Inventory Tweaks ReFoxed 玩家背包整理兼容都复用 common 收藏锁槽合并 helper，并由 `InventorySortingCompatServiceTest` 覆盖。
   - NeoForge Quark hotbar changer compatibility is covered by `InventorySortingCompatServiceTest` for favorite-state swaps between hotbar and main-inventory rows.
@@ -178,10 +177,10 @@ Date: 2026-08-16
 
 - Latest local verification:
 - 最新本地验证：
-  - `ReliquaryCompatServiceTest`: passed with three assertions covering mixed locked/unlocked preservation, unchanged mode keep behavior, and overflow-safe full-inventory mode.
-  - `ReliquaryCompatServiceTest`：3 项断言通过，覆盖锁定/未锁混合保留、模式保留量保持原行为，以及无溢出的全背包模式。
-  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test --tests mycraft.yuyears.neofavoriteitems.application.ReliquaryCompatServiceTest :neoforge:compileJava`: passed with the narrowed `fillTear` compatibility.
-  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test --tests mycraft.yuyears.neofavoriteitems.application.ReliquaryCompatServiceTest :neoforge:compileJava`：收窄后的 `fillTear` 兼容通过单测与编译。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test --tests mycraft.yuyears.neofavoriteitems.application.InteractionGuardServiceTest`: passed after adding Wrench Finder source-policy coverage.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test --tests mycraft.yuyears.neofavoriteitems.application.InteractionGuardServiceTest`：新增 Wrench Finder 来源策略覆盖后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`: passed with the optional Wrench Finder mixin.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`：加入可选 Wrench Finder Mixin 后通过。
   - `.\gradle.bat --no-daemon --no-build-cache -Pskip_build_number_increment=true build`: passed; common tests and Fabric/Forge/NeoForge assembly completed without changing build metadata.
   - `.\gradle.bat --no-daemon --no-build-cache -Pskip_build_number_increment=true build`：通过；common 测试与 Fabric/Forge/NeoForge 打包全部完成，未修改构建编号。
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test`: passed after adding ClientSort collect/sort payload rewrite tests.

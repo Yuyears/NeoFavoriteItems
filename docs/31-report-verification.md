@@ -97,8 +97,8 @@ Date: 2026-08-16
 78. ClientSort collect/sort/transfer/stack-fill 兼容现在会在 ClientSort schema 校验与实际操作边界改写槽位数组：锁定 collect 槽会被过滤，transfer 与 stack-fill 的来源/目标数组都会过滤锁槽，sort 映射会固定锁槽，并按 ClientSort 的目标顺序把剩余已排序来源重新配对到剩余目标槽。
 79. Better Experience provides the inspected Confluence modpack nearby-container quick-stack action. NeoForge compatibility now only skips Better Experience's per-stack transfer call when the source stack belongs to a locked player-inventory slot; container discovery and target insertion remain owned by Better Experience.
 80. 已排查到汇流整合包附近容器一键存储动作由 Better Experience 提供。NeoForge 兼容现在只在来源 stack 属于已锁玩家背包槽时跳过 Better Experience 的单次 stack 转移调用；容器发现和目标放入仍由 Better Experience 自身处理。
-81. Reliquary Void Tear compatibility now targets only automatic collection in `fillTear`. Target discovery and counting remain unchanged; when matching locked slots exist, the quantity used by the pass is capped to keep quantity plus unlocked matches and consumption shrinks only matching unlocked stacks. No matching locked slot means the original Reliquary call runs unchanged.
-82. Reliquary 虚空之泪兼容现在只作用于 `fillTear` 自动收集。目标检索和统计保持不变；存在同类锁槽时，本轮使用的数量限制为保留量与未锁同类数量之和，消费只缩减同类未锁 stack；不存在同类锁槽时原样调用 Reliquary。
+81. Wrench Finder direct lookup now treats locked player-inventory and offhand sources as absent during `findDirectMatch`, preventing its non-transactional copy-and-set equip path from duplicating a protected item while allowing later unlocked matches to remain discoverable.
+82. Wrench Finder 直接检索现在会在 `findDirectMatch` 中把锁定玩家背包与副手来源视为不存在，避免其非事务性的复制后写入装备流程复制受保护物品，同时保留后续未锁匹配项的检索能力。
 
 ## Integration Validation Summary
 
@@ -276,8 +276,8 @@ Date: 2026-08-16
 - 在安装 ClientSort 的加载器上实机验证 ClientSort collect 与 sort。
 - Better Experience fast-storage compatibility still needs in-game validation with a locked source slot next to a matching nearby container stack.
 - Better Experience 一键存储兼容仍需实机验证：玩家已锁来源槽旁边存在可合并的附近容器同类 stack 时，锁槽物品不应被拿走。
-- Reliquary Void Tear automatic collection still needs in-game validation with all matching stacks locked, mixed locked/unlocked matching stacks, and an unlocked control inventory. Void Tear growth must equal the matching unlocked inventory decrease; locked stacks must remain byte-for-byte unchanged.
-- Reliquary 虚空之泪自动收集仍需实机验证同类物品全锁、锁定/未锁混合、全未锁对照。虚空之泪增长量必须等于同类未锁背包物品减少量，锁定 stack 必须完全不变。
+- Wrench Finder compatibility still needs in-game validation with a locked direct source, mixed locked/unlocked matches, a locked offhand source, an unlocked control, and a non-empty main hand. Locked sources must remain unchanged and no duplicate or main-hand item loss may occur.
+- Wrench Finder 兼容仍需实机验证锁定直接来源、锁定/未锁匹配项并存、锁定副手来源、全未锁对照及主手非空场景。锁定来源必须保持不变，且不得复制或丢失原主手物品。
 - NeoForge in-game validation of Sophisticated Backpacks Alt-left-click slot locking after the `QUICK_MOVE` click-path fix.
 - NeoForge 仍需实机验证 Sophisticated Backpacks 在修复 `QUICK_MOVE` 点击路径后的 Alt+左键槽位锁定行为。
 - Manual matrix validation for persistence paths and lifecycle timing:

@@ -16,8 +16,8 @@
     "InventoryTweaksSortingCompatMixin",
     "QuarkHotbarChangeCompatMixin",
     "QuarkSortingHandlerCompatMixin",
-    "ReliquaryVoidTearCompatMixin",
-    "SophisticatedSorterCoreUtilsCompatMixin"
+    "SophisticatedSorterCoreUtilsCompatMixin",
+    "WrenchFinderDirectMatchCompatMixin"
   ],
   "client": [
     "MouseTweaksMainCompatMixin",

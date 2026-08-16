@@ -67,6 +67,22 @@ class InteractionGuardServiceTest {
     }
 
     @Test
+    void unlockedSourceAllowsQuickMoveRemoval() {
+        assertFalse(InteractionGuardService.getInstance()
+            .evaluate(23, InteractionType.QUICK_MOVE, false, true)
+            .denied());
+    }
+
+    @Test
+    void lockedOffhandRejectsQuickMoveRemoval() {
+        FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(40), true);
+
+        assertTrue(InteractionGuardService.getInstance()
+            .evaluate(40, InteractionType.QUICK_MOVE, false, true)
+            .denied());
+    }
+
+    @Test
     void lockedEmptySlotRejectsCursorPlacementWhenConfigDisallowsIt() {
         ConfigManager.getInstance().getConfig().general.allowItemsIntoLockedEmptySlots = false;
         FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(9), true);
