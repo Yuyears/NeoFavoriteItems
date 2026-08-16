@@ -16,6 +16,7 @@
     "InventoryTweaksSortingCompatMixin",
     "QuarkHotbarChangeCompatMixin",
     "QuarkSortingHandlerCompatMixin",
+    "ReliquaryVoidTearCompatMixin",
     "SophisticatedSorterCoreUtilsCompatMixin"
   ],
   "client": [

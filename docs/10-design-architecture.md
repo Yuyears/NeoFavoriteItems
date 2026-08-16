@@ -2,9 +2,9 @@
 
 # Neo Favorite Items 架构说明
 
-Last updated: 2026-06-08
+Last updated: 2026-08-16
 
-最后更新：2026-06-08
+最后更新：2026-08-16
 
 This document records the current project structure and implementation boundaries. It describes the repository as it exists now, not an older migration draft.
 
@@ -122,6 +122,8 @@ Location: `common/.../application`
 - `ClientSortCompatService`：在 ClientSort schema 校验和实际操作入口改写 collect/sort/transfer/stack-fill 数组。collect 会过滤锁定槽（包含锁定空槽）。transfer 与 stack fill 会同时过滤锁定来源数组和目标数组，因为 ClientSort 使用目标槽 `safeInsert(srcStack)`，可能不经过来源槽移除 API 就缩减来源 stack。sort 会保留 ClientSort 的目标顺序语义：固定锁槽，把锁槽分别从已排序来源列表和目标槽列表中剔除，再按 ClientSort 原目标顺序重新配对剩余来源与目标，使未锁物品围绕锁定空洞保持紧凑连续。只有实际改写 ClientSort 数组时才输出 debug 诊断。
 - `BetterExperienceCompatService`: detects whether Better Experience fast storage is about to use a locked player-inventory stack as its source, without replacing the mod's container search or insertion behavior.
 - `BetterExperienceCompatService`：只检测 Better Experience 一键存储是否正要把已锁玩家背包 stack 作为来源，不替换该模组的容器搜索或放入逻辑。
+- `ReliquaryCompatService`: raises one Void Tear automatic-collection pass's effective keep quantity when matching locked inventory items exceed the mode's normal keep quantity.
+- `ReliquaryCompatService`：当同类锁定背包物品超过模式默认保留量时，提高虚空之泪单次自动收集的有效保留量。
 
 ### Integration
 
@@ -235,6 +237,8 @@ Location: `common/.../render`
 - NeoForge 额外提供一个低层 `MouseHandler` 按下入口，用于处理部分整合包中空槽点击到不了 `ScreenEvent` 或 `mouseClicked` 的情况。存在 Mouse Tweaks 时，该入口只预激活并切换按下目标，不取消原始按下，从而让 Mouse Tweaks 继续初始化拖动检测。
 - The optional NeoForge compatibility mixins for Quark target `SortingHandler.sortInventory(Container, int, int, int[])` and `ChangeHotbarMessage.swap(Container, int, int)`. Sorting augments Quark's locked slot array with favorite player-inventory indices. Hotbar changing runs the swap under a scoped inventory-guard bypass, then swaps favorite state and sends a full favorite sync.
 - NeoForge 的可选 Quark 兼容 Mixin 目标为 `SortingHandler.sortInventory(Container, int, int, int[])` 与 `ChangeHotbarMessage.swap(Container, int, int)`。排序路径会把已收藏玩家背包索引补入 Quark 的排序锁定槽数组；快捷栏切换路径会在有作用域的库存守卫旁路下执行交换，随后交换收藏状态并发送全量收藏同步。
+- Optional Reliquary compatibility targets only `VoidTearItem.fillTear`. Reliquary still discovers and counts its target normally. If the target also exists in locked slots, the pass quantity is capped by unlocked availability and only matching unlocked stacks are shrunk; without a matching locked slot, Reliquary's original call runs unchanged.
+- 可选 Reliquary 兼容只作用于 `VoidTearItem.fillTear`。目标检索与总数统计仍由 Reliquary 原样执行；同类物品同时存在于锁槽时，本轮数量按未锁可用量封顶并只缩减同类未锁 stack；不存在同类锁槽时完全调用 Reliquary 原逻辑。
 
 ## Runtime Flows
 
