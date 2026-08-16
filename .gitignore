@@ -43,4 +43,5 @@ logs/
 *.iws
 
 docs/
-
+.claude/
+.tmp/
