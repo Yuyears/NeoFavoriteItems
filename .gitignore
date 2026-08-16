@@ -42,5 +42,5 @@ logs/
 *.ipr
 *.iws
 
-docs/*
+docs/
 
