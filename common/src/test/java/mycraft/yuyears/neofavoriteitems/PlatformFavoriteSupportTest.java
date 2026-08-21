@@ -62,4 +62,24 @@ class PlatformFavoriteSupportTest {
             PlatformFavoriteSupport.isServerAuthoritative(false, true)
         ));
     }
+
+    @Test
+    void recognizesForgeAndNeoForgeFakePlayers() {
+        assertTrue(PlatformFavoriteSupport.isSyntheticPlayerClassName(
+            "net.neoforged.neoforge.common.util.FakePlayer"
+        ));
+        assertTrue(PlatformFavoriteSupport.isSyntheticPlayerClassName(
+            "net.minecraftforge.common.util.FakePlayer"
+        ));
+    }
+
+    @Test
+    void doesNotRecognizeRegularPlayersAsSynthetic() {
+        assertFalse(PlatformFavoriteSupport.isSyntheticPlayerClassName(
+            "net.minecraft.server.level.ServerPlayer"
+        ));
+        assertFalse(PlatformFavoriteSupport.isSyntheticPlayerClassName(
+            "com.example.FakePlayerLikeThing"
+        ));
+    }
 }

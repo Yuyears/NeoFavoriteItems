@@ -16,5 +16,24 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          cache: gradle
       - name: Test, compile, and process resources
-        run: .\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pbuild_number=build${{ github.run_number }} -Prelease_channel=dev :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava :fabric:processResources :forge:processResources :neoforge:processResources
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            .\gradle.bat --configure-on-demand --no-daemon --no-build-cache `
+              -Pbuild_number=build${{ github.run_number }} `
+              -Prelease_channel=dev `
+              :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava `
+              :fabric:processResources :forge:processResources :neoforge:processResources
+
+            if ($LASTEXITCODE -eq 0) {
+              exit 0
+            }
+
+            if ($attempt -lt 3) {
+              Start-Sleep -Seconds (30 * $attempt)
+            }
+          }
+
+          exit 1

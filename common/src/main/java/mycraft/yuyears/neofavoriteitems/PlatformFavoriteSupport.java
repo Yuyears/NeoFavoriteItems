@@ -27,6 +27,23 @@ public final class PlatformFavoriteSupport {
 
     private PlatformFavoriteSupport() {}
 
+    public static boolean isSyntheticPlayer(Player player) {
+        if (player == null) {
+            return false;
+        }
+        for (Class<?> type = player.getClass(); type != null; type = type.getSuperclass()) {
+            if (isSyntheticPlayerClassName(type.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean isSyntheticPlayerClassName(String className) {
+        return "net.neoforged.neoforge.common.util.FakePlayer".equals(className)
+            || "net.minecraftforge.common.util.FakePlayer".equals(className);
+    }
+
     public static void initializeClient(Path gameDirectory) {
         initializeClient(gameDirectory, true);
     }
