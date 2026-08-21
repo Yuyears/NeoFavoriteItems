@@ -62,7 +62,7 @@ public final class InventorySortingCompatService {
         return true;
     }
 
-    static boolean swapFavoriteState(int slot1, int slot2) {
+    public static boolean swapFavoriteState(int slot1, int slot2) {
         if (!SlotMappingService.isPlayerInventoryIndex(slot1)
             || !SlotMappingService.isPlayerInventoryIndex(slot2)
             || slot1 == slot2) {

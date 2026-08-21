@@ -66,6 +66,24 @@ class FavoritesManagerTest {
         assertEquals(Set.of(7), FavoritesManager.getStateService().getFavoriteSlots());
     }
 
+    @Test
+    void clientStateIsIsolatedFromServerStateForSamePlayer() {
+        UUID playerId = UUID.randomUUID();
+
+        FavoritesManager.getStateService().setPlayer(playerId);
+        FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(3), true);
+
+        FavoritesManager.getStateService().useClientState();
+        FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(7), true);
+        assertEquals(Set.of(7), FavoritesManager.getStateService().getFavoriteSlots());
+
+        FavoritesManager.getStateService().setPlayer(playerId);
+        assertEquals(Set.of(3), FavoritesManager.getStateService().getFavoriteSlots());
+
+        FavoritesManager.getStateService().clearPlayer();
+        assertEquals(Set.of(7), FavoritesManager.getStateService().getFavoriteSlots());
+    }
+
     private void runFavoriteWrite(
         UUID playerId,
         int slot,

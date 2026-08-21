@@ -37,6 +37,17 @@ class ServerFavoriteServiceTest {
     }
 
     @Test
+    void correctionSyncIsLimitedToOncePerPlayerPerTick() {
+        UUID firstPlayer = UUID.randomUUID();
+        UUID secondPlayer = UUID.randomUUID();
+
+        assertTrue(ServerFavoriteService.shouldSendCorrectionSync(firstPlayer, 10L));
+        assertFalse(ServerFavoriteService.shouldSendCorrectionSync(firstPlayer, 10L));
+        assertTrue(ServerFavoriteService.shouldSendCorrectionSync(firstPlayer, 11L));
+        assertTrue(ServerFavoriteService.shouldSendCorrectionSync(secondPlayer, 10L));
+    }
+
+    @Test
     void deathDropPreservationIsScopedAndNestable() {
         UUID playerId = UUID.randomUUID();
 
@@ -130,6 +141,36 @@ class ServerFavoriteServiceTest {
             2,
             5,
             slot -> slot == 2 || slot == 4,
+            slot -> false
+        ));
+    }
+
+    @Test
+    void remainingSpaceSkipsProtectedSelectedThenUsesOffhand() {
+        assertEquals(40, ServerFavoriteService.resolveSlotWithRemainingSpace(
+            2,
+            2,
+            slot -> slot == 2 || slot == 40 || slot == 5,
+            slot -> slot == 2
+        ));
+    }
+
+    @Test
+    void remainingSpaceSkipsProtectedOffhandAndEarlierMainSlot() {
+        assertEquals(6, ServerFavoriteService.resolveSlotWithRemainingSpace(
+            40,
+            2,
+            slot -> slot == 40 || slot == 4 || slot == 6,
+            slot -> slot == 40 || slot == 4
+        ));
+    }
+
+    @Test
+    void remainingSpaceKeepsVanillaResultWhenAllowed() {
+        assertEquals(4, ServerFavoriteService.resolveSlotWithRemainingSpace(
+            4,
+            2,
+            slot -> slot == 4 || slot == 6,
             slot -> false
         ));
     }

@@ -1,7 +1,8 @@
-package mycraft.yuyears.neofavoriteitems.fabric.mixin;
+package mycraft.yuyears.neofavoriteitems.mixin;
 
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundSetCreativeModeSlotPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,6 +23,13 @@ public abstract class ServerGamePacketListenerImplMixin {
     private void neoFavoriteItems$guardOffhandSwapAction(ServerboundPlayerActionPacket packet, CallbackInfo ci) {
         if (packet.getAction() == ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND
             && ServerFavoriteService.shouldCancelOffhandSwap(player)) {
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "handleSetCreativeModeSlot", at = @At("HEAD"), cancellable = true)
+    private void neoFavoriteItems$guardCreativeSlotSet(ServerboundSetCreativeModeSlotPacket packet, CallbackInfo ci) {
+        if (ServerFavoriteService.shouldCancelCreativeSlotSet(player, packet.slotNum(), packet.itemStack())) {
             ci.cancel();
         }
     }

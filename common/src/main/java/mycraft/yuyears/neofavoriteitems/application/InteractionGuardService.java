@@ -106,6 +106,19 @@ public class InteractionGuardService {
         return InteractionDecision.allow();
     }
 
+    public boolean shouldCancelSwap(
+        int firstSlot,
+        boolean firstHasItem,
+        int secondSlot,
+        boolean secondHasItem,
+        boolean holdingBypassKey
+    ) {
+        return evaluate(firstSlot, InteractionType.SWAP, holdingBypassKey, firstHasItem).denied()
+            || evaluateIncomingItem(firstSlot, InteractionType.SWAP, holdingBypassKey, secondHasItem).denied()
+            || evaluate(secondSlot, InteractionType.SWAP, holdingBypassKey, secondHasItem).denied()
+            || evaluateIncomingItem(secondSlot, InteractionType.SWAP, holdingBypassKey, firstHasItem).denied();
+    }
+
     private boolean shouldBlockByConfig(NeoFavoriteItemsConfig config, InteractionType interactionType) {
         return switch (interactionType) {
             case CLICK -> config.lockBehavior.preventClick;

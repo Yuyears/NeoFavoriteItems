@@ -49,9 +49,17 @@ public class FavoritesManager implements FavoriteStateService, FavoriteSlotCodec
     }
 
     @Override
-    public void clearPlayer() {
+    public void useClientState() {
         currentPlayerUUID.remove();
-        clientFavoriteSlots.clear();
+    }
+
+    @Override
+    public void clearPlayer() {
+        boolean clientStateActive = currentPlayerUUID.get() == null;
+        currentPlayerUUID.remove();
+        if (clientStateActive) {
+            clientFavoriteSlots.clear();
+        }
     }
 
     @Override

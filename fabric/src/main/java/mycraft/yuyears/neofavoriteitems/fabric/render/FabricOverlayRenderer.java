@@ -142,7 +142,7 @@ public class FabricOverlayRenderer extends OverlayRenderer {
 
     public void renderHotbarOverlays(GuiGraphics context) {
         var client = Minecraft.getInstance();
-        if (client.player == null || client.screen != null) {
+        if (client.player == null) {
             return;
         }
 

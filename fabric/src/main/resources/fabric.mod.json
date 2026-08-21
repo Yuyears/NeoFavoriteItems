@@ -17,6 +17,7 @@
     ]
   },
   "mixins": [
+    "neo_favorite_items.common.mixins.json",
     "neo_favorite_items.mixins.json",
     "neo_favorite_items.fabric.compat.mixins.json"
   ],

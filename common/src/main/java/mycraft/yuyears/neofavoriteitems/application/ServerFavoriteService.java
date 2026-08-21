@@ -20,9 +20,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameRules;
 
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.IntPredicate;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -30,6 +33,9 @@ import java.lang.reflect.Method;
 public final class ServerFavoriteService {
     private static final Map<UUID, Long> revisionsByPlayer = new ConcurrentHashMap<>();
     private static final Map<UUID, Boolean> bypassStateByPlayer = new ConcurrentHashMap<>();
+    private static final Map<UUID, InstantSwapTransaction> instantSwapTransactionsByPlayer = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> correctionSyncTicksByPlayer = new ConcurrentHashMap<>();
+    private static Consumer<ServerPlayer> correctionSyncSender = player -> {};
 
     private ServerFavoriteService() {}
 
@@ -92,6 +98,11 @@ public final class ServerFavoriteService {
     public static void resetRevision(ServerPlayer player) {
         revisionsByPlayer.put(player.getUUID(), 0L);
         bypassStateByPlayer.put(player.getUUID(), false);
+        correctionSyncTicksByPlayer.remove(player.getUUID());
+    }
+
+    public static void setCorrectionSyncSender(Consumer<ServerPlayer> sender) {
+        correctionSyncSender = sender == null ? player -> {} : sender;
     }
 
     public static void updateBypassState(ServerPlayer player, boolean held) {
@@ -102,6 +113,8 @@ public final class ServerFavoriteService {
     public static void clearPlayerState(Player player) {
         revisionsByPlayer.remove(player.getUUID());
         bypassStateByPlayer.remove(player.getUUID());
+        instantSwapTransactionsByPlayer.remove(player.getUUID());
+        correctionSyncTicksByPlayer.remove(player.getUUID());
     }
 
     public static void runWithInventoryGuardsBypassed(Player player, Runnable action) {
@@ -115,6 +128,247 @@ public final class ServerFavoriteService {
         } finally {
             endInventoryGuardBypass(player.getUUID());
         }
+    }
+
+    public static boolean prepareInstantSwap(
+        ServerPlayer player,
+        InstantSwapCompatService.Operation operation,
+        int containerId,
+        int targetMenuSlot,
+        int hotbarIndex,
+        int auxiliaryMenuSlot
+    ) {
+        if (player == null
+            || !player.isAlive()
+            || player.isSpectator()
+            || operation == null
+            || player.containerMenu.containerId != containerId
+            || targetMenuSlot < 0
+            || targetMenuSlot >= player.containerMenu.slots.size()
+            || hotbarIndex < 0
+            || hotbarIndex > 8) {
+            return false;
+        }
+
+        AbstractContainerMenu menu = player.containerMenu;
+        Slot targetSlot = menu.slots.get(targetMenuSlot);
+        int targetInventoryIndex = resolvePlayerInventoryIndex(targetSlot, player);
+        if (targetInventoryIndex >= 0
+            && !InstantSwapCompatService.isHotbarMainInventoryPair(targetInventoryIndex, hotbarIndex)) {
+            return false;
+        }
+        Slot hotbarSlot = findPlayerInventoryMenuSlot(menu, player, hotbarIndex);
+        if (hotbarSlot == null || hotbarSlot.index == targetMenuSlot) {
+            return false;
+        }
+
+        int auxiliaryInventoryIndex = -1;
+        if (operation == InstantSwapCompatService.Operation.PICKUP_EXCHANGE
+            && (!menu.getCarried().isEmpty()
+                || hotbarIndex != player.getInventory().selected
+                || (!targetSlot.hasItem() && !hotbarSlot.hasItem()))) {
+            return false;
+        }
+        if (operation == InstantSwapCompatService.Operation.HOTBAR_STASH) {
+            if (!menu.getCarried().isEmpty()
+                || hotbarIndex != player.getInventory().selected
+                || auxiliaryMenuSlot < 0
+                || auxiliaryMenuSlot >= menu.slots.size()) {
+                return false;
+            }
+            Slot emptySlot = menu.slots.get(auxiliaryMenuSlot);
+            auxiliaryInventoryIndex = resolvePlayerInventoryIndex(emptySlot, player);
+            if (auxiliaryInventoryIndex < 0
+                || auxiliaryInventoryIndex > 8
+                || auxiliaryInventoryIndex == hotbarIndex
+                || emptySlot.hasItem()
+                || !targetSlot.hasItem()
+                || !hotbarSlot.hasItem()) {
+                return false;
+            }
+        }
+
+        var plan = InstantSwapCompatService.createPlan(
+            operation,
+            targetMenuSlot,
+            targetInventoryIndex,
+            hotbarSlot.index,
+            hotbarIndex,
+            auxiliaryMenuSlot,
+            auxiliaryInventoryIndex,
+            targetSlot.hasItem(),
+            hotbarSlot.hasItem()
+        ).orElse(null);
+        if (plan == null) {
+            return false;
+        }
+        int[] favoriteCycle = plan.favoriteCycle().stream().mapToInt(Integer::intValue).toArray();
+        FavoritesManager.getStateService().setPlayer(player.getUUID());
+        if (!InstantSwapCompatService.containsFavoriteSlot(
+            FavoritesManager.getStateService().getFavoriteSlots(),
+            favoriteCycle
+        )) {
+            return false;
+        }
+        instantSwapTransactionsByPlayer.put(
+            player.getUUID(),
+            new InstantSwapTransaction(menu, plan, favoriteCycle, player.level().getGameTime() + 5L)
+        );
+        return true;
+    }
+
+    public static boolean beginAuthorizedInstantSwapClick(
+        AbstractContainerMenu menu,
+        Player player,
+        int slotId,
+        int button,
+        ClickType clickType
+    ) {
+        if (!(player instanceof ServerPlayer)) {
+            return false;
+        }
+        InstantSwapTransaction transaction = instantSwapTransactionsByPlayer.get(player.getUUID());
+        if (transaction == null
+            || transaction.completed
+            || transaction.activeClick
+            || transaction.containerId != menu.containerId
+            || transaction.expiresAt < player.level().getGameTime()
+            || !transaction.nextClick().matches(slotId, button, clickType)) {
+            if (transaction != null && transaction.expiresAt < player.level().getGameTime()) {
+                instantSwapTransactionsByPlayer.remove(player.getUUID(), transaction);
+            }
+            return false;
+        }
+
+        transaction.activeClick = true;
+        transaction.nextClick++;
+        return true;
+    }
+
+    public static void finishAuthorizedInstantSwapClick(Player player) {
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return;
+        }
+        InstantSwapTransaction transaction = instantSwapTransactionsByPlayer.get(player.getUUID());
+        if (transaction == null || !transaction.activeClick) {
+            return;
+        }
+        transaction.activeClick = false;
+        if (transaction.nextClick == transaction.clicks.size()
+            && transaction.contentFollowsCycle(serverPlayer.containerMenu)) {
+            applyInstantSwapFavoriteCycle(serverPlayer, transaction.favoriteCycle);
+            transaction.completed = true;
+        }
+    }
+
+    public static boolean completeInstantSwap(ServerPlayer player) {
+        InstantSwapTransaction transaction = instantSwapTransactionsByPlayer.remove(player.getUUID());
+        return transaction != null && transaction.completed;
+    }
+
+    public static boolean executeInstantSwap(
+        ServerPlayer player,
+        InstantSwapCompatService.Operation operation,
+        int containerId,
+        int targetMenuSlot,
+        int hotbarIndex,
+        int auxiliaryMenuSlot
+    ) {
+        if (!prepareInstantSwap(player, operation, containerId, targetMenuSlot, hotbarIndex, auxiliaryMenuSlot)) {
+            DebugLogger.debug(
+                "Server rejected Su's Instant Swap execution: player={} operation={} target={} hotbar={}",
+                player == null ? "null" : player.getName().getString(),
+                operation,
+                targetMenuSlot,
+                hotbarIndex
+            );
+            return false;
+        }
+        InstantSwapTransaction transaction = instantSwapTransactionsByPlayer.remove(player.getUUID());
+        if (transaction == null) {
+            return false;
+        }
+        beginInventoryGuardBypass(player.getUUID());
+        try {
+            for (InstantSwapCompatService.PlannedClick click : transaction.clicks) {
+                transaction.menu.clicked(click.slotId(), click.button(), click.clickType(), player);
+            }
+        } finally {
+            endInventoryGuardBypass(player.getUUID());
+        }
+        if (!transaction.contentFollowsCycle(transaction.menu)) {
+            DebugLogger.debug(
+                "Server rejected Su's Instant Swap result: player={} operation={} target={} hotbar={}",
+                player.getName().getString(),
+                operation,
+                targetMenuSlot,
+                hotbarIndex
+            );
+            return false;
+        }
+        applyInstantSwapFavoriteCycle(player, transaction.favoriteCycle);
+        // Direct server-side menu clicks do not guarantee an immediate client slot update.
+        player.containerMenu.broadcastChanges();
+        DebugLogger.debug(
+            "Server completed Su's Instant Swap: player={} operation={} target={} hotbar={}",
+            player.getName().getString(),
+            operation,
+            targetMenuSlot,
+            hotbarIndex
+        );
+        return true;
+    }
+
+    public static boolean moveCreativeFavoritePairs(ServerPlayer player, int[] slotPairs) {
+        if (player == null
+            || !player.isAlive()
+            || player.isSpectator()
+            || !player.getAbilities().instabuild
+            || !InstantSwapCompatService.areHotbarMainInventoryPairs(slotPairs)) {
+            return false;
+        }
+        FavoritesManager.getStateService().setPlayer(player.getUUID());
+        Set<Integer> currentFavorites = FavoritesManager.getStateService().getFavoriteSlots();
+        Set<Integer> movedFavorites = InstantSwapCompatService.moveFavoritePairs(currentFavorites, slotPairs);
+        if (currentFavorites.equals(movedFavorites)) {
+            return false;
+        }
+        FavoritesManager favoritesManager = FavoritesManager.getInstance();
+        for (int inventoryIndex : slotPairs) {
+            favoritesManager.setSlotFavorite(inventoryIndex, movedFavorites.contains(inventoryIndex));
+        }
+        markFavoriteStateChanged(player, "creative_instant_swap");
+        return true;
+    }
+
+    public static boolean executeCreativeSwapPairs(ServerPlayer player, int[] slotPairs) {
+        if (player == null
+            || !player.isAlive()
+            || player.isSpectator()
+            || !player.getAbilities().instabuild
+            || !InstantSwapCompatService.areHotbarMainInventoryPairs(slotPairs)) {
+            return false;
+        }
+        FavoritesManager.getStateService().setPlayer(player.getUUID());
+        Set<Integer> currentFavorites = FavoritesManager.getStateService().getFavoriteSlots();
+        Set<Integer> movedFavorites = InstantSwapCompatService.moveFavoritePairs(currentFavorites, slotPairs);
+        runWithInventoryGuardsBypassed(player, () -> {
+            for (int i = 0; i < slotPairs.length; i += 2) {
+                int first = slotPairs[i];
+                int second = slotPairs[i + 1];
+                ItemStack firstStack = player.getInventory().getItem(first).copy();
+                ItemStack secondStack = player.getInventory().getItem(second).copy();
+                player.getInventory().setItem(first, secondStack);
+                player.getInventory().setItem(second, firstStack);
+            }
+        });
+        FavoritesManager favoritesManager = FavoritesManager.getInstance();
+        for (int inventoryIndex : slotPairs) {
+            favoritesManager.setSlotFavorite(inventoryIndex, movedFavorites.contains(inventoryIndex));
+        }
+        markFavoriteStateChanged(player, "creative_instant_swap");
+        player.inventoryMenu.broadcastChanges();
+        return true;
     }
 
     public static void beginRespawnInventoryRestoreBypass(Player newPlayer, boolean keepEverything) {
@@ -223,17 +477,11 @@ public final class ServerFavoriteService {
         if (player == null || slotId < 0 || slotId >= menu.slots.size()) {
             return false;
         }
-        if (isSophisticatedStorageNonPlayerSlot(menu, slotId)) {
+        if (isInventoryGuardBypassed(player)) {
             return false;
         }
-
         Slot slot = menu.slots.get(slotId);
         int inventoryIndex = resolvePlayerInventoryIndex(slot, player);
-        if (inventoryIndex < 0) {
-            return false;
-        }
-
-        FavoritesManager.getInstance().setPlayer(player.getUUID());
         if (clickType == ClickType.SWAP && shouldCancelSwap(player, inventoryIndex, button, slot.hasItem())) {
             DebugLogger.debug(
                 "Server canceled menu swap: player={} inventoryIndex={} slotId={} button={}",
@@ -242,8 +490,13 @@ public final class ServerFavoriteService {
                 slotId,
                 button
             );
-            return true;
+            return rejectAndRequestCorrectionSync(player);
         }
+        if (isSophisticatedStorageNonPlayerSlot(menu, slotId) || inventoryIndex < 0) {
+            return false;
+        }
+
+        FavoritesManager.getInstance().setPlayer(player.getUUID());
         if (clickType == ClickType.QUICK_MOVE && shouldCancelQuickMoveTarget(player, slot.getItem())) {
             DebugLogger.debug(
                 "Server canceled quick move into locked target: player={} sourceInventoryIndex={} slotId={}",
@@ -251,7 +504,7 @@ public final class ServerFavoriteService {
                 inventoryIndex,
                 slotId
             );
-            return true;
+            return rejectAndRequestCorrectionSync(player);
         }
 
         var decision = evaluateExistingItem(player, inventoryIndex, toInteractionType(clickType), slot.hasItem());
@@ -264,7 +517,7 @@ public final class ServerFavoriteService {
                 clickType,
                 button
             );
-            return true;
+            return rejectAndRequestCorrectionSync(player);
         }
         return false;
     }
@@ -273,16 +526,37 @@ public final class ServerFavoriteService {
         if (player == null || player.level().isClientSide()) {
             return false;
         }
-        return shouldCancelSwap(
+        boolean denied = shouldCancelSwap(
             player,
             player.getInventory().selected,
             40,
             !player.getInventory().getItem(player.getInventory().selected).isEmpty()
         );
+        return denied && rejectAndRequestCorrectionSync(player);
+    }
+
+    public static boolean shouldCancelCreativeSlotSet(ServerPlayer player, int menuSlot, ItemStack newStack) {
+        if (player == null
+            || !player.getAbilities().instabuild
+            || menuSlot < 0
+            || menuSlot >= player.inventoryMenu.slots.size()) {
+            return false;
+        }
+        Slot slot = player.inventoryMenu.getSlot(menuSlot);
+        ItemStack currentStack = slot.getItem();
+        if (ItemStack.matches(currentStack, newStack) && currentStack.getCount() == newStack.getCount()) {
+            return false;
+        }
+        boolean denied = !currentStack.isEmpty() && shouldPreventSlotPickup(slot, player)
+            || newStack != null && !newStack.isEmpty() && shouldPreventSlotPlace(slot, player, newStack);
+        return denied && rejectAndRequestCorrectionSync(player);
     }
 
     public static boolean shouldPreventSlotPickup(Slot slot, Player player) {
         if (!isServerPlayerInventorySlot(slot, player)) {
+            return false;
+        }
+        if (isInventoryGuardBypassed(player)) {
             return false;
         }
 
@@ -308,6 +582,9 @@ public final class ServerFavoriteService {
 
     public static boolean shouldPreventSlotPlace(Slot slot, Player player, ItemStack incomingStack) {
         if (!isServerPlayerInventorySlot(slot, player)) {
+            return false;
+        }
+        if (isInventoryGuardBypassed(player)) {
             return false;
         }
 
@@ -494,6 +771,29 @@ public final class ServerFavoriteService {
         return resolvedSlot;
     }
 
+    public static int resolveSlotWithRemainingSpace(Inventory inventory, ItemStack incomingStack, int firstSlot) {
+        if (!shouldSkipLockedOccupiedSlotForIncomingItem(inventory, firstSlot, incomingStack)) {
+            return firstSlot;
+        }
+
+        return resolveSlotWithRemainingSpace(
+            firstSlot,
+            inventory.selected,
+            slot -> hasRemainingSpaceForItem(inventory, slot, incomingStack),
+            slot -> shouldSkipLockedOccupiedSlotForIncomingItem(inventory, slot, incomingStack)
+        );
+    }
+
+    public static boolean shouldPreventInPlaceSlotMerge(Slot slot, ItemStack incomingStack) {
+        if (slot == null || slot.getItem().isEmpty() || incomingStack == null || incomingStack.isEmpty()) {
+            return false;
+        }
+        if (!(slot.container instanceof Inventory inventory)) {
+            return false;
+        }
+        return shouldPreventInventoryReceive(inventory, slot.getContainerSlot(), incomingStack);
+    }
+
     private static boolean tryRerouteDeniedIncomingStack(Inventory inventory, int inventoryIndex, ItemStack currentStack, ItemStack incomingStack, InteractionDecision decision) {
         if (inventory == null
             || inventory.player == null
@@ -551,6 +851,47 @@ public final class ServerFavoriteService {
             }
         }
         return -1;
+    }
+
+    static int resolveSlotWithRemainingSpace(
+        int firstSlot,
+        int selectedSlot,
+        IntPredicate hasRemainingSpace,
+        IntPredicate shouldSkipSlot
+    ) {
+        if (firstSlot < 0 || !shouldSkipSlot.test(firstSlot)) {
+            return firstSlot;
+        }
+        if (hasRemainingSpace.test(selectedSlot) && !shouldSkipSlot.test(selectedSlot)) {
+            return selectedSlot;
+        }
+        if (hasRemainingSpace.test(40) && !shouldSkipSlot.test(40)) {
+            return 40;
+        }
+        for (int slot = 0; slot < Inventory.INVENTORY_SIZE; slot++) {
+            if (hasRemainingSpace.test(slot) && !shouldSkipSlot.test(slot)) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean hasRemainingSpaceForItem(Inventory inventory, int inventoryIndex, ItemStack incomingStack) {
+        ItemStack currentStack = inventory.getItem(inventoryIndex);
+        return !currentStack.isEmpty()
+            && ItemStack.isSameItemSameComponents(currentStack, incomingStack)
+            && currentStack.isStackable()
+            && currentStack.getCount() < Math.min(currentStack.getMaxStackSize(), inventory.getMaxStackSize());
+    }
+
+    private static boolean shouldSkipLockedOccupiedSlotForIncomingItem(
+        Inventory inventory,
+        int inventoryIndex,
+        ItemStack incomingStack
+    ) {
+        return isServerPlayerInventoryIndex(inventory, inventoryIndex)
+            && !inventory.getItem(inventoryIndex).isEmpty()
+            && shouldPreventInventoryReceive(inventory, inventoryIndex, incomingStack);
     }
 
     private static boolean shouldSkipLockedEmptySlotForIncomingItem(Inventory inventory, int inventoryIndex) {
@@ -646,6 +987,31 @@ public final class ServerFavoriteService {
         return -1;
     }
 
+    private static Slot findPlayerInventoryMenuSlot(AbstractContainerMenu menu, Player player, int inventoryIndex) {
+        for (Slot slot : menu.slots) {
+            if (resolvePlayerInventoryIndex(slot, player) == inventoryIndex) {
+                return slot;
+            }
+        }
+        return null;
+    }
+
+    private static void applyInstantSwapFavoriteCycle(ServerPlayer player, int[] favoriteCycle) {
+        FavoritesManager.getStateService().setPlayer(player.getUUID());
+        Set<Integer> currentFavorites = FavoritesManager.getStateService().getFavoriteSlots();
+        Set<Integer> movedFavorites = InstantSwapCompatService.moveFavoriteSlots(currentFavorites, favoriteCycle);
+        if (currentFavorites.equals(movedFavorites)) {
+            return;
+        }
+        FavoritesManager favoritesManager = FavoritesManager.getInstance();
+        for (int inventoryIndex : favoriteCycle) {
+            if (inventoryIndex >= 0) {
+                favoritesManager.setSlotFavorite(inventoryIndex, movedFavorites.contains(inventoryIndex));
+            }
+        }
+        markFavoriteStateChanged(player, "instant_swap");
+    }
+
     private static boolean isSophisticatedStorageNonPlayerSlot(AbstractContainerMenu menu, int slotId) {
         if (menu == null || !isInstanceOf(menu, "net.p3pp3rf1y.sophisticatedcore.common.gui.StorageContainerMenuBase")) {
             return false;
@@ -727,12 +1093,35 @@ public final class ServerFavoriteService {
         return bypassStateByPlayer.getOrDefault(player.getUUID(), false);
     }
 
-    static boolean isInventoryGuardBypassed(UUID playerId) {
+    static boolean shouldSendCorrectionSync(UUID playerId, long gameTime) {
+        return !Long.valueOf(gameTime).equals(correctionSyncTicksByPlayer.put(playerId, gameTime));
+    }
+
+    private static boolean rejectAndRequestCorrectionSync(Player player) {
+        if (player instanceof ServerPlayer serverPlayer
+            && shouldSendCorrectionSync(player.getUUID(), player.level().getGameTime())) {
+            correctionSyncSender.accept(serverPlayer);
+            DebugLogger.debug(
+                "Server sent corrective favorite full sync after rejected inventory operation: player={}",
+                player.getName().getString()
+            );
+        }
+        return true;
+    }
+
+    public static boolean isInventoryGuardBypassed(UUID playerId) {
         return ScopedPlayerOperationService.isInventoryGuardBypassed(playerId);
     }
 
-    private static boolean isInventoryGuardBypassed(Player player) {
-        return player != null && isInventoryGuardBypassed(player.getUUID());
+    public static boolean isInventoryGuardBypassed(Player player) {
+        if (player == null) {
+            return false;
+        }
+        InstantSwapTransaction transaction = instantSwapTransactionsByPlayer.get(player.getUUID());
+        return isInventoryGuardBypassed(player.getUUID())
+            || transaction != null
+            && transaction.activeClick
+            && transaction.expiresAt >= player.level().getGameTime();
     }
 
     static boolean shouldBypassRespawnInventoryRestore(
@@ -744,11 +1133,11 @@ public final class ServerFavoriteService {
         return !clientSide && (keepEverything || keepInventory || preserveLockedSlotContents);
     }
 
-    static void beginInventoryGuardBypass(UUID playerId) {
+    public static void beginInventoryGuardBypass(UUID playerId) {
         ScopedPlayerOperationService.beginInventoryGuardBypass(playerId);
     }
 
-    static void endInventoryGuardBypass(UUID playerId) {
+    public static void endInventoryGuardBypass(UUID playerId) {
         ScopedPlayerOperationService.endInventoryGuardBypass(playerId);
     }
 
@@ -795,10 +1184,13 @@ public final class ServerFavoriteService {
         FavoritesManager.getInstance().setPlayer(player.getUUID());
         Inventory inventory = player.getInventory();
         boolean partnerHasItem = !inventory.getItem(partnerInventoryIndex).isEmpty();
-        return evaluateExistingItem(player, clickedInventoryIndex, InteractionType.SWAP, clickedHasItem).denied()
-            || evaluateIncomingItem(player, clickedInventoryIndex, InteractionType.SWAP, partnerHasItem).denied()
-            || evaluateExistingItem(player, partnerInventoryIndex, InteractionType.SWAP, partnerHasItem).denied()
-            || evaluateIncomingItem(player, partnerInventoryIndex, InteractionType.SWAP, clickedHasItem).denied();
+        return InteractionGuardService.getInstance().shouldCancelSwap(
+            clickedInventoryIndex,
+            clickedHasItem,
+            partnerInventoryIndex,
+            partnerHasItem,
+            isBypassKeyHeld(player)
+        );
     }
 
     private static int swapButtonToInventoryIndex(int button) {
@@ -849,6 +1241,58 @@ public final class ServerFavoriteService {
 
     private static long nextRevision(ServerPlayer player) {
         return revisionsByPlayer.merge(player.getUUID(), 1L, Long::sum);
+    }
+
+    private static final class InstantSwapTransaction {
+        private final AbstractContainerMenu menu;
+        private final int containerId;
+        private final List<InstantSwapCompatService.PlannedClick> clicks;
+        private final int[] favoriteCycle;
+        private final int[] menuSlotCycle;
+        private final List<ItemStack> beforeStacks;
+        private final long expiresAt;
+        private int nextClick;
+        private boolean activeClick;
+        private boolean completed;
+
+        private InstantSwapTransaction(
+            AbstractContainerMenu menu,
+            InstantSwapCompatService.OperationPlan plan,
+            int[] favoriteCycle,
+            long expiresAt
+        ) {
+            this.menu = menu;
+            this.containerId = menu.containerId;
+            this.clicks = plan.clicks();
+            this.favoriteCycle = favoriteCycle.clone();
+            this.menuSlotCycle = plan.menuSlotCycle().stream().mapToInt(Integer::intValue).toArray();
+            this.beforeStacks = stacksAt(menu, this.menuSlotCycle);
+            this.expiresAt = expiresAt;
+        }
+
+        private InstantSwapCompatService.PlannedClick nextClick() {
+            return clicks.get(nextClick);
+        }
+
+        private boolean contentFollowsCycle(AbstractContainerMenu menu) {
+            return menu.containerId == containerId
+                && InstantSwapCompatService.contentFollowsCycle(
+                    beforeStacks,
+                    stacksAt(menu, menuSlotCycle),
+                    ItemStack::matches
+                );
+        }
+
+        private static List<ItemStack> stacksAt(AbstractContainerMenu menu, int[] menuSlots) {
+            List<ItemStack> stacks = new ArrayList<>(menuSlots.length);
+            for (int menuSlot : menuSlots) {
+                if (menuSlot < 0 || menuSlot >= menu.slots.size()) {
+                    return List.of();
+                }
+                stacks.add(menu.slots.get(menuSlot).getItem().copy());
+            }
+            return stacks;
+        }
     }
 
     public record ToggleResult(boolean accepted, int changedSlot, boolean nowFavorite, long revision, Set<Integer> favoriteSlots) {

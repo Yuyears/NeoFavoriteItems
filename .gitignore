@@ -43,5 +43,9 @@ logs/
 *.iws
 
 docs/
+!docs/
+docs/*
+!docs/work-items/
+!docs/work-items/*.md
 .claude/
 .tmp/

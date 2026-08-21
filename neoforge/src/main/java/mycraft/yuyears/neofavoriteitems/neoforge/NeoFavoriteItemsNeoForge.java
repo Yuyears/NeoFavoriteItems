@@ -11,6 +11,7 @@ import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
 import mycraft.yuyears.neofavoriteitems.neoforge.render.NeoForgeOverlayRenderer;
+import mycraft.yuyears.neofavoriteitems.application.InstantSwapCompatService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.resources.ResourceLocation;
@@ -23,6 +24,7 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
@@ -122,6 +124,12 @@ public class NeoFavoriteItemsNeoForge {
         private static net.minecraft.client.KeyMapping bypassLockKey;
         private static boolean lastLoggedLockOperationKeyState;
         private static boolean lastLoggedBypassLockKeyState;
+        private static boolean previousLockOperationKeyState;
+        private static boolean previousBypassLockKeyState;
+        private static InstantSwapCompatService.ModifierMode lastPressedModifier = InstantSwapCompatService.ModifierMode.BYPASS;
+        private static final long INSTANT_SWAP_KEY_DEBOUNCE_NANOS = 20_000_000L;
+        private static long lockOperationReleasedAtNanos;
+        private static long bypassReleasedAtNanos;
         private NeoForgeOverlayRenderer overlayRenderer;
 
         public void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
@@ -167,6 +175,7 @@ public class NeoFavoriteItemsNeoForge {
         public void onClientTick(ClientTickEvent.Post event) {
             var minecraft = Minecraft.getInstance();
             if (minecraft.player != null) {
+                updateModifierMode();
                 logKeyStatesIfChanged();
             }
 
@@ -184,6 +193,56 @@ public class NeoFavoriteItemsNeoForge {
 
         public static boolean isLockOperationKeyHeld() {
             return isKeyHeld(lockOperationKey);
+        }
+
+        @SubscribeEvent
+        public void onKeyInput(InputEvent.Key event) {
+            if (matchesKey(lockOperationKey, event.getKey())) {
+                if (event.getAction() == InputConstants.PRESS) {
+                    lastPressedModifier = InstantSwapCompatService.ModifierMode.MOVE_LOCKS;
+                } else if (event.getAction() == InputConstants.RELEASE) {
+                    lockOperationReleasedAtNanos = System.nanoTime();
+                }
+            } else if (matchesKey(bypassLockKey, event.getKey())) {
+                if (event.getAction() == InputConstants.PRESS) {
+                    lastPressedModifier = InstantSwapCompatService.ModifierMode.BYPASS;
+                } else if (event.getAction() == InputConstants.RELEASE) {
+                    bypassReleasedAtNanos = System.nanoTime();
+                }
+            }
+        }
+
+        private static boolean matchesKey(net.minecraft.client.KeyMapping mapping, int key) {
+            return mapping != null
+                && mapping.getKey() != null
+                && mapping.getKey().getType() == InputConstants.Type.KEYSYM
+                && mapping.getKey().getValue() == key;
+        }
+
+        public static InstantSwapCompatService.ModifierMode instantSwapModifierMode() {
+            long now = System.nanoTime();
+            return InstantSwapCompatService.resolveModifierMode(
+                InstantSwapCompatService.isModifierActive(
+                    isBypassKeyHeld(), now, bypassReleasedAtNanos, INSTANT_SWAP_KEY_DEBOUNCE_NANOS
+                ),
+                InstantSwapCompatService.isModifierActive(
+                    isLockOperationKeyHeld(), now, lockOperationReleasedAtNanos, INSTANT_SWAP_KEY_DEBOUNCE_NANOS
+                ),
+                lastPressedModifier
+            );
+        }
+
+        private static void updateModifierMode() {
+            boolean lockHeld = isLockOperationKeyHeld();
+            boolean bypassHeld = isBypassKeyHeld();
+            if (lockHeld && !previousLockOperationKeyState) {
+                lastPressedModifier = InstantSwapCompatService.ModifierMode.MOVE_LOCKS;
+            }
+            if (bypassHeld && !previousBypassLockKeyState) {
+                lastPressedModifier = InstantSwapCompatService.ModifierMode.BYPASS;
+            }
+            previousLockOperationKeyState = lockHeld;
+            previousBypassLockKeyState = bypassHeld;
         }
 
         private static boolean isKeyHeld(net.minecraft.client.KeyMapping keyMapping) {
@@ -262,5 +321,11 @@ public class NeoFavoriteItemsNeoForge {
 
     public static boolean isLockOperationKeyHeld() {
         return IS_CLIENT && ClientEventHandler.isLockOperationKeyHeld();
+    }
+
+    public static InstantSwapCompatService.ModifierMode instantSwapModifierMode() {
+        return IS_CLIENT
+            ? ClientEventHandler.instantSwapModifierMode()
+            : InstantSwapCompatService.ModifierMode.NONE;
     }
 }

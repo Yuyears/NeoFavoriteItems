@@ -1,4 +1,4 @@
-package mycraft.yuyears.neofavoriteitems.forge.mixin;
+package mycraft.yuyears.neofavoriteitems.mixin;
 
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import net.minecraft.world.entity.player.Inventory;
@@ -44,6 +44,11 @@ public abstract class InventoryMixin {
     @Inject(method = "getFreeSlot", at = @At("RETURN"), cancellable = true)
     private void neoFavoriteItems$skipLockedEmptySlotsForIncomingItems(CallbackInfoReturnable<Integer> cir) {
         cir.setReturnValue(ServerFavoriteService.resolveFreeSlotForIncomingItem((Inventory) (Object) this, cir.getReturnValue()));
+    }
+
+    @Inject(method = "getSlotWithRemainingSpace", at = @At("RETURN"), cancellable = true)
+    private void neoFavoriteItems$skipLockedOccupiedSlotsForIncomingItems(ItemStack stack, CallbackInfoReturnable<Integer> cir) {
+        cir.setReturnValue(ServerFavoriteService.resolveSlotWithRemainingSpace((Inventory) (Object) this, stack, cir.getReturnValue()));
     }
 
     @Inject(method = "dropAll", at = @At("HEAD"))

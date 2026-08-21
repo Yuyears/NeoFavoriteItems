@@ -1,4 +1,4 @@
-package mycraft.yuyears.neofavoriteitems.forge.mixin;
+package mycraft.yuyears.neofavoriteitems.mixin;
 
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import net.minecraft.server.level.ServerPlayer;

@@ -99,6 +99,16 @@ Date: 2026-08-16
 80. 已排查到汇流整合包附近容器一键存储动作由 Better Experience 提供。NeoForge 兼容现在只在来源 stack 属于已锁玩家背包槽时跳过 Better Experience 的单次 stack 转移调用；容器发现和目标放入仍由 Better Experience 自身处理。
 81. Wrench Finder direct lookup now treats locked player-inventory and offhand sources as absent during `findDirectMatch`, preventing its non-transactional copy-and-set equip path from duplicating a protected item while allowing later unlocked matches to remain discoverable.
 82. Wrench Finder 直接检索现在会在 `findDirectMatch` 中把锁定玩家背包与副手来源视为不存在，避免其非事务性的复制后写入装备流程复制受保护物品，同时保留后续未锁匹配项的检索能力。
+83. Client favorite state is now separate from UUID-keyed server state, preventing integrated client/server state collision for the same player UUID.
+84. 客户端收藏状态现与按 UUID 保存的服务端状态分离，避免集成服中相同玩家 UUID 导致双端状态串用。
+85. Vanilla in-place merge paths now skip locked occupied player slots in both menu shift-click and inventory pickup selection without blocking equivalent unlocked targets.
+86. 原版原地合并路径现在会在菜单 Shift 点击和背包拾取选择中跳过锁定非空玩家槽，同时不阻断同类未锁目标。
+87. Server and Fabric/Forge/NeoForge client swap guards now use one shared two-endpoint decision.
+88. 服务端与 Fabric/Forge/NeoForge 客户端交换守卫现共用一套双端判定。
+- Server menu swaps evaluate the hotbar/offhand player partner even when the clicked endpoint belongs to an external or Sophisticated container.
+- 服务端菜单交换即使点击端属于外部容器或 Sophisticated 容器，也会检查快捷栏/副手玩家端。
+89. NeoForge Su's Instant Swap normal and row swaps check every participating player slot at the mod's three click emitters. No modifier blocks a locked operation; bypass preserves lock positions; the lock-operation key keeps Su's original SWAP/PICKUP sequence through a validated short-lived transaction. The server rejects transactions without an authoritative locked endpoint or an empty PICKUP cursor, and commits lock movement only after stacks match the expected cycle. Hotbar-priority keeps its original three-slot item flow and matching three-slot lock rotation.
+90. NeoForge 的 Su's Instant Swap 普通交换与整行交换会在该模组三个点击发射器检查所有参与的玩家槽。无修饰键时阻止涉及锁槽的操作；旁路键保持锁位置；锁定键通过经过校验的短期事务保留 Su 原有 SWAP/PICKUP 序列。缺少服务端权威锁端点或 PICKUP 光标非空时拒绝事务；stack 实际符合预期循环后才提交锁移动。热栏优先继续使用原三槽物品流向，并执行对应的三槽锁轮转。
 
 ## Integration Validation Summary
 
@@ -276,10 +286,14 @@ Date: 2026-08-16
 - 在安装 ClientSort 的加载器上实机验证 ClientSort collect 与 sort。
 - Better Experience fast-storage compatibility still needs in-game validation with a locked source slot next to a matching nearby container stack.
 - Better Experience 一键存储兼容仍需实机验证：玩家已锁来源槽旁边存在可合并的附近容器同类 stack 时，锁槽物品不应被拿走。
-- Wrench Finder compatibility still needs in-game validation with a locked direct source, mixed locked/unlocked matches, a locked offhand source, an unlocked control, and a non-empty main hand. Locked sources must remain unchanged and no duplicate or main-hand item loss may occur.
-- Wrench Finder 兼容仍需实机验证锁定直接来源、锁定/未锁匹配项并存、锁定副手来源、全未锁对照及主手非空场景。锁定来源必须保持不变，且不得复制或丢失原主手物品。
+- Wrench Finder temporary compatibility shim removed after upstream fixed the locked-source duplication bug; no project-side Wrench Finder runtime validation remains required.
+- Wrench Finder 临时兼容层已在上游修复锁定来源复制问题后移除；项目不再保留 Wrench Finder 运行时兼容验证项。
 - NeoForge in-game validation of Sophisticated Backpacks Alt-left-click slot locking after the `QUICK_MOVE` click-path fix.
 - NeoForge 仍需实机验证 Sophisticated Backpacks 在修复 `QUICK_MOVE` 点击路径后的 Alt+左键槽位锁定行为。
+- In-game validation of occupied merge protection: shift-click and ground-item pickup must skip locked matching stacks and continue merging into unlocked matching stacks.
+- 实机验证非空合并保护：Shift 点击和地面拾取必须跳过锁定同类堆叠，并继续合并到未锁同类堆叠。
+- NeoForge in-game validation of Su's Instant Swap compatibility passed for survival and creative swap paths.
+- NeoForge 实机验证 Su's Instant Swap 兼容层通过，覆盖生存与创造交换路径。
 - Manual matrix validation for persistence paths and lifecycle timing:
 - 持久化路径与生命周期时机的手工矩阵验证：
   - client-only join to unmodded server
@@ -292,6 +306,20 @@ Date: 2026-08-16
 ## Notes
 
 ## 说明
+
+- Phase 3 automated integration passed: 93 common tests, three-loader compilation, and three-loader resource processing. No game was launched.
+- 第三阶段自动化集成通过：93 项 common 测试、三端编译及三端资源处理均成功。本阶段未启动游戏。
+- Su's Instant Swap transaction redesign passed 98 common tests and Fabric/Forge/NeoForge compilation. No game was launched.
+- Su's Instant Swap 事务重构通过 98 项 common 测试及 Fabric/Forge/NeoForge 编译。本次未启动游戏。
+- Pure Su's Instant Swap operation-plan tests cover SWAP, PICKUP exchange, hotbar-priority stash, and invalid shapes. Current CI-equivalent verification passed 102 common tests plus three-loader compilation and resource processing. No game was launched.
+- Su's Instant Swap 纯操作计划测试覆盖 SWAP、PICKUP 交换、热栏优先暂存及非法形状。当前 CI 等价验证通过 102 项 common 测试、三端编译和三端资源处理。本次未启动游戏。
+- Launch-level Mixin smoke validation remains skipped because no stable non-game headless entrypoint exists in the repository; runtime Mixin application remains part of manual launch validation.
+- 启动级 Mixin 烟测继续跳过，因为仓库不存在稳定且不启动游戏的无头入口；Mixin 运行时应用仍由手工启动验证覆盖。
+- Su's Instant Swap creative and survival compatibility passed NeoForge in-game validation.
+- Su's Instant Swap 创造与生存兼容路径已通过 NeoForge 实机验证。
+- 服务端拒绝客户端容器点击、副手交换包或创造槽写入包时会触发权威全量锁同步，同一玩家同一 tick 只发送一次；低层库存及第三方服务端变更拒绝不触发。common 测试与 Fabric/Forge/NeoForge 编译通过，未启动游戏。
+- 三端快捷栏 HUD Overlay 在 GUI 打开时不再隐藏；GUI 内与 HUD 使用同一客户端锁状态。需实机确认具体整合包 GUI 的层级与视觉遮挡。
+- Su's Instant Swap 生存 Alt 使用客户端即时锁状态更新并由服务端全量同步确认；创造 Alt 使用服务端 pair/row 批次；Ctrl 保持上游路径。实机验证通过。
 
 - This document is a delivery-facing verification summary. It complements `30-report-tests.md`, which focuses on automated evidence and coverage metrics.
 - 本文档是面向交付的修复验证摘要，它与 `30-report-tests.md` 互补，后者更侧重自动化证据和覆盖率指标。

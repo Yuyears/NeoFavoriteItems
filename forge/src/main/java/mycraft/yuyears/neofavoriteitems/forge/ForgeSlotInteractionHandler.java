@@ -99,12 +99,13 @@ public final class ForgeSlotInteractionHandler {
         }
 
         boolean partnerHasItem = !player.getInventory().getItem(partnerInventoryIndex).isEmpty();
-        boolean bypass = NeoFavoriteItemsForge.isBypassKeyHeld();
-        InteractionGuardService guard = InteractionGuardService.getInstance();
-        return guard.evaluate(inventoryIndex, InteractionType.SWAP, bypass, clickedHasItem).denied()
-            || guard.evaluateIncomingItem(inventoryIndex, InteractionType.SWAP, bypass, partnerHasItem).denied()
-            || guard.evaluate(partnerInventoryIndex, InteractionType.SWAP, bypass, partnerHasItem).denied()
-            || guard.evaluateIncomingItem(partnerInventoryIndex, InteractionType.SWAP, bypass, clickedHasItem).denied();
+        return InteractionGuardService.getInstance().shouldCancelSwap(
+            inventoryIndex,
+            clickedHasItem,
+            partnerInventoryIndex,
+            partnerHasItem,
+            NeoFavoriteItemsForge.isBypassKeyHeld()
+        );
     }
 
     private static int swapButtonToInventoryIndex(int button) {

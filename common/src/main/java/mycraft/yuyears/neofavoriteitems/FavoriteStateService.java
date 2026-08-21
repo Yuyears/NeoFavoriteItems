@@ -8,6 +8,8 @@ import java.util.UUID;
 public interface FavoriteStateService {
     void setPlayer(UUID playerUUID);
 
+    void useClientState();
+
     void clearPlayer();
 
     void removePlayer(UUID playerUUID);

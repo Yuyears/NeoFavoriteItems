@@ -133,6 +133,7 @@ public final class PlatformFavoriteSupport {
     }
 
     public static void synchronizeClientPersistence(Minecraft minecraft, boolean serverAuthoritative) {
+        FavoritesManager.getStateService().useClientState();
         boolean effectiveServerAuthoritative = isServerAuthoritative(serverAuthoritative, minecraft.getSingleplayerServer() != null);
         ClientStorageTarget storageTarget = resolveClientStorageTarget(minecraft);
         boolean storageChanged = !Objects.equals(activeClientWorldDirectory, storageTarget.worldDirectory())
@@ -160,8 +161,6 @@ public final class PlatformFavoriteSupport {
                     DataPersistenceManager.getInstance().saveData(activeClientPlayerId);
                 }
 
-                FavoritesManager.getStateService().setPlayer(playerUUID);
-
                 if (usesClientLocalPersistence(effectiveServerAuthoritative)) {
                     ClientFavoriteSyncService.resetSession();
                     FavoritesManager.getStateService().clearFavorites();
@@ -183,7 +182,6 @@ public final class PlatformFavoriteSupport {
         }
 
         if (activeClientPlayerId != null && !clientServerAuthoritative) {
-            FavoritesManager.getStateService().setPlayer(activeClientPlayerId);
             DataPersistenceManager.getInstance().saveData(activeClientPlayerId);
         }
 

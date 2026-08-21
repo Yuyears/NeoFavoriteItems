@@ -4,16 +4,8 @@
   "package": "mycraft.yuyears.neofavoriteitems.neoforge.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "AbstractContainerMenuMixin",
-    "InventoryMixin",
-    "LivingEntityMixin",
-    "PlayerDropEquipmentMixin",
-    "PlayerMixin",
     "InvWrapperMixin",
-    "RangedWrapperMixin",
-    "ServerPlayerMixin",
-    "ServerGamePacketListenerImplMixin",
-    "SlotMixin"
+    "RangedWrapperMixin"
   ],
   "client": [
     "AbstractContainerScreenMixin",

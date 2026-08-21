@@ -4,6 +4,7 @@ import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
 import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
+import mycraft.yuyears.neofavoriteitems.application.InstantSwapCompatService;
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.ConnectionProtocol;
@@ -24,10 +25,14 @@ public final class NeoForgeFavoriteNetworking {
     private NeoForgeFavoriteNetworking() {}
 
     public static void registerPackets(PayloadRegistrar registrar) {
+        ServerFavoriteService.setCorrectionSyncSender(NeoForgeFavoriteNetworking::sendFullSync);
         PayloadRegistrar optionalRegistrar = registrar.optional();
         optionalRegistrar.playToServer(ToggleFavoritePayload.TYPE, ToggleFavoritePayload.STREAM_CODEC, ToggleFavoritePayload::handle);
         optionalRegistrar.playToServer(RequestFavoriteSyncPayload.TYPE, RequestFavoriteSyncPayload.STREAM_CODEC, RequestFavoriteSyncPayload::handle);
         optionalRegistrar.playToServer(BypassKeyStatePayload.TYPE, BypassKeyStatePayload.STREAM_CODEC, BypassKeyStatePayload::handle);
+        optionalRegistrar.playToServer(PrepareInstantSwapPayload.TYPE, PrepareInstantSwapPayload.STREAM_CODEC, PrepareInstantSwapPayload::handle);
+        optionalRegistrar.playToServer(CompleteInstantSwapPayload.TYPE, CompleteInstantSwapPayload.STREAM_CODEC, CompleteInstantSwapPayload::handle);
+        optionalRegistrar.playToServer(MoveCreativeFavoritePairsPayload.TYPE, MoveCreativeFavoritePairsPayload.STREAM_CODEC, MoveCreativeFavoritePairsPayload::handle);
         optionalRegistrar.playToClient(SyncFavoritesPayload.TYPE, SyncFavoritesPayload.STREAM_CODEC, SyncFavoritesPayload::handle);
         optionalRegistrar.playToClient(SyncFavoriteChangesPayload.TYPE, SyncFavoriteChangesPayload.STREAM_CODEC, SyncFavoriteChangesPayload::handle);
     }
@@ -49,6 +54,44 @@ public final class NeoForgeFavoriteNetworking {
         }
         PacketDistributor.sendToServer(new BypassKeyStatePayload(held));
         DebugLogger.debug("NeoForge sent bypass key state: held={}", held);
+    }
+
+    public static boolean tryPrepareInstantSwap(
+        InstantSwapCompatService.Operation operation,
+        int containerId,
+        int targetMenuSlot,
+        int hotbarIndex,
+        int auxiliaryMenuSlot
+    ) {
+        if (!hasServerChannel(PrepareInstantSwapPayload.TYPE.id())) {
+            return false;
+        }
+        PacketDistributor.sendToServer(new PrepareInstantSwapPayload(
+            operation,
+            containerId,
+            targetMenuSlot,
+            hotbarIndex,
+            auxiliaryMenuSlot
+        ));
+        return true;
+    }
+
+    public static void completeInstantSwap() {
+        if (hasServerChannel(CompleteInstantSwapPayload.TYPE.id())) {
+            PacketDistributor.sendToServer(CompleteInstantSwapPayload.INSTANCE);
+        }
+    }
+
+    public static void moveCreativeFavoritePairs(int[] slotPairs) {
+        if (hasServerChannel(MoveCreativeFavoritePairsPayload.TYPE.id())) {
+            PacketDistributor.sendToServer(new MoveCreativeFavoritePairsPayload(slotPairs.clone(), false));
+        }
+    }
+
+    public static void executeCreativeSwapPairs(int[] slotPairs) {
+        if (hasServerChannel(MoveCreativeFavoritePairsPayload.TYPE.id())) {
+            PacketDistributor.sendToServer(new MoveCreativeFavoritePairsPayload(slotPairs.clone(), true));
+        }
     }
 
     public static void sendFullSync(ServerPlayer player) {
@@ -73,9 +116,13 @@ public final class NeoForgeFavoriteNetworking {
     }
 
     public static boolean isServerPresent() {
+        return hasServerChannel(ToggleFavoritePayload.TYPE.id());
+    }
+
+    private static boolean hasServerChannel(ResourceLocation payloadId) {
         Minecraft minecraft = Minecraft.getInstance();
         return minecraft.getConnection() != null
-            && NetworkRegistry.hasChannel(minecraft.getConnection().getConnection(), ConnectionProtocol.PLAY, ToggleFavoritePayload.TYPE.id());
+            && NetworkRegistry.hasChannel(minecraft.getConnection().getConnection(), ConnectionProtocol.PLAY, payloadId);
     }
 
     public record ToggleFavoritePayload(int inventoryIndex) implements CustomPacketPayload {
@@ -155,6 +202,132 @@ public final class NeoForgeFavoriteNetworking {
 
         public static void handle(BypassKeyStatePayload payload, IPayloadContext context) {
             context.enqueueWork(() -> ServerFavoriteService.updateBypassState((ServerPlayer) context.player(), payload.held()));
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PrepareInstantSwapPayload(
+        InstantSwapCompatService.Operation operation,
+        int containerId,
+        int targetMenuSlot,
+        int hotbarIndex,
+        int auxiliaryMenuSlot
+    ) implements CustomPacketPayload {
+        public static final Type<PrepareInstantSwapPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "prepare_instant_swap")
+        );
+        public static final StreamCodec<FriendlyByteBuf, PrepareInstantSwapPayload> STREAM_CODEC =
+            StreamCodec.of(PrepareInstantSwapPayload::write, PrepareInstantSwapPayload::read);
+
+        private static void write(FriendlyByteBuf buffer, PrepareInstantSwapPayload payload) {
+            buffer.writeEnum(payload.operation);
+            buffer.writeInt(payload.containerId);
+            buffer.writeInt(payload.targetMenuSlot);
+            buffer.writeInt(payload.hotbarIndex);
+            buffer.writeInt(payload.auxiliaryMenuSlot);
+        }
+
+        private static PrepareInstantSwapPayload read(FriendlyByteBuf buffer) {
+            return new PrepareInstantSwapPayload(
+                buffer.readEnum(InstantSwapCompatService.Operation.class),
+                buffer.readInt(),
+                buffer.readInt(),
+                buffer.readInt(),
+                buffer.readInt()
+            );
+        }
+
+        public static void handle(PrepareInstantSwapPayload payload, IPayloadContext context) {
+            context.enqueueWork(() -> {
+                ServerPlayer player = (ServerPlayer) context.player();
+                ServerFavoriteService.executeInstantSwap(
+                    player,
+                    payload.operation(),
+                    payload.containerId(),
+                    payload.targetMenuSlot(),
+                    payload.hotbarIndex(),
+                    payload.auxiliaryMenuSlot()
+                );
+                sendFullSync(player);
+            });
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record CompleteInstantSwapPayload() implements CustomPacketPayload {
+        public static final CompleteInstantSwapPayload INSTANCE = new CompleteInstantSwapPayload();
+        public static final Type<CompleteInstantSwapPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "complete_instant_swap")
+        );
+        public static final StreamCodec<FriendlyByteBuf, CompleteInstantSwapPayload> STREAM_CODEC =
+            StreamCodec.of(CompleteInstantSwapPayload::write, CompleteInstantSwapPayload::read);
+
+        private static void write(FriendlyByteBuf buffer, CompleteInstantSwapPayload payload) {
+        }
+
+        private static CompleteInstantSwapPayload read(FriendlyByteBuf buffer) {
+            return INSTANCE;
+        }
+
+        public static void handle(CompleteInstantSwapPayload payload, IPayloadContext context) {
+            context.enqueueWork(() -> {
+                ServerPlayer player = (ServerPlayer) context.player();
+                ServerFavoriteService.completeInstantSwap(player);
+                sendFullSync(player);
+            });
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record MoveCreativeFavoritePairsPayload(int[] slotPairs, boolean executeSwap) implements CustomPacketPayload {
+        public static final Type<MoveCreativeFavoritePairsPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "move_creative_favorite_pairs")
+        );
+        public static final StreamCodec<FriendlyByteBuf, MoveCreativeFavoritePairsPayload> STREAM_CODEC =
+            StreamCodec.of(MoveCreativeFavoritePairsPayload::write, MoveCreativeFavoritePairsPayload::read);
+
+        private static void write(FriendlyByteBuf buffer, MoveCreativeFavoritePairsPayload payload) {
+            buffer.writeVarInt(payload.slotPairs.length);
+            for (int slot : payload.slotPairs) {
+                buffer.writeVarInt(slot);
+            }
+            buffer.writeBoolean(payload.executeSwap);
+        }
+
+        private static MoveCreativeFavoritePairsPayload read(FriendlyByteBuf buffer) {
+            int length = buffer.readVarInt();
+            if (length < 0 || length > 18) {
+                return new MoveCreativeFavoritePairsPayload(new int[0], false);
+            }
+            int[] slots = new int[length];
+            for (int i = 0; i < length; i++) {
+                slots[i] = buffer.readVarInt();
+            }
+            return new MoveCreativeFavoritePairsPayload(slots, buffer.readBoolean());
+        }
+
+        public static void handle(MoveCreativeFavoritePairsPayload payload, IPayloadContext context) {
+            context.enqueueWork(() -> {
+                ServerPlayer player = (ServerPlayer) context.player();
+                if (payload.executeSwap()) {
+                    ServerFavoriteService.executeCreativeSwapPairs(player, payload.slotPairs());
+                } else {
+                    ServerFavoriteService.moveCreativeFavoritePairs(player, payload.slotPairs());
+                }
+                sendFullSync(player);
+            });
         }
 
         @Override

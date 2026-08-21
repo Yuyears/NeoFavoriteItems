@@ -28,6 +28,7 @@ public final class FabricFavoriteNetworking {
     }
 
     public static void registerServerReceivers() {
+        ServerFavoriteService.setCorrectionSyncSender(FabricFavoriteNetworking::sendFullSync);
         ServerPlayNetworking.registerGlobalReceiver(ToggleFavoritePayload.TYPE, (payload, context) ->
             context.server().execute(() -> {
                 ServerPlayer player = context.player();

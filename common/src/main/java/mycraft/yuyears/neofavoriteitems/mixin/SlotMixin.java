@@ -1,4 +1,4 @@
-package mycraft.yuyears.neofavoriteitems.fabric.mixin;
+package mycraft.yuyears.neofavoriteitems.mixin;
 
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import net.minecraft.world.Container;

@@ -8,8 +8,8 @@
 - Mod ID：`neo_favorite_items`
 - Package: `mycraft.yuyears.neofavoriteitems`
 - 包名：`mycraft.yuyears.neofavoriteitems`
-- Version: `0.0.2-alpha`
-- 版本：`0.0.2-alpha`
+- Version: `0.0.2-beta`
+- 版本：`0.0.2-beta`
 - Java: 21
 - Java：21
 - Build system: Gradle Kotlin DSL + Architectury Loom
@@ -181,14 +181,14 @@ Build outputs:
 
 构建产物：
 
-- `fabric/build/libs/neo_favorite_items-fabric-0.0.2-alpha-<build_number>.jar`
-- `forge/build/libs/neo_favorite_items-forge-0.0.2-alpha-<build_number>.jar`
-- `neoforge/build/libs/neo_favorite_items-neoforge-0.0.2-alpha-<build_number>.jar`
-- `build/result/neo_favorite_items-<loader>-0.0.2-alpha-<build_number>.jar`
+- `fabric/build/libs/neo_favorite_items-1.21.1-fabric-release-0.0.2-beta-build1.jar`
+- `forge/build/libs/neo_favorite_items-1.21.1-forge-release-0.0.2-beta-build1.jar`
+- `neoforge/build/libs/neo_favorite_items-1.21.1-neoforge-release-0.0.2-beta-build1.jar`
+- `build/result/neo_favorite_items-<minecraft>-<loader>-<channel>-<modVersion>-<build>.jar`
 
-`build_number` is stored in `gradle.properties` and automatically increments when running `build`, `assemble`, `jar`, or `remapJar` tasks. When `mod_version` changes, the next increment resets the build number to `build1`. It does not increment for `compileJava`, `runClient`, `help`, or `--dry-run`. Use `-Pskip_build_number_increment=true` when a release rebuild must keep the current build number.
+`build_number` and `release_channel` are read-only defaults from `gradle.properties` and may be overridden explicitly, for example `-Pbuild_number=build5 -Prelease_channel=dev`. CI supplies its own build number. Gradle never rewrites `gradle.properties`.
 
-`build_number` 保存在 `gradle.properties` 中，执行 `build`、`assemble`、`jar` 或 `remapJar` 任务时会自动递增。当 `mod_version` 变化时，下一次递增会把构建号重置为 `build1`。执行 `compileJava`、`runClient`、`help` 或 `--dry-run` 时不会递增。如果发布重构建需要保持当前构建号，可使用 `-Pskip_build_number_increment=true`。
+`build_number` 和 `release_channel` 从 `gradle.properties` 读取默认值，也可显式覆盖，例如 `-Pbuild_number=build5 -Prelease_channel=dev`。CI 提供自己的构建号。Gradle 不会回写 `gradle.properties`。
 
 The result-copy task uses lazy task-path dependencies so focused commands such as `.\gradle.bat :common:test` work with Gradle configuration-on-demand.
 

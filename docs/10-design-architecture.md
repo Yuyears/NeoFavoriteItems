@@ -106,8 +106,12 @@ Location: `common/.../application`
 - `InteractionGuardService`：根据收藏状态、配置、旁路键和槽位内容做拦截决策
 - `InteractionGuardService.evaluateIncomingItem`: applies target-slot semantics for composite moves so locked slots can reject incoming stacks before vanilla removes the source item
 - `InteractionGuardService.evaluateIncomingItem`：为复合移动提供目标槽语义，使锁定槽位能在原版移除来源物品前拒绝放入
+- `InteractionGuardService.shouldCancelSwap`: centralizes the same two-endpoint source/target decision used by the server and all three clients.
+- `InteractionGuardService.shouldCancelSwap`：集中服务端与三端客户端共用的双端来源/目标交换判定。
 - `ServerFavoriteService`: handles server-side toggles, validation, revisions, bypass state, and server interaction protection
 - `ServerFavoriteService`：处理服务端收藏切换、校验、修订号、旁路状态和服务端交互保护
+- Rejected client container clicks, offhand-swap packets, and creative-slot-set packets trigger an authoritative full favorite sync through a loader-registered sender. Lower-level inventory and third-party server mutations do not trigger correction sync. Rejections for the same player in the same server tick are coalesced.
+- 客户端容器点击、副手交换包或创造槽写入包被拒绝时，通过加载器注册的发送器回传权威全量锁状态；低层库存变更与第三方服务端逻辑拒绝不触发纠正同步。同一玩家同一服务端 tick 内的重复拒绝会被合并。
 - `ScopedPlayerOperationService`: owns nestable per-thread player operation scopes used by server inventory guard bypass and death-drop preservation
 - `ScopedPlayerOperationService`：管理可嵌套的逐线程玩家操作作用域，供服务端库存守卫旁路和死亡掉落保留使用
 - `LockedEmptySlotFallback`: selects the safe fallback slot for incoming stacks blocked by a locked empty target, preferring hotbar slots before main-inventory slots
@@ -122,6 +126,10 @@ Location: `common/.../application`
 - `ClientSortCompatService`：在 ClientSort schema 校验和实际操作入口改写 collect/sort/transfer/stack-fill 数组。collect 会过滤锁定槽（包含锁定空槽）。transfer 与 stack fill 会同时过滤锁定来源数组和目标数组，因为 ClientSort 使用目标槽 `safeInsert(srcStack)`，可能不经过来源槽移除 API 就缩减来源 stack。sort 会保留 ClientSort 的目标顺序语义：固定锁槽，把锁槽分别从已排序来源列表和目标槽列表中剔除，再按 ClientSort 原目标顺序重新配对剩余来源与目标，使未锁物品围绕锁定空洞保持紧凑连续。只有实际改写 ClientSort 数组时才输出 debug 诊断。
 - `BetterExperienceCompatService`: detects whether Better Experience fast storage is about to use a locked player-inventory stack as its source, without replacing the mod's container search or insertion behavior.
 - `BetterExperienceCompatService`：只检测 Better Experience 一键存储是否正要把已锁玩家背包 stack 作为来源，不替换该模组的容器搜索或放入逻辑。
+- `InstantSwapCompatService`: defines Su's Instant Swap pass/block/lock-follow decisions and creates immutable operation plans containing the exact click sequence, favorite cycle, and menu-slot cycle for SWAP, PICKUP exchange, and hotbar-priority stash.
+- `InstantSwapCompatService`：定义 Su's Instant Swap 的放行、阻止、锁跟随决策，并为 SWAP、PICKUP 交换和热栏优先暂存生成包含精确点击序列、锁循环与菜单槽循环的不可变操作计划。
+- Su modifier arbitration is a single pure mode: `NONE`, `BYPASS`, or `MOVE_LOCKS`. If Ctrl and Alt overlap, most recently pressed modifier wins; no operation can enter both paths.
+- Su 修饰键仲裁使用单一纯模式：`NONE`、`BYPASS` 或 `MOVE_LOCKS`。Ctrl 与 Alt 重叠时以后按下者为准，单次操作不会同时进入两条路径。
 
 ### Integration
 
@@ -146,6 +154,8 @@ Location: `common/.../persistence`
 
 - `DataPersistenceManager`: saves and loads favorite data by player UUID.
 - `DataPersistenceManager`：按玩家 UUID 保存和加载收藏数据。
+- `FavoritesManager` keeps client-local/synchronized state separate from UUID-keyed server state. Client code explicitly selects client state; server code selects a player UUID. This also applies to integrated servers where both sides use the same UUID.
+- `FavoritesManager` 将客户端本地/同步状态与按 UUID 保存的服务端状态分离。客户端显式选择客户端状态，服务端选择玩家 UUID；集成服务端双端 UUID 相同时也不会共用集合。
 - It supports client-local storage namespaces keyed by server address, world-save storage for integrated/dedicated servers, legacy client-path fallback, migration from the old game-directory server root, per-player login reads, cache-only in-play updates, and full-cache server-stop flushes.
 - 支持按服务器地址分命名空间的客户端本地存储、单人/专用服务端世界存档目录、旧客户端路径兼容回退、从旧游戏根目录服务端路径迁移、玩家登录按 UUID 读取、游戏过程仅更新缓存，以及关服完整缓存回写。
 
@@ -205,6 +215,12 @@ Location: `common/.../render`
 - Forge/NeoForge 的槽位解析器会把由 `InvWrapper` 或 `RangedWrapper` 支撑的 `SlotItemHandler` 映射回玩家背包索引。该路径覆盖 JustDireThings 这类把玩家槽实现为 item-handler 槽，而不是原版 `Slot(playerInventory, ...)` 的界面。
 - Optional compatibility mixins are isolated in non-required compat configs and the per-loader `mixin/compat` packages. Compatibility mixin classes use the `<ModOrFeature><TargetOrScenario>CompatMixin` naming pattern, such as `Ae2MenuCompatMixin`, `MouseTweaksMainCompatMixin`, and `ClientSortSortHandlerCompatMixin`. AE2 compatibility targets shared abstractions (`AEBaseMenu` and `MEStorageMenu`) and avoids early `ModList`/class-presence decisions, following the Mouse Tweaks-style runtime mixin application pattern.
 - 可选兼容 Mixin 隔离在非 required 的 compat 配置和各平台 `mixin/compat` 包中。兼容 Mixin 类使用 `<模组或功能><目标或场景>CompatMixin` 命名模式，例如 `Ae2MenuCompatMixin`、`MouseTweaksMainCompatMixin` 与 `ClientSortSortHandlerCompatMixin`。AE2 兼容目标限定在公共抽象（`AEBaseMenu` 与 `MEStorageMenu`），并避免过早依赖 `ModList`/类存在性判断，采用更接近 Mouse Tweaks 的运行时 Mixin 应用方式。
+- NeoForge Su's Instant Swap compatibility targets its three `SwapEngine` click emitters. Unlocked and bypassed operations remain upstream-owned. With the lock-operation key held, locked pairs cancel the upstream click and send one validated operation request; the server executes the complete click plan in one task, verifies the resulting stack cycle, moves favorite state, increments the revision, and sends authoritative sync. Client-only installations retain local post-state validation.
+- Creative-mode Su's Instant Swap uses separate direct client-inventory mutation paths. Default swaps skip locked pairs, bypass remains upstream-owned, and the lock-operation key moves lock pairs after the upstream mutation. Creative item updates and lock moves are separate packets, so corrective full sync limits ghost-lock persistence but does not make this path atomic.
+- Su's Instant Swap 的创造模式使用独立的客户端物品栏直接修改路径。默认交换跳过锁定对应组，旁路仍由上游执行，锁定键在上游变更后移动对应锁。创造物品更新与锁移动使用独立数据包，因此纠正全量同步只能缩短幽灵锁持续时间，不能使该路径原子化。
+- NeoForge 的 Su's Instant Swap 兼容只作用于 `SwapEngine` 的三个点击发射器。未锁和旁路操作完全保留上游实现，包括整行校验、背包 PICKUP 交换和热栏优先暂存。按住锁定键时，只有经过校验的槽循环至少包含一个服务端权威锁槽，才会准备五 tick 服务端事务。事务只授权精确匹配的原版点击，PICKUP 序列还要求空光标；只有实际 stack 符合预期两槽或三槽循环时才提交锁状态。授权或 post-state 校验失败时，完成 payload 会请求全量纠正。仅客户端安装时也执行相同 post-state 校验。
+- 生存 Alt 与 Ctrl 路径完全分离：Ctrl 只调用上游交换并保持锁位置；Alt 取消上游点击，由服务端执行本次完整交换并在 scoped bypass 内移动锁。两者只共享纯槽位映射与操作计划 helper，不共享事务状态。
+- 创造 Alt 使用独立服务端 pair/row 批次，在服务端旁路保护下同时交换物品和锁；创造 Ctrl 保持上游客户端路径。创造物品更新不再与后续锁移动包竞争。
 
 ### Forge
 
@@ -235,8 +251,8 @@ Location: `common/.../render`
 - NeoForge 额外提供一个低层 `MouseHandler` 按下入口，用于处理部分整合包中空槽点击到不了 `ScreenEvent` 或 `mouseClicked` 的情况。存在 Mouse Tweaks 时，该入口只预激活并切换按下目标，不取消原始按下，从而让 Mouse Tweaks 继续初始化拖动检测。
 - The optional NeoForge compatibility mixins for Quark target `SortingHandler.sortInventory(Container, int, int, int[])` and `ChangeHotbarMessage.swap(Container, int, int)`. Sorting augments Quark's locked slot array with favorite player-inventory indices. Hotbar changing runs the swap under a scoped inventory-guard bypass, then swaps favorite state and sends a full favorite sync.
 - NeoForge 的可选 Quark 兼容 Mixin 目标为 `SortingHandler.sortInventory(Container, int, int, int[])` 与 `ChangeHotbarMessage.swap(Container, int, int)`。排序路径会把已收藏玩家背包索引补入 Quark 的排序锁定槽数组；快捷栏切换路径会在有作用域的库存守卫旁路下执行交换，随后交换收藏状态并发送全量收藏同步。
-- Optional Wrench Finder compatibility filters locked player-inventory and offhand stacks only while `ItemLookupService.findDirectMatch` searches direct candidates. Locked matches remain invisible to Wrench Finder, later unlocked matches remain searchable, and its equip logic is unchanged.
-- 可选 Wrench Finder 兼容只在 `ItemLookupService.findDirectMatch` 检索直接候选时过滤锁定玩家背包与副手 stack。锁定匹配项对 Wrench Finder 不可见，后续未锁匹配项仍可继续命中，其装备逻辑保持不变。
+- Wrench Finder compatibility shim removed after the upstream mod fixed its locked-source duplication bug; standard server-side inventory guards remain authoritative.
+- Wrench Finder 兼容临时层已在上游修复锁定来源复制问题后移除；标准服务端库存守卫继续作为权威保护。
 
 ## Runtime Flows
 
@@ -275,6 +291,8 @@ Location: `common/.../render`
 8. 平台层按决策取消交互或允许继续。
 9. Composite moves evaluate both ends: the source slot uses normal removal semantics and the destination slot uses incoming-item semantics.
 10. 复合移动会同时检查两端：来源槽使用普通取出语义，目标槽使用放入语义。
+   Menu `SWAP` checks its hotbar/offhand player endpoint before filtering container-owned clicked slots. Container slots remain unlocked, but they cannot be exchanged with a protected player slot unless bypass is active.
+   菜单 `SWAP` 会在过滤容器自有点击槽前检查快捷栏/副手玩家端。容器槽本身仍不受锁定，但未启用旁路时不能与受保护玩家槽交换。
 11. Offhand swaps check the hovered/selected slot and slot `40`; quick-moving equipment checks the corresponding armor/offhand target before allowing the source move.
 12. 副手交换会同时检查悬停/当前槽与 `40` 号副手槽；Shift 点击装备会先检查对应护甲/副手目标槽再允许来源移动。
 13. Standard slot mutations are guarded at `Slot` API boundaries so custom menu flows that call `safeInsert`, `safeTake`, `tryRemove`, `remove`, `set`, or `setByPlayer` still reuse the common decision service.
@@ -299,6 +317,8 @@ Location: `common/.../render`
 32. 对已锁定空玩家槽的外部直接写入不会在来源物品已被移除后静默取消。专用的 `Inventory.setItem` 与主手 `Player.setItemInHand` 回退入口会把 incoming stack 改放到第一个空且未锁定的快捷栏槽，再改放到第一个空且未锁定的主背包槽；没有回退槽时掉落。
 33. Ground-item pickup and other vanilla `Inventory.add(...)` paths do not wait until `setItem` to reject locked empty slots. Instead, `Inventory.getFreeSlot()` is adjusted on the server so locked empty main-inventory slots are skipped when `allowItemsIntoLockedEmptySlots=false`; vanilla then inserts into the next available unlocked empty slot, or keeps the incoming stack unconsumed when no valid free slot exists.
 34. 地面掉落物拾取和其他原版 `Inventory.add(...)` 路径不会等到 `setItem` 阶段才拒绝锁定空槽。服务端会修正 `Inventory.getFreeSlot()`，使 `allowItemsIntoLockedEmptySlots=false` 时跳过已锁定的空主背包槽；随后原版会把物品放入下一个可用未锁空槽，若没有有效空槽则保留 incoming stack 不被消耗。
+35. In-place stack growth is guarded at both vanilla merge selectors: `AbstractContainerMenu.moveItemStackTo` treats locked occupied player slots as full, while `Inventory.getSlotWithRemainingSpace` preserves vanilla selected/offhand/main-inventory order but skips locked occupied targets.
+36. 原地堆叠增长在两个原版合并选择点受保护：`AbstractContainerMenu.moveItemStackTo` 将锁定非空玩家槽视为已满；`Inventory.getSlotWithRemainingSpace` 保持原版“当前槽、副手、主背包”顺序，但跳过锁定非空目标。
 35. GUI cursor placement and normal `Slot` APIs remain pure guards: `mayPlace`, `safeInsert`, `set`, and `setByPlayer` reject locked empty slots without rerouting the carried stack. This preserves the expected locked-slot experience and avoids duplicating cursor stacks.
 36. GUI 光标放入和普通 `Slot` API 仍保持纯拦截：`mayPlace`、`safeInsert`、`set` 与 `setByPlayer` 会拒绝锁定空槽，但不会改道光标物品。这样保留锁槽体验，并避免复制光标物品。
 37. NeoForge GUI mouse guarding uses official `ScreenEvent.MouseButtonPressed.Pre` and `ScreenEvent.MouseButtonReleased.Pre` hooks. The release hook covers creative inventory cursor placement, where vanilla can defer the `PICKUP` slot action until mouse release.
@@ -418,6 +438,12 @@ Location: `common/.../render`
 
 - Prefer putting new logic in `common`; keep loader layers as thin adapters.
 - 新逻辑优先放入 `common`，平台层保持薄适配。
+- Loader-neutral core mixins live under `common/.../mixin` and are registered by `neo_favorite_items.common.mixins.json`. Loader configs retain client hooks and true platform adapters.
+- 平台无关核心 Mixin 位于 `common/.../mixin`，由 `neo_favorite_items.common.mixins.json` 注册；各平台配置只保留客户端钩子与真实平台适配。
+- Keep optional compatibility mixins loader-local while their `IMixinConfigPlugin` ownership or target availability checks differ. Consolidate only when source, mappings, dependencies, and loading policy all match.
+- 可选兼容 Mixin 的 `IMixinConfigPlugin` 归属或目标存在性检查不同时继续留在平台层；只有源码、映射、依赖和加载策略均一致时才合并。
+- Do not add or package MixinExtras solely to replace an isolated vanilla Mixin injection. Adopt it across loaders only after dependency versions converge or measured redirect conflicts outweigh the new runtime dependency.
+- 不为替换单个原生 Mixin 注入而新增或打包 MixinExtras；只有三端依赖版本收敛，或已测得的 Redirect 冲突收益超过新增运行时依赖成本时才采用。
 - Persistence and networking should pass logical slots or player inventory indices, not GUI slot ids.
 - 持久化和网络只传递逻辑槽位或玩家背包索引，不传递 GUI slot id。
 - Prefer safe, semantic API boundaries before adding mod-specific compatibility. Do not globally hide `getItem` reads unless a future fix proves the synchronization impact is acceptable.

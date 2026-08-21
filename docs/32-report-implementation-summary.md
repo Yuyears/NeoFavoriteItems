@@ -35,6 +35,7 @@ Last updated: 2026-08-16
 - Fabric、Forge、NeoForge 入口与客户端按键注册
 - Overlay render entrypoints and hotbar HUD overlays for all three loaders
 - 三个平台 Overlay 渲染入口和快捷栏 HUD Overlay
+- 三端 HUD 快捷栏锁 Overlay 在 GUI 打开期间保持显示，并与 GUI 槽位 Overlay 共用当前客户端锁状态。
 - Nine PNG overlay textures and configurable color rendering
 - 九种 Overlay PNG 材质和配置色渲染
 - Unified interaction decisions through `InteractionGuardService`
@@ -43,6 +44,8 @@ Last updated: 2026-08-16
 - 客户端锁定操作键、旁路键状态轮询
 - Server-side toggle handling, revisions, full/incremental sync, and bypass-key state sync
 - 服务端收藏切换、修订号、全量/增量同步和旁路键状态同步
+- 服务端拒绝客户端容器点击、副手交换包或创造槽写入包时，发送按玩家、按 tick 合并的纠正全量同步；低层库存与第三方服务端变更拒绝不触发该同步。
+- Su 兼容层现使用独立 ModifierMode 仲裁 Ctrl/Alt；生存 Alt 与创造 Alt 各自使用服务端操作入口，Ctrl 不进入锁移动或服务端事务路径。
 - Player login/logout load-save flow for all three loaders
 - 三个平台玩家登录/登出加载保存流程
 - Mouse Tweaks-style drag-click lock toggling now uses the same optional compatibility pattern on Fabric, Forge, and NeoForge: Mouse Tweaks' slot-enter detection is reused, newly entered slots are forwarded to this mod's toggle path, and `slotClicked` hooks only cancel leaked inventory clicks while the lock-operation key is held.
@@ -83,6 +86,16 @@ Last updated: 2026-08-16
 - 对锁定空当前槽的外部直接放入现在会把 incoming item 改放到第一个空且未锁定的快捷栏槽，再改放到第一个空且未锁定的主背包槽；没有回退槽时掉落。该路径覆盖 Integrated Dynamics Squeezer 这类 `Inventory.setItem` 调用，以及 Actually Additions Display Stand 这类主手 `Player.setItemInHand` 调用。
 - Vanilla incoming-item insertion now corrects server-side `Inventory.getFreeSlot()` results before `Inventory.add(...)` consumes a stack. Locked empty main-inventory slots are skipped when `allowItemsIntoLockedEmptySlots=false`, so picked-up ground items move to another valid empty slot or remain unpicked when none exists.
 - 原版 incoming item 放入现在会在 `Inventory.add(...)` 消耗 stack 前修正服务端 `Inventory.getFreeSlot()` 结果。`allowItemsIntoLockedEmptySlots=false` 时会跳过锁定空主背包槽，因此拾取的地面掉落物会进入其他有效空槽；没有有效空槽时则保持未拾取。
+- Client and integrated-server favorite state now use separate storage contexts even when both sides have the same player UUID.
+- 客户端与集成服务端收藏状态现使用独立存储上下文，即使双端玩家 UUID 相同也不会串状态。
+- Vanilla occupied-stack merging now skips locked player targets through narrow hooks in `AbstractContainerMenu.moveItemStackTo` and `Inventory.getSlotWithRemainingSpace`, preserving vanilla target order and unlocked behavior.
+- 原版非空堆叠合并现通过 `AbstractContainerMenu.moveItemStackTo` 与 `Inventory.getSlotWithRemainingSpace` 的窄钩子跳过锁定玩家目标，同时保持原版目标顺序和未锁行为。
+- Two-endpoint swap policy is shared by the server and Fabric/Forge/NeoForge client handlers.
+- 双端交换策略现由服务端与 Fabric/Forge/NeoForge 客户端 handler 共用。
+- Server `ClickType.SWAP` protection now checks the player hotbar/offhand partner before excluding container-owned clicked slots, closing partial-mutation risk for external-container-to-locked-player-slot swaps.
+- 服务端 `ClickType.SWAP` 保护现在会先检查玩家快捷栏/副手交换端，再排除容器自有点击槽，从而封闭外部容器与锁定玩家槽交换时的部分变更风险。
+- NeoForge now has optional Su's Instant Swap compatibility at `SwapEngine`'s three click emitters. Locked operations are blocked by default, bypass leaves lock positions unchanged, and the lock-operation key authorizes only Su's exact short-lived vanilla click sequence when the server confirms an authoritative locked endpoint. Lock state moves only after post-state stacks match the resulting two-slot or three-slot item flow. Su's verifier, fallback, row loop, and hotbar-priority behavior remain upstream-owned.
+- NeoForge 现已在 `SwapEngine` 三个点击发射器提供可选 Su's Instant Swap 兼容。涉及锁槽的操作默认阻止；旁路键保持锁位置；锁定键只有在服务端确认存在权威锁端点时，才临时授权 Su 精确的原版点击序列；post-state stack 符合实际两槽或三槽物品流向后才移动锁状态。Su 的校验、回退、整行循环和热栏优先行为仍由上游实现负责。
 - Locked empty slot fallback is separated from GUI cursor placement: `Slot` mutation guards still only reject the carried stack, while the fallback path is reserved for direct inventory writes and main-hand replacement.
 - 锁定空槽回退已与 GUI 光标放入分离：`Slot` 变更守卫仍只拒绝光标物品，回退路径仅用于直接背包写入和主手替换。
 - NeoForge cursor placement into locked empty slots now also guards the official mouse-release screen event, covering creative inventory placement paths that defer `PICKUP` handling until release without adding a dedicated creative-screen mixin.
@@ -93,11 +106,17 @@ Last updated: 2026-08-16
 - 未注册的历史 `SophisticatedInventoryHelperCompatMixin` 已删除，因为当前保护策略优先使用更低层的变更守卫和有针对性的 Sophisticated Sorter/界面兼容，而不是替换 SophisticatedCore 的宽泛库存 helper。
 - Forge and NeoForge compat mixin plugins now check early-discovered mod files through `LoadingModList` before falling back to runtime `ModList`.
 - Forge 与 NeoForge 兼容 Mixin plugin 现在会先通过 `LoadingModList` 检查早期发现的模组文件，再回退到运行期 `ModList`。
+- Eight byte-identical loader-neutral core mixins now live in `common` and load through one shared required mixin config registered by Fabric, Forge, and NeoForge. Loader-specific client, item-handler, and optional compatibility hooks remain local.
+- 8 个逐字节相同的平台无关核心 Mixin 现统一位于 `common`，并通过三端共同注册的一份 required Mixin 配置加载；平台客户端、物品处理器及可选兼容钩子继续留在各端。
+- GitHub Actions now runs the common test suite, compiles Fabric/Forge/NeoForge, and processes all three loaders' resources on Java 21 with build-number mutation disabled.
+- GitHub Actions 现使用 Java 21 执行 common 测试、编译 Fabric/Forge/NeoForge 并处理三端资源，同时禁用构建号变更。
+- The low-cost/high-return maintenance list is closed: CI and core-mixin consolidation shipped; known mutation-boundary testing is an architecture rule; MixinExtras was rejected until loader dependencies converge or real redirect conflicts justify its runtime packaging cost.
+- 低成本高收益维护清单已收口：CI 与核心 Mixin 合并已交付；已知变更边界回归测试已固化为架构规则；MixinExtras 延后到三端依赖收敛或真实 Redirect 冲突足以覆盖运行时打包成本时再引入。
 - Gradle cache defaults are project-local through `gradle.bat` (`.gradle-home`), while `GRADLE_USER_HOME` and `GRADLE_HOME` remain available for local overrides. Common, Forge, and NeoForge compile classpaths include Fabric loader as compile-only annotation metadata so javac can resolve `net.fabricmc.api.EnvType` from referenced annotated classes without packaging Fabric loader into non-Fabric jars. Forge config registration now uses the constructor-injected `FMLJavaModLoadingContext` instead of deprecated static lookup.
 - Gradle 缓存默认通过 `gradle.bat` 指向项目内 `.gradle-home`，同时保留 `GRADLE_USER_HOME` 与 `GRADLE_HOME` 供本地覆盖。common、Forge 与 NeoForge 编译 classpath 以 compile-only 方式包含 Fabric loader 注解元数据，使 javac 能解析被引用注解类中的 `net.fabricmc.api.EnvType`，但不会把 Fabric loader 打入非 Fabric 产物。Forge 配置注册现在使用构造函数注入的 `FMLJavaModLoadingContext`，不再使用已弃用的静态查找。
 - ClientSort compatibility now uses optional three-loader mixins on ClientSort's schema validator and operation entrypoints: collect skips locked player-inventory menu slots, including locked empty slots that ClientSort would otherwise reject through placement checks; transfer and stack-fill filter locked source and target slots so destination `safeInsert(srcStack)` cannot shrink a locked source stack; sort fixes locked slots in place and re-pairs remaining sorted sources with remaining target slots in ClientSort's target order. The common logic is covered by `ClientSortCompatServiceTest`, and debug diagnostics are emitted when arrays are rewritten.
 - ClientSort 兼容现在通过三端可选 Mixin 作用于 ClientSort 的 schema validator 与操作入口：collect 会跳过锁定玩家背包 menu slot，包括 ClientSort 原本会通过放入校验拒绝的锁定空槽；transfer 与 stack-fill 会过滤锁定来源槽和目标槽，避免目标槽 `safeInsert(srcStack)` 缩减锁定来源 stack；sort 会固定锁槽，并按 ClientSort 的目标顺序把剩余已排序来源重新配对到剩余目标槽。公共逻辑由 `ClientSortCompatServiceTest` 覆盖，数组被改写时会输出 debug 诊断。
 - Better Experience fast-storage compatibility is added on NeoForge with a deliberately narrow source-slot guard: when its `StorageManager.saveAll(Player)` is about to transfer an `ItemStack` object that is still the exact stack stored in a locked player-inventory slot, that one transfer call is skipped.
 - NeoForge 新增 Better Experience 一键存储兼容，并刻意保持为窄范围来源槽保护：当其 `StorageManager.saveAll(Player)` 正要转移的 `ItemStack` 对象仍是已锁玩家背包槽中的同一 stack 时，只跳过这一笔转移调用。
-- NeoForge now has optional Wrench Finder compatibility scoped to `ItemLookupService.findDirectMatch`: locked inventory and offhand candidates are hidden before Wrench Finder copies or equips them, while unlocked candidates and external-storage lookup remain unchanged.
-- NeoForge 现提供只作用于 `ItemLookupService.findDirectMatch` 的可选 Wrench Finder 兼容：锁定背包与副手候选会在 Wrench Finder 复制或装备前被隐藏，未锁候选和外部存储检索保持不变。
+- The temporary Wrench Finder compatibility shim was removed after the upstream mod fixed its locked-source duplication bug; no Wrench Finder-specific runtime hook remains.
+- Wrench Finder 上游修复锁定来源复制问题后，项目已移除临时兼容层；不再保留 Wrench Finder 专用运行时钩子。

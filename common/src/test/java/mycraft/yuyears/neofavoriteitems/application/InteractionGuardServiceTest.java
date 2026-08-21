@@ -123,4 +123,24 @@ class InteractionGuardServiceTest {
             .denied());
         assertFalse(FavoritesManager.getStateService().isSlotFavorite(LogicalSlotIndex.of(9)));
     }
+
+    @Test
+    void swapChecksBothEndpointsAndBypassOnce() {
+        FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(4), true);
+
+        assertTrue(InteractionGuardService.getInstance().shouldCancelSwap(4, true, 8, true, false));
+        assertTrue(InteractionGuardService.getInstance().shouldCancelSwap(8, true, 4, true, false));
+        assertFalse(InteractionGuardService.getInstance().shouldCancelSwap(4, true, 8, true, true));
+
+        FavoritesManager.getStateService().clearFavorites();
+        assertFalse(InteractionGuardService.getInstance().shouldCancelSwap(4, true, 8, true, false));
+    }
+
+    @Test
+    void externalContainerEndpointStillChecksPlayerSwapPartner() {
+        FavoritesManager.getStateService().setSlotFavorite(LogicalSlotIndex.of(4), true);
+
+        assertTrue(InteractionGuardService.getInstance().shouldCancelSwap(-1, true, 4, true, false));
+        assertFalse(InteractionGuardService.getInstance().shouldCancelSwap(-1, true, 4, true, true));
+    }
 }

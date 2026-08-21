@@ -29,6 +29,7 @@ public final class ForgeFavoriteNetworking {
     private ForgeFavoriteNetworking() {}
 
     public static void registerPackets() {
+        ServerFavoriteService.setCorrectionSyncSender(ForgeFavoriteNetworking::sendFullSync);
         CHANNEL.messageBuilder(ToggleFavoritePayload.class, 0)
             .codec(ToggleFavoritePayload.STREAM_CODEC)
             .consumerMainThread(ForgeFavoriteNetworking::handleToggleFavorite)

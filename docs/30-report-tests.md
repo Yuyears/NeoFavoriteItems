@@ -47,6 +47,16 @@ Date: 2026-08-16
   - 按配置启用旁路键时，旁路键仍可放行放入和来源取出行为
   - locked empty slot fallback selection prefers empty unlocked hotbar slots, falls back to main inventory, skips locked targets, and reports no-slot cases
   - 锁定空槽放入回退选择会优先空且未锁定的快捷栏槽，其次主背包槽，并会跳过锁定目标和覆盖无可用槽场景
+  - client state remains isolated from UUID-keyed server state for the same integrated-server player
+  - 同一集成服玩家的客户端状态与按 UUID 保存的服务端状态保持隔离
+  - occupied merge-target resolution skips locked selected/offhand/main-inventory slots while preserving vanilla order
+  - 非空合并目标解析会跳过锁定的当前槽、副手槽和主背包槽，同时保持原版顺序
+  - swap decisions check both endpoints through one common policy and still honor bypass
+  - 交换判定通过一套公共策略检查两端，并继续支持旁路
+  - external container endpoints are treated as unlocked while their hotbar/offhand player partner is still checked; bypass remains allowed
+  - 外部容器端按未锁处理，但其快捷栏/副手玩家交换端仍会检查锁定；旁路继续放行
+  - Su's Instant Swap policy covers unlocked pass-through, either-endpoint lock blocking, bypass pass-through, lock-key precedence, strict hotbar/main-inventory pair validation, two-slot lock exchange, hotbar-priority three-slot lock rotation, and external-container lock exit
+  - Su's Instant Swap 策略覆盖未锁放行、任一端锁定阻止、旁路放行、锁定键优先级、严格的快捷栏/主背包槽对校验、两槽锁交换、热栏优先三槽锁轮转，以及物品离开玩家背包时的锁状态移除
 - AE2 compatibility note:
 - AE2 兼容说明：
   - AE2 menu-layer hooks are compile/build verified.
@@ -177,6 +187,18 @@ Date: 2026-08-16
 
 - Latest local verification:
 - 最新本地验证：
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test --rerun-tasks :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed with 93 common tests; all three loader integrations compile.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test --rerun-tasks :fabric:compileJava :forge:compileJava :neoforge:compileJava`：93 项 common 测试通过；三端接入均编译通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test --tests mycraft.yuyears.neofavoriteitems.application.InstantSwapCompatServiceTest --rerun-tasks :neoforge:compileJava`: passed after adding Su's Instant Swap policy, optional client mixin, and validated server payload.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test --tests mycraft.yuyears.neofavoriteitems.application.InstantSwapCompatServiceTest --rerun-tasks :neoforge:compileJava`：新增 Su's Instant Swap 策略、可选客户端 Mixin 和服务端校验 payload 后通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test --rerun-tasks :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed with 98 common tests after replacing direct Su's Instant Swap inventory writes with exact-click transactions, lock-state cycles, authoritative locked-endpoint validation, and post-state verification; all three loaders compile.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test --rerun-tasks :fabric:compileJava :forge:compileJava :neoforge:compileJava`：将 Su's Instant Swap 的直接背包写入替换为精确点击事务、锁状态轮转、权威锁端点校验及 post-state 验证后，98 项 common 测试通过，三端编译通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava :fabric:processResources :forge:processResources :neoforge:processResources`: passed with 102 common tests after adding pure operation-plan coverage; all three loaders compile and process resources.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava :fabric:processResources :forge:processResources :neoforge:processResources`：补充纯操作计划覆盖后，102 项 common 测试通过，三端编译与资源处理通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test --rerun-tasks`: passed with 88 tests after client/server state isolation, occupied merge-target selection, and shared swap-policy regressions were added.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test --rerun-tasks`：新增客户端/服务端状态隔离、非空合并目标选择和共享交换策略回归后，88 项测试通过。
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :fabric:compileJava :forge:compileJava :neoforge:compileJava`: passed; all three loader mixin entrypoints compile.
+  - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :fabric:compileJava :forge:compileJava :neoforge:compileJava`：通过；三端 Mixin 接入点均可编译。
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test --tests mycraft.yuyears.neofavoriteitems.application.InteractionGuardServiceTest`: passed after adding Wrench Finder source-policy coverage.
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :common:test --tests mycraft.yuyears.neofavoriteitems.application.InteractionGuardServiceTest`：新增 Wrench Finder 来源策略覆盖后通过。
   - `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache :neoforge:compileJava`: passed with the optional Wrench Finder mixin.
@@ -307,6 +329,21 @@ Date: 2026-08-16
 - Result: passed
 - 结果：通过
 
+## Phase 3 Loader Maintenance
+
+## 第三阶段加载器维护
+
+- `common` now compiles eight shared core mixins with a compile-only Sponge Mixin API dependency; no runtime dependency was added.
+- `common` 现在通过 compile-only Sponge Mixin API 编译 8 个公共核心 Mixin；未新增运行时依赖。
+- CI command: `.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava :fabric:processResources :forge:processResources :neoforge:processResources`.
+- CI 命令：`.\gradle.bat --configure-on-demand --no-daemon --no-build-cache -Pskip_build_number_increment=true :common:test :fabric:compileJava :forge:compileJava :neoforge:compileJava :fabric:processResources :forge:processResources :neoforge:processResources`。
+- Local forced rerun passed: 93 tests, 0 failures, 0 errors; Fabric, Forge, and NeoForge compilation passed.
+- 本地强制重跑通过：93 项测试、0 failure、0 error；Fabric、Forge、NeoForge 编译通过。
+- `:fabric:processResources :forge:processResources :neoforge:processResources` passed; every loader output contains exactly one common mixin config plus its loader and compatibility configs.
+- `:fabric:processResources :forge:processResources :neoforge:processResources` 通过；每个平台资源产物均包含一份 common Mixin 配置，以及自身平台与兼容配置。
+- Dependency audit confirmed Fabric supplies MixinExtras 0.4.1, NeoForge supplies 0.5.3, and Forge supplies none. The only common ordinal redirect remains on vanilla Mixin to avoid adding a packaged Forge runtime dependency for one injection.
+- 依赖审计确认 Fabric 提供 MixinExtras 0.4.1、NeoForge 提供 0.5.3，而 Forge 未提供。唯一的 common ordinal Redirect 继续使用原生 Mixin，避免只为一个注入点新增 Forge 打包运行时依赖。
+
 ## Automated Persistence Coverage
 
 ## 自动化持久化覆盖
@@ -335,3 +372,5 @@ Date: 2026-08-16
 
 - This document covers automated verification in the current workspace. Runtime validation status is maintained in `31-report-verification.md`.
 - 本文档覆盖当前工作区内的自动化验证。运行时验证状态维护在 `31-report-verification.md`。
+- `ServerFavoriteServiceTest.correctionSyncIsLimitedToOncePerPlayerPerTick` 覆盖纠正全量同步按玩家、按服务端 tick 合并；三加载器编译覆盖发送器注册和 GUI 打开时 HUD 渲染路径。
+- `InstantSwapCompatServiceTest.modifierModeUsesMostRecentlyPressedModifierWhenBothHeld` 覆盖 Ctrl/Alt 同按时最近按下者唯一生效。

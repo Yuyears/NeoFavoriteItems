@@ -10,6 +10,7 @@ dependencies {
     })
 
     compileOnly("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
+    compileOnly("net.fabricmc:sponge-mixin:0.15.4+mixin.0.8.7")
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testCompileOnly("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")

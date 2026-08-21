@@ -16,12 +16,12 @@
     "InventoryTweaksSortingCompatMixin",
     "QuarkHotbarChangeCompatMixin",
     "QuarkSortingHandlerCompatMixin",
-    "SophisticatedSorterCoreUtilsCompatMixin",
-    "WrenchFinderDirectMatchCompatMixin"
+    "SophisticatedSorterCoreUtilsCompatMixin"
   ],
   "client": [
     "MouseTweaksMainCompatMixin",
     "QuarkEasyTransferringClientCompatMixin",
+    "SusInstantSwapEngineCompatMixin",
     "SophisticatedStorageScreenCompatMixin"
   ],
   "server": [],

@@ -1,4 +1,4 @@
-package mycraft.yuyears.neofavoriteitems.neoforge.mixin;
+package mycraft.yuyears.neofavoriteitems.mixin;
 
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import net.minecraft.world.InteractionHand;
