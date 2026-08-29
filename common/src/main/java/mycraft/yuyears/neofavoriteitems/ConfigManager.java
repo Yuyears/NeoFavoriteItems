@@ -7,11 +7,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import mycraft.yuyears.neofavoriteitems.render.OverlayMaterialMode;
+import mycraft.yuyears.neofavoriteitems.render.OverlayTextureCatalog;
 
 public class ConfigManager {
     private enum ConfigFileKind {
-        COMMON,
-        CLIENT,
+        SERVER,
+        CLIENT_RENDERING,
+        CLIENT_LOGIC,
+        CLIENT_COMBINED,
         LEGACY
     }
 
@@ -218,8 +222,20 @@ public class ConfigManager {
     private NeoFavoriteItemsConfig config;
     private Path commonConfigPath;
     private Path clientConfigPath;
+    private Path clientLogicConfigPath;
     private Path legacyConfigPath;
+    private Path legacyCommonConfigPath;
+    private Path legacyClientConfigPath;
     private final List<String> loadIssues;
+    private FileStamp commonStamp = FileStamp.MISSING;
+    private FileStamp clientStamp = FileStamp.MISSING;
+    private FileStamp clientLogicStamp = FileStamp.MISSING;
+    private long lastChangeCheckNanos;
+    private boolean draftDirty;
+    private boolean externalChangeDetected;
+    private boolean profileConfigSeen;
+    private long revision;
+    private int normalizationCount;
 
     private ConfigManager() {
         this.config = new NeoFavoriteItemsConfig();
@@ -236,8 +252,60 @@ public class ConfigManager {
     public void initialize(Path configDir) {
         this.commonConfigPath = configDir.resolve(NeoFavoriteItemsConstants.COMMON_CONFIG_FILE_NAME);
         this.clientConfigPath = configDir.resolve(NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME);
+        this.clientLogicConfigPath = configDir.resolve(NeoFavoriteItemsConstants.CLIENT_LOGIC_CONFIG_FILE_NAME);
         this.legacyConfigPath = configDir.resolve(NeoFavoriteItemsConstants.CONFIG_FILE_NAME);
+        this.legacyCommonConfigPath = configDir.resolve(NeoFavoriteItemsConstants.LEGACY_COMMON_CONFIG_FILE_NAME);
+        this.legacyClientConfigPath = configDir.resolve(NeoFavoriteItemsConstants.LEGACY_CLIENT_CONFIG_FILE_NAME);
         loadConfig();
+    }
+
+    /** Reload configuration immediately, for UI Reload/Apply actions. */
+    public synchronized boolean reload() {
+        if (commonConfigPath == null) {
+            return false;
+        }
+        loadConfig();
+        return true;
+    }
+
+    /** Poll config files at most twice per second and reload external edits. */
+    public synchronized boolean reloadIfChanged() {
+        if (commonConfigPath == null) {
+            return false;
+        }
+        long now = System.nanoTime();
+        if (now - lastChangeCheckNanos < 500_000_000L) {
+            return false;
+        }
+        lastChangeCheckNanos = now;
+        FileStamp currentCommon = FileStamp.read(commonConfigPath);
+        FileStamp currentClient = FileStamp.read(clientConfigPath);
+        FileStamp currentClientLogic = FileStamp.read(clientLogicConfigPath);
+        if (currentCommon.equals(commonStamp) && currentClient.equals(clientStamp)
+            && currentClientLogic.equals(clientLogicStamp)) {
+            return false;
+        }
+        if (draftDirty) {
+            externalChangeDetected = true;
+            return false;
+        }
+        loadConfig();
+        externalChangeDetected = false;
+        DebugLogger.debug("Configuration reloaded after file change");
+        return true;
+    }
+
+    public synchronized void setDraftDirty(boolean dirty) {
+        draftDirty = dirty;
+        if (!dirty) externalChangeDetected = false;
+    }
+
+    public synchronized boolean isExternalChangeDetected() {
+        return externalChangeDetected;
+    }
+
+    public synchronized boolean isDraftDirty() {
+        return draftDirty;
     }
 
     public NeoFavoriteItemsConfig getConfig() {
@@ -247,6 +315,11 @@ public class ConfigManager {
     public void applyPlatformConfig(NeoFavoriteItemsConfig config) {
         this.config = config;
         loadIssues.clear();
+        revision++;
+    }
+
+    public synchronized long getRevision() {
+        return revision;
     }
 
     public List<String> getLoadIssues() {
@@ -255,11 +328,16 @@ public class ConfigManager {
 
     public void loadConfig() {
         config = new NeoFavoriteItemsConfig();
+        externalChangeDetected = false;
         loadIssues.clear();
+        profileConfigSeen = false;
+        normalizationCount = 0;
 
         boolean commonNeedsRewrite = !Files.exists(commonConfigPath);
         boolean clientNeedsRewrite = !Files.exists(clientConfigPath);
+        boolean clientLogicNeedsRewrite = !Files.exists(clientLogicConfigPath);
         boolean legacyExists = Files.exists(legacyConfigPath);
+        boolean legacySplitExists = Files.exists(legacyCommonConfigPath) || Files.exists(legacyClientConfigPath);
         boolean legacyMigrationAttempted = legacyExists && (commonNeedsRewrite || clientNeedsRewrite);
         boolean legacyMigrationRead = false;
 
@@ -268,10 +346,22 @@ public class ConfigManager {
         }
 
         if (Files.exists(commonConfigPath)) {
-            commonNeedsRewrite = readConfigFile(commonConfigPath, ConfigFileKind.COMMON);
+            commonNeedsRewrite = readConfigFile(commonConfigPath, ConfigFileKind.SERVER);
+        } else if (Files.exists(legacyCommonConfigPath)) {
+            readConfigFile(legacyCommonConfigPath, ConfigFileKind.SERVER);
         }
         if (Files.exists(clientConfigPath)) {
-            clientNeedsRewrite = readConfigFile(clientConfigPath, ConfigFileKind.CLIENT);
+            clientNeedsRewrite = readConfigFile(clientConfigPath, ConfigFileKind.CLIENT_RENDERING);
+        } else if (Files.exists(legacyClientConfigPath)) {
+            readConfigFile(legacyClientConfigPath, ConfigFileKind.CLIENT_COMBINED);
+        }
+        if (Files.exists(clientLogicConfigPath)) {
+            clientLogicNeedsRewrite = readConfigFile(clientLogicConfigPath, ConfigFileKind.CLIENT_LOGIC);
+        }
+
+        if (!profileConfigSeen) {
+            config.overlay.syncProfilesFromLegacy();
+            clientNeedsRewrite = true;
         }
 
         boolean commonSaved = true;
@@ -280,15 +370,42 @@ public class ConfigManager {
             commonSaved = saveCommonConfig();
         }
         if (clientNeedsRewrite) {
-            clientSaved = saveClientConfig();
+            clientSaved = saveClientRenderingConfig();
+        }
+        boolean clientLogicSaved = true;
+        if (clientLogicNeedsRewrite) {
+            clientLogicSaved = saveClientLogicConfig();
         }
 
         if (legacyExists && (!legacyMigrationAttempted || (legacyMigrationRead && commonSaved && clientSaved))) {
             deleteLegacyConfig();
         }
+        if (legacySplitExists && commonSaved && clientSaved && clientLogicSaved) {
+            deleteMigratedConfig(legacyCommonConfigPath);
+            deleteMigratedConfig(legacyClientConfigPath);
+        }
 
         if (!loadIssues.isEmpty()) {
             DebugLogger.warn("Config loaded with {} issue(s); defaults were kept for invalid entries", loadIssues.size());
+        }
+        commonStamp = FileStamp.read(commonConfigPath);
+        clientStamp = FileStamp.read(clientConfigPath);
+        clientLogicStamp = FileStamp.read(clientLogicConfigPath);
+        lastChangeCheckNanos = System.nanoTime();
+        revision++;
+    }
+
+    private record FileStamp(boolean exists, long modifiedMillis, long size) {
+        private static final FileStamp MISSING = new FileStamp(false, 0L, 0L);
+
+        private static FileStamp read(Path path) {
+            try {
+                return Files.exists(path)
+                    ? new FileStamp(true, Files.getLastModifiedTime(path).toMillis(), Files.size(path))
+                    : MISSING;
+            } catch (IOException | RuntimeException e) {
+                return MISSING;
+            }
         }
     }
 
@@ -307,8 +424,11 @@ public class ConfigManager {
         try {
             String content = Files.readString(path, StandardCharsets.UTF_8);
             int issuesBeforeParse = loadIssues.size();
+            int normalizationsBeforeParse = normalizationCount;
             parseConfig(content, kind);
-            return loadIssues.size() > issuesBeforeParse || hasMissingConfigEntries(content, kind);
+            return loadIssues.size() > issuesBeforeParse
+                || normalizationCount > normalizationsBeforeParse
+                || hasMissingConfigEntries(content, kind);
         } catch (IOException e) {
             recordLoadIssue("Failed to read config file " + path + "; regenerated readable defaults", e);
             return true;
@@ -366,6 +486,9 @@ public class ConfigManager {
                 case "feedback" -> setFeedbackValue(key, value);
                 case "debug" -> setDebugValue(key, value);
                 case "keybindings" -> setKeybindingValue(key, value);
+                default -> {
+                    if (section.startsWith("profile.")) setProfileValue(section, key, value);
+                }
             }
         } catch (Exception e) {
             recordLoadIssue(
@@ -524,19 +647,16 @@ public class ConfigManager {
     }
 
     private static double parseColorComponent(String value) {
-        double component = parseDouble(value);
-        if (component > 1.0d) {
+        String componentText = value.trim();
+        double component = parseDouble(componentText);
+        if (componentText.matches("[+-]?\\d+") || component > 1.0d) {
             component /= 255.0d;
         }
         return clamp01(component);
     }
 
     private static double parseAlpha(String value) {
-        double alpha = parseDouble(value);
-        if (alpha > 1.0d) {
-            alpha /= 255.0d;
-        }
-        return clamp01(alpha);
+        return parseColorComponent(value);
     }
 
     private static int luvToArgb(double l, double u, double v, double alpha) {
@@ -614,6 +734,13 @@ public class ConfigManager {
     }
 
     private NeoFavoriteItemsConfig.OverlayStyle parseOverlayStyle(String value) {
+        return parseOverlayStyle(value, config.overlay.lockedStyle);
+    }
+
+    private NeoFavoriteItemsConfig.OverlayStyle parseOverlayStyle(
+        String value,
+        NeoFavoriteItemsConfig.OverlayStyle fallback
+    ) {
         String cleanValue = value.replace("\"", "");
         switch (cleanValue) {
             case "LOCK_ICON" -> {
@@ -629,8 +756,8 @@ public class ConfigManager {
         try {
             return NeoFavoriteItemsConfig.OverlayStyle.valueOf(cleanValue);
         } catch (IllegalArgumentException e) {
-            recordLoadIssue("Unknown overlay style: " + cleanValue + "; using default " + config.overlay.lockedStyle, e);
-            return config.overlay.lockedStyle;
+            recordLoadIssue("Unknown overlay style: " + cleanValue + "; using default " + fallback, e);
+            return fallback;
         }
     }
 
@@ -638,9 +765,10 @@ public class ConfigManager {
         switch (key) {
             case "showVisualFeedback" -> config.feedback.showVisualFeedback = parseBoolean(value);
             case "playSoundFeedback" -> config.feedback.playSoundFeedback = parseBoolean(value);
-            case "feedbackSound" -> config.feedback.feedbackSound = value.replace("\"", "");
+            case "feedbackSound" -> config.feedback.feedbackSound = parseConfigString(value);
             case "feedbackVolume" -> config.feedback.feedbackVolume = Float.parseFloat(value);
             case "feedbackPitch" -> config.feedback.feedbackPitch = Float.parseFloat(value);
+            case "uiTheme" -> config.feedback.uiTheme = parseConfigString(value).toUpperCase(java.util.Locale.ROOT);
         }
     }
 
@@ -660,7 +788,9 @@ public class ConfigManager {
 
     public void saveConfig() {
         saveCommonConfig();
-        saveClientConfig();
+        saveClientRenderingConfig();
+        saveClientLogicConfig();
+        revision++;
     }
 
     private boolean saveCommonConfig() {
@@ -675,10 +805,10 @@ public class ConfigManager {
         }
     }
 
-    private boolean saveClientConfig() {
+    private boolean saveClientRenderingConfig() {
         try {
             Files.createDirectories(clientConfigPath.getParent());
-            Files.writeString(clientConfigPath, renderClientConfig(config), StandardCharsets.UTF_8);
+            Files.writeString(clientConfigPath, renderClientRenderingConfig(config), StandardCharsets.UTF_8);
             return true;
         } catch (IOException e) {
             DebugLogger.error("Failed to write client config file: {}", clientConfigPath);
@@ -687,12 +817,118 @@ public class ConfigManager {
         }
     }
 
-    private void deleteLegacyConfig() {
+    private mycraft.yuyears.neofavoriteitems.render.OverlayMaterialMode parseMaterialMode(String value, mycraft.yuyears.neofavoriteitems.render.OverlayMaterialMode fallback) {
         try {
-            Files.deleteIfExists(legacyConfigPath);
-            DebugLogger.debug("Deleted migrated legacy config file: {}", legacyConfigPath);
+            return mycraft.yuyears.neofavoriteitems.render.OverlayMaterialMode.valueOf(value.replace("\"", "").trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            return fallback;
+        }
+    }
+
+    public synchronized void saveServerConfig() {
+        if (saveCommonConfig()) commonStamp = FileStamp.read(commonConfigPath);
+        revision++;
+    }
+
+    public synchronized void saveClientConfig() {
+        if (saveClientRenderingConfig()) clientStamp = FileStamp.read(clientConfigPath);
+        if (saveClientLogicConfig()) clientLogicStamp = FileStamp.read(clientLogicConfigPath);
+        revision++;
+    }
+
+    private void setProfileValue(String section, String key, String value) {
+        OverlayProfileConfig profile = switch (section) {
+            case "profile.locked" -> config.overlay.locked;
+            case "profile.bypass" -> config.overlay.bypass;
+            case "profile.lockable" -> config.overlay.lockable;
+            case "profile.unlockable" -> config.overlay.unlockable;
+            default -> throw new IllegalArgumentException(section);
+        };
+        switch (key) {
+            case "style" -> profile.style = parseOverlayStyle(value, profile.style);
+            case "materialMode" -> profile.materialMode = parseMaterialMode(value, profile.materialMode);
+            case "materialId" -> {
+                profile.materialId = parseConfigString(value);
+                if (OverlayTextureCatalog.NO_MATERIAL.equals(profile.materialId)
+                    || OverlayTextureCatalog.presetStyle(profile.materialId) == NeoFavoriteItemsConfig.OverlayStyle.COLOR_OVERLAY) {
+                    profile.materialMode = OverlayMaterialMode.NO_MATERIAL;
+                    profile.materialId = OverlayTextureCatalog.NO_MATERIAL;
+                }
+            }
+            case "color" -> profile.color = parseColorValue(value);
+            case "opacity" -> profile.opacity = parseClampedProfileFloat(value, 0.0f, 1.0f);
+            case "colorMode" -> profile.colorMode = mycraft.yuyears.neofavoriteitems.render.OverlayColorMode.valueOf(value.replace("\"", ""));
+            case "opacityBehavior" -> profile.opacityBehavior = OverlayProfileConfig.OpacityBehavior.valueOf(value.replace("\"", ""));
+            case "anchor" -> profile.anchor = mycraft.yuyears.neofavoriteitems.render.OverlayPlacement.Anchor.valueOf(value.replace("\"", ""));
+            case "offsetX" -> profile.offsetX = parseFiniteProfileFloat(value);
+            case "offsetY" -> profile.offsetY = parseFiniteProfileFloat(value);
+            case "width" -> profile.width = parsePositiveProfileFloat(value);
+            case "height" -> profile.height = parsePositiveProfileFloat(value);
+            case "scale" -> profile.scale = parsePositiveProfileFloat(value);
+            case "rotationDegrees" -> profile.rotationDegrees = parseFiniteProfileFloat(value);
+            case "zIndex" -> profile.zIndex = parseOverlayZIndex(value);
+            case "allowOverflow" -> profile.allowOverflow = parseBoolean(value);
+            case "clipToSlot" -> profile.clipToSlot = parseBoolean(value);
+        }
+        profileConfigSeen = true;
+    }
+
+    private float parseFiniteProfileFloat(String value) {
+        float parsed = Float.parseFloat(value);
+        if (!Float.isFinite(parsed)) throw new IllegalArgumentException("Profile value must be finite");
+        return parsed;
+    }
+
+    private float parsePositiveProfileFloat(String value) {
+        float parsed = parseFiniteProfileFloat(value);
+        if (parsed <= 0.0f) throw new IllegalArgumentException("Profile value must be positive");
+        return parsed;
+    }
+
+    private float parseClampedProfileFloat(String value, float min, float max) {
+        float parsed = parseFiniteProfileFloat(value);
+        float normalized = Math.clamp(parsed, min, max);
+        if (Float.compare(parsed, normalized) != 0) normalizationCount++;
+        return normalized;
+    }
+
+    private int parseOverlayZIndex(String value) {
+        double parsed = Double.parseDouble(value);
+        int normalized = normalizeOverlayZIndex(parsed);
+        if (Double.compare(parsed, normalized) != 0) normalizationCount++;
+        return normalized;
+    }
+
+    static int normalizeOverlayZIndex(double value) {
+        if (!Double.isFinite(value)) throw new IllegalArgumentException("zIndex must be finite");
+        int zIndex = (int) Math.min(Math.max(value, 0.0D), 1000.0D);
+        return zIndex == mycraft.yuyears.neofavoriteitems.render.OverlayZIndex.ITEM
+            ? mycraft.yuyears.neofavoriteitems.render.OverlayZIndex.ABOVE_ITEM
+            : zIndex;
+    }
+
+    private boolean saveClientLogicConfig() {
+        try {
+            Files.createDirectories(clientLogicConfigPath.getParent());
+            Files.writeString(clientLogicConfigPath, renderClientLogicConfig(config), StandardCharsets.UTF_8);
+            return true;
         } catch (IOException e) {
-            recordLoadIssue("Failed to delete migrated legacy config file " + legacyConfigPath, e);
+            DebugLogger.error("Failed to write client logic config file: {}", clientLogicConfigPath);
+            DebugLogger.error("Client logic config write failure", e);
+            return false;
+        }
+    }
+
+    private void deleteLegacyConfig() {
+        deleteMigratedConfig(legacyConfigPath);
+    }
+
+    private void deleteMigratedConfig(Path path) {
+        try {
+            Files.deleteIfExists(path);
+            DebugLogger.debug("Deleted migrated legacy config file: {}", path);
+        } catch (IOException e) {
+            recordLoadIssue("Failed to delete migrated legacy config file " + path, e);
         }
     }
 
@@ -702,10 +938,16 @@ public class ConfigManager {
     }
 
     private boolean hasMissingConfigEntries(String content, ConfigFileKind kind) {
-        if (kind == ConfigFileKind.CLIENT) {
+        if (kind == ConfigFileKind.CLIENT_RENDERING) {
+            return hasMissingRenderingConfigEntries(content);
+        }
+        if (kind == ConfigFileKind.CLIENT_LOGIC) {
+            return hasMissingClientLogicConfigEntries(content);
+        }
+        if (kind == ConfigFileKind.CLIENT_COMBINED) {
             return hasMissingClientConfigEntries(content);
         }
-        if (kind == ConfigFileKind.COMMON) {
+        if (kind == ConfigFileKind.SERVER) {
             return hasMissingCommonConfigEntries(content);
         }
         return hasMissingCommonConfigEntries(content) || hasMissingClientConfigEntries(content);
@@ -730,32 +972,40 @@ public class ConfigManager {
     }
 
     private boolean hasMissingClientConfigEntries(String content) {
-        return !content.contains("lockedStyle")
-            || !content.contains("holdingKeyLockedStyle")
-            || !content.contains("highlightStyle")
-            || !(content.contains("lockedOverlayColor") || content.contains("overlayColor"))
-            || !(content.contains("lockedOverlayOpacity") || content.contains("overlayOpacity"))
-            || !content.contains("lockableHighlightColor")
-            || !content.contains("lockableHighlightOpacity")
-            || !content.contains("unlockableHighlightColor")
-            || !content.contains("unlockableHighlightOpacity")
-            || !content.contains("colorOverlayOpacity")
-            || !content.contains("bypassOverlayOpacityMultiplier")
-            || !content.contains("renderLockedOverlayInFront")
-            || !content.contains("renderLockableHighlightInFront")
-            || !content.contains("renderUnlockableHighlightInFront")
-            || !content.contains("showVisualFeedback")
+        return hasMissingRenderingConfigEntries(content) || hasMissingClientLogicConfigEntries(content);
+    }
+
+    private boolean hasMissingRenderingConfigEntries(String content) {
+        return content.contains("[overlay]")
+            || !content.contains("[profile.locked]")
+            || !content.contains("[profile.bypass]")
+            || !content.contains("[profile.lockable]")
+            || !content.contains("[profile.unlockable]")
+            || !content.contains("materialMode")
+            || !content.contains("colorMode")
+            || !content.contains("materialId")
+            || !content.contains("rotationDegrees")
+            || !content.contains("zIndex");
+    }
+
+    private boolean hasMissingClientLogicConfigEntries(String content) {
+        return !content.contains("showVisualFeedback")
             || !content.contains("playSoundFeedback")
             || !content.contains("feedbackSound")
             || !content.contains("feedbackVolume")
-            || !content.contains("feedbackPitch");
+            || !content.contains("feedbackPitch")
+            || !content.contains("uiTheme");
     }
 
     private boolean isKnownSection(String section, ConfigFileKind kind) {
+        boolean profileSection = section.equals("profile.locked") || section.equals("profile.bypass")
+            || section.equals("profile.lockable") || section.equals("profile.unlockable");
         return switch (kind) {
-            case COMMON -> isCommonSection(section);
-            case CLIENT -> isClientSection(section);
-            case LEGACY -> isCommonSection(section) || isClientSection(section) || "keybindings".equals(section);
+            case SERVER -> isCommonSection(section);
+            case CLIENT_RENDERING -> "overlay".equals(section) || profileSection;
+            case CLIENT_LOGIC -> "feedback".equals(section);
+            case CLIENT_COMBINED -> isClientSection(section) || profileSection;
+            case LEGACY -> isCommonSection(section) || isClientSection(section) || profileSection || "keybindings".equals(section);
         };
     }
 
@@ -764,6 +1014,11 @@ public class ConfigManager {
             return false;
         }
         return switch (section) {
+            case "profile.locked", "profile.bypass", "profile.lockable", "profile.unlockable" -> switch (key) {
+                case "style", "materialMode", "materialId", "color", "opacity", "colorMode", "opacityBehavior", "anchor", "offsetX", "offsetY",
+                     "width", "height", "scale", "rotationDegrees", "zIndex", "allowOverflow", "clipToSlot" -> true;
+                default -> false;
+            };
             case "general" -> switch (key) {
                 case "lockEmptySlots", "autoUnlockEmptySlots", "allowItemsIntoLockedEmptySlots" -> true;
                 default -> false;
@@ -851,6 +1106,47 @@ public class ConfigManager {
         );
     }
 
+    private String renderClientRenderingConfig(NeoFavoriteItemsConfig config) {
+        return "# Neo Favorite Items Client Rendering Configuration\n"
+            + "# 新物品收藏模组客户端配置：渲染\n"
+            + "# Rendering is client-only; server-side lock rules are still controlled by the common config\n"
+            + "# 渲染仅在客户端生效；服务端锁定规则仍由 common 配置控制\n\n"
+            + renderProfile("locked", config.overlay.locked)
+            + renderProfile("bypass", config.overlay.bypass)
+            + renderProfile("lockable", config.overlay.lockable)
+            + renderProfile("unlockable", config.overlay.unlockable);
+    }
+
+    private String renderProfile(String name, OverlayProfileConfig profile) {
+        return "[profile." + name + "]\n"
+            + "style = \"" + profile.style.name() + "\"\n"
+            + "materialMode = \"" + profile.materialMode.name() + "\"\n"
+            + "materialId = \"" + escapeConfigString(profile.materialId) + "\"\n"
+            + "color = \"" + colorToRgba(profile.color) + "\"\n"
+            + "opacity = " + floatToConfig(profile.opacity) + "\n"
+            + "colorMode = \"" + profile.colorMode.name() + "\"\n"
+            + "opacityBehavior = \"" + profile.opacityBehavior.name() + "\"\n"
+            + "anchor = \"" + profile.anchor.name() + "\"\n"
+            + "offsetX = " + floatToConfig(profile.offsetX) + "\n"
+            + "offsetY = " + floatToConfig(profile.offsetY) + "\n"
+            + "width = " + floatToConfig(profile.width) + "\n"
+            + "height = " + floatToConfig(profile.height) + "\n"
+            + "scale = " + floatToConfig(profile.scale) + "\n"
+            + "rotationDegrees = " + floatToConfig(profile.rotationDegrees) + "\n"
+            + "zIndex = " + profile.zIndex + "\n"
+            + "allowOverflow = " + profile.allowOverflow + "\n"
+            + "clipToSlot = " + profile.clipToSlot + "\n\n";
+    }
+
+    private String renderClientLogicConfig(NeoFavoriteItemsConfig config) {
+        String combined = renderClientConfig(config);
+        int feedbackSection = combined.indexOf("[feedback]");
+        return "# Neo Favorite Items Client Logic Configuration\n"
+            + "# 客户端本地反馈和行为配置\n\n"
+            + combined.substring(feedbackSection)
+            + "uiTheme = \"" + escapeConfigString(config.feedback.uiTheme) + "\"\n";
+    }
+
     private String colorToRgba(int color) {
         return "rgba("
             + ((color >> 16) & 0xFF)
@@ -869,5 +1165,13 @@ public class ConfigManager {
 
     private String escapeConfigString(String value) {
         return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private String parseConfigString(String value) {
+        String clean = value.trim();
+        if (clean.length() >= 2 && clean.startsWith("\"") && clean.endsWith("\"")) {
+            clean = clean.substring(1, clean.length() - 1);
+        }
+        return clean.replace("\\\"", "\"").replace("\\\\", "\\");
     }
 }

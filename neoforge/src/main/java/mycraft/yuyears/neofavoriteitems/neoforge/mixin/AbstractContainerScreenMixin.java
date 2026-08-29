@@ -6,6 +6,8 @@ import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeLockOperationStateMachi
 import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeMouseTweaksBridge;
 import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeSlotInteractionHandler;
 import mycraft.yuyears.neofavoriteitems.neoforge.NeoForgeSlotResolver;
+import mycraft.yuyears.neofavoriteitems.neoforge.render.NeoForgeOverlayRenderer;
+import net.minecraft.client.gui.GuiGraphics;
 import org.lwjgl.glfw.GLFW;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.ClickType;
@@ -18,6 +20,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(AbstractContainerScreen.class)
 public abstract class AbstractContainerScreenMixin {
+    @Inject(method = "renderSlot", at = @At("HEAD"))
+    private void neoFavoriteItems$renderBelowItem(GuiGraphics graphics, Slot slot, CallbackInfo ci) {
+        NeoForgeOverlayRenderer.renderSlotBelow((AbstractContainerScreen<?>)(Object)this, graphics, slot);
+    }
+
+    @Inject(method = "renderTooltip", at = @At("HEAD"))
+    private void neoFavoriteItems$renderAboveItem(GuiGraphics graphics, int mouseX, int mouseY, CallbackInfo ci) {
+        NeoForgeOverlayRenderer.renderScreenAbove((AbstractContainerScreen<?>)(Object)this, graphics);
+    }
+
     @Inject(method = "mouseClicked(DDI)Z", at = @At("HEAD"), cancellable = true)
     private void neoFavoriteItems$handleLockOperationMouseClicked(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT

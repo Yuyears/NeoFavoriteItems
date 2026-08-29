@@ -1,7 +1,114 @@
 {
+  "screen.neo_favorite_items.external_change": "Config changed on disk. Reload or Apply to resolve.",
+  "screen.neo_favorite_items.no_more": "No more entries",
+  "screen.neo_favorite_items.open_assets_folder": "Open custom material folder",
   "key.neo_favorite_items.lock_operation": "Lock Operation Key",
   "key.neo_favorite_items.bypass_lock": "Bypass Lock Key",
   "category.neo_favorite_items": "Neo Favorite Items",
   "text.neo_favorite_items.slot_marked": "Slot locked!",
-  "text.neo_favorite_items.slot_unmarked": "Slot unlocked!"
+  "text.neo_favorite_items.slot_unmarked": "Slot unlocked!",
+  "key.neo_favorite_items.config_ui": "Open Configuration",
+  "screen.neo_favorite_items.assets": "%s",
+  "screen.neo_favorite_items.title": "Neo Favorite Items",
+  "screen.neo_favorite_items.profiles": "Style Profiles",
+  "screen.neo_favorite_items.title": "Neo Favorite Items",
+  "screen.neo_favorite_items.preview": "Preview",
+  "screen.neo_favorite_items.opacity": "Locked opacity: %s%%",
+  "screen.neo_favorite_items.locked_style": "Locked: %s",
+  "screen.neo_favorite_items.bypass_style": "Bypass: %s",
+  "screen.neo_favorite_items.highlight_style": "Highlight: %s",
+  "screen.neo_favorite_items.theme": "Theme: %s",
+  "screen.neo_favorite_items.preview_mode": "Preview mode: %s",
+  "screen.neo_favorite_items.theme": "Theme: %s",
+  "screen.neo_favorite_items.color": "Color: %s",
+  "screen.neo_favorite_items.locked_label": "Locked slot style",
+  "screen.neo_favorite_items.bypass_label": "Ctrl bypass style",
+  "screen.neo_favorite_items.highlight_label": "Alt lock hint style",
+  "screen.neo_favorite_items.unlockable_label": "Alt unlock hint",
+  "screen.neo_favorite_items.tab.normal": "Normal",
+  "screen.neo_favorite_items.tab.ctrl": "Ctrl",
+  "screen.neo_favorite_items.tab.alt_lock": "Alt +",
+  "screen.neo_favorite_items.tab.alt_unlock": "Alt -",
+  "screen.neo_favorite_items.theme_label": "UI theme",
+  "screen.neo_favorite_items.style_label": "Material mode",
+  "screen.neo_favorite_items.material_mode_label": "Material mode",
+  "screen.neo_favorite_items.material_mode.material": "Material",
+  "screen.neo_favorite_items.material_mode.no_material": "No material",
+  "screen.neo_favorite_items.custom_assets_label": "Custom assets",
+  "screen.neo_favorite_items.color_mode_label": "Color mode",
+  "screen.neo_favorite_items.color_mode.tint": "Tint",
+  "screen.neo_favorite_items.color_mode.native": "Native",
+  "screen.neo_favorite_items.color_mode.multiply": "Multiply",
+  "screen.neo_favorite_items.color_mode.grayscale": "Grayscale",
+  "screen.neo_favorite_items.color_mode.replace": "Replace",
+  "screen.neo_favorite_items.color_mode.tooltip.tint": "Preserve source OKLab lightness while applying the selected hue and chroma.",
+  "screen.neo_favorite_items.color_mode.tooltip.native": "Use original material colors.",
+  "screen.neo_favorite_items.color_mode.tooltip.multiply": "Multiply material RGB by the selected color per channel; complementary channels may turn black.",
+  "screen.neo_favorite_items.color_mode.tooltip.grayscale": "Convert material to grayscale.",
+  "screen.neo_favorite_items.color_mode.tooltip.replace": "Replace material RGB; preserve alpha.",
+  "screen.neo_favorite_items.color_label": "Overlay color",
+  "screen.neo_favorite_items.preview_mode_label": "Preview fallback mode",
+  "screen.neo_favorite_items.opacity_label": "Overlay opacity",
+  "screen.neo_favorite_items.profile_tab": "Profile: %s",
+  "screen.neo_favorite_items.profile_style": "Style: %s",
+  "screen.neo_favorite_items.color_picker": "RGBA / HSV color",
+  "screen.neo_favorite_items.color_hex": "Hex color",
+  "screen.neo_favorite_items.refresh_assets": "Refresh assets",
+  "screen.neo_favorite_items.refresh_assets_count": "Refresh assets (%s)",
+  "screen.neo_favorite_items.reload": "Reload",
+  "screen.neo_favorite_items.apply": "Apply",
+  "screen.neo_favorite_items.cancel": "Cancel",
+  "screen.neo_favorite_items.assets_unavailable": "Assets unavailable",
+  "screen.neo_favorite_items.assets_none": "Assets: none",
+  "screen.neo_favorite_items.assets_count": "Assets: %s",
+  "screen.neo_favorite_items.invalid_number": "Invalid number"
+  ,"screen.neo_favorite_items.material_label": "Material"
+  ,"screen.neo_favorite_items.anchor.slot_top_left": "Top left"
+  ,"screen.neo_favorite_items.anchor.slot_top_center": "Top center"
+  ,"screen.neo_favorite_items.anchor.slot_top_right": "Top right"
+  ,"screen.neo_favorite_items.anchor.slot_center_left": "Center left"
+  ,"screen.neo_favorite_items.anchor.slot_center": "Center"
+  ,"screen.neo_favorite_items.anchor.slot_center_right": "Center right"
+  ,"screen.neo_favorite_items.anchor.slot_bottom_left": "Bottom left"
+  ,"screen.neo_favorite_items.anchor.slot_bottom_center": "Bottom center"
+  ,"screen.neo_favorite_items.anchor.slot_bottom_right": "Bottom right"
+  ,"screen.neo_favorite_items.opacity_behavior_label": "Bypass opacity"
+  ,"screen.neo_favorite_items.opacity_behavior.fixed": "Fixed value"
+  ,"screen.neo_favorite_items.opacity_behavior.multiply_locked": "Multiply locked opacity"
+  ,"screen.neo_favorite_items.anchor_label": "Material anchor"
+  ,"screen.neo_favorite_items.offset_x": "X offset"
+  ,"screen.neo_favorite_items.offset_y": "Y offset"
+  ,"screen.neo_favorite_items.width": "Width"
+  ,"screen.neo_favorite_items.height": "Height"
+  ,"screen.neo_favorite_items.scale": "Scale"
+  ,"screen.neo_favorite_items.rotation": "Rotation"
+  ,"screen.neo_favorite_items.z_index": "Z index"
+  ,"screen.neo_favorite_items.overflow": "Allow overflow"
+  ,"screen.neo_favorite_items.clip": "Clip to slot"
+  ,"screen.neo_favorite_items.reset": "Reset page"
+  ,"screen.neo_favorite_items.page.rendering": "Rendering"
+  ,"screen.neo_favorite_items.page.client_logic": "Client behavior"
+  ,"screen.neo_favorite_items.page.server_rules": "Server rules"
+  ,"screen.neo_favorite_items.logic.visual_feedback": "Visual feedback"
+  ,"screen.neo_favorite_items.logic.sound_feedback": "Sound feedback"
+  ,"screen.neo_favorite_items.logic.sound_id": "Sound ID"
+  ,"screen.neo_favorite_items.logic.volume": "Volume"
+  ,"screen.neo_favorite_items.logic.pitch": "Pitch"
+  ,"screen.neo_favorite_items.logic.volume_value": "%s%%"
+  ,"screen.neo_favorite_items.logic.pitch_value": "%s"
+  ,"screen.neo_favorite_items.server.auto_unlock_empty": "Auto-unlock empty slots"
+  ,"screen.neo_favorite_items.server.lock_empty": "Lock empty slots"
+  ,"screen.neo_favorite_items.server.allow_into_locked_empty": "Allow items into locked empty slots"
+  ,"screen.neo_favorite_items.server.prevent_click": "Prevent click"
+  ,"screen.neo_favorite_items.server.prevent_drop": "Prevent drop"
+  ,"screen.neo_favorite_items.server.prevent_quick_move": "Prevent quick move"
+  ,"screen.neo_favorite_items.server.prevent_shift_click": "Prevent Shift-click"
+  ,"screen.neo_favorite_items.server.prevent_drag": "Prevent drag"
+  ,"screen.neo_favorite_items.server.prevent_swap": "Prevent swap"
+  ,"screen.neo_favorite_items.server.allow_bypass": "Allow bypass key"
+  ,"screen.neo_favorite_items.server.move_behavior": "Favorite movement"
+  ,"screen.neo_favorite_items.server.move_behavior.follow_item": "Follow item"
+  ,"screen.neo_favorite_items.server.move_behavior.stay_at_position": "Stay at slot"
+  ,"screen.neo_favorite_items.server.preserve_on_death": "Preserve on death"
+  ,"screen.neo_favorite_items.server.debug": "Debug logging"
 }

@@ -5,6 +5,8 @@ import mycraft.yuyears.neofavoriteitems.fabric.FabricSlotResolver;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.fabric.FabricMouseTweaksBridge;
 import mycraft.yuyears.neofavoriteitems.fabric.NeoFavoriteItemsFabricClient;
+import mycraft.yuyears.neofavoriteitems.fabric.render.FabricOverlayRenderer;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
@@ -18,6 +20,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(AbstractContainerScreen.class)
 public abstract class AbstractContainerScreenMixin {
+    @Inject(method = "renderSlot", at = @At("HEAD"))
+    private void neoFavoriteItems$renderBelowItem(GuiGraphics graphics, Slot slot, CallbackInfo ci) {
+        FabricOverlayRenderer.renderSlotBelow((AbstractContainerScreen<?>)(Object)this, graphics, slot);
+    }
+
+    @Inject(method = "renderTooltip", at = @At("HEAD"))
+    private void neoFavoriteItems$renderAboveItem(GuiGraphics graphics, int mouseX, int mouseY, CallbackInfo ci) {
+        FabricOverlayRenderer.renderScreenAbove((AbstractContainerScreen<?>)(Object)this, graphics);
+    }
+
     @Unique
     private static final int neoFavoriteItems$LEFT_BUTTON = 0;
     @Shadow

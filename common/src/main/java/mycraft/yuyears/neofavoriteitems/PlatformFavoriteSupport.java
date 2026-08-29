@@ -4,6 +4,9 @@ import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.persistence.DataPersistenceManager;
+import mycraft.yuyears.neofavoriteitems.render.CustomAssetRegistry;
+import mycraft.yuyears.neofavoriteitems.render.CustomTextureManager;
+import mycraft.yuyears.neofavoriteitems.render.OverlayTextureCatalog;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
@@ -17,6 +20,7 @@ import java.net.SocketAddress;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
+import net.minecraft.Util;
 
 public final class PlatformFavoriteSupport {
     private static UUID activeClientPlayerId;
@@ -24,6 +28,9 @@ public final class PlatformFavoriteSupport {
     private static boolean clientServerAuthoritative;
     private static Path activeClientWorldDirectory;
     private static String activeClientStorageNamespace = NeoFavoriteItemsConstants.DEFAULT_SERVER_DIRECTORY;
+    private static CustomAssetRegistry customAssetRegistry;
+    private static CustomTextureManager customTextureManager;
+    private static Path gameDirectory;
 
     private PlatformFavoriteSupport() {}
 
@@ -49,10 +56,58 @@ public final class PlatformFavoriteSupport {
     }
 
     public static void initializeClient(Path gameDirectory, boolean initializeLocalConfig) {
+        PlatformFavoriteSupport.gameDirectory = gameDirectory;
         if (initializeLocalConfig) {
             ConfigManager.getInstance().initialize(gameDirectory.resolve("config"));
         }
         DataPersistenceManager.getInstance().initialize(gameDirectory, null, false);
+        customAssetRegistry = new CustomAssetRegistry(gameDirectory);
+        if (customTextureManager != null) customTextureManager.close();
+        customTextureManager = new CustomTextureManager(customAssetRegistry);
+        refreshCustomTextures();
+    }
+
+    public static void openCustomAssetsDirectory() {
+        Path root = gameDirectory;
+        if (Minecraft.getInstance().gameDirectory != null) root = Minecraft.getInstance().gameDirectory.toPath();
+        if (root == null) return;
+        Path directory = root.resolve(NeoFavoriteItemsConstants.CUSTOM_ASSETS_DIRECTORY);
+        try { java.nio.file.Files.createDirectories(directory); Util.getPlatform().openPath(directory); }
+        catch (java.io.IOException | RuntimeException exception) { DebugLogger.warn("Failed to open custom assets directory: {}", exception.getMessage()); }
+    }
+
+    public static void reloadClientConfigIfChanged() {
+        ConfigManager.getInstance().reloadIfChanged();
+    }
+
+    public static CustomAssetRegistry getCustomAssetRegistry() {
+        return customAssetRegistry;
+    }
+
+    public static CustomTextureManager getCustomTextureManager() {
+        return customTextureManager;
+    }
+
+    public static CustomTextureManager.RefreshResult refreshCustomTextures() {
+        if (customTextureManager == null) return null;
+        CustomTextureManager.RefreshResult result = customTextureManager.refresh();
+        boolean changed = normalizeMissingCustomMaterial(config -> customTextureManager.contains(config.materialId));
+        if (changed) ConfigManager.getInstance().saveConfig();
+        return result;
+    }
+
+    private static boolean normalizeMissingCustomMaterial(java.util.function.Predicate<OverlayProfileConfig> exists) {
+        boolean changed = false;
+        var overlay = ConfigManager.getInstance().getConfig().overlay;
+        for (OverlayProfileConfig profile : java.util.List.of(
+            overlay.locked, overlay.bypass, overlay.lockable, overlay.unlockable
+        )) {
+            if (profile.materialId != null && profile.materialId.startsWith("custom:") && !exists.test(profile)) {
+                profile.materialId = OverlayTextureCatalog.presetId(profile.style);
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     public static void initializeServer(Path serverDirectory) {
@@ -204,6 +259,7 @@ public final class PlatformFavoriteSupport {
 
         FavoritesManager.getStateService().clearPlayer();
         ClientFavoriteSyncService.resetSession();
+        ServerConfigAccess.reset();
         if (usesClientLocalPersistence(clientServerAuthoritative)) {
             applyClientStorageTarget(storageTarget);
         }

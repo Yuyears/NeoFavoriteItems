@@ -2,6 +2,9 @@ package mycraft.yuyears.neofavoriteitems.fabric;
 
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
+import mycraft.yuyears.neofavoriteitems.ConfigManager;
+import mycraft.yuyears.neofavoriteitems.ServerConfigAccess;
+import mycraft.yuyears.neofavoriteitems.ServerRulesSnapshot;
 import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -23,8 +26,11 @@ public final class FabricFavoriteNetworking {
         PayloadTypeRegistry.playC2S().register(ToggleFavoritePayload.TYPE, ToggleFavoritePayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(RequestFavoriteSyncPayload.TYPE, RequestFavoriteSyncPayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(BypassKeyStatePayload.TYPE, BypassKeyStatePayload.STREAM_CODEC);
+        PayloadTypeRegistry.playC2S().register(RequestServerConfigPayload.TYPE, RequestServerConfigPayload.STREAM_CODEC);
+        PayloadTypeRegistry.playC2S().register(UpdateServerConfigPayload.TYPE, UpdateServerConfigPayload.STREAM_CODEC);
         PayloadTypeRegistry.playS2C().register(SyncFavoritesPayload.TYPE, SyncFavoritesPayload.STREAM_CODEC);
         PayloadTypeRegistry.playS2C().register(SyncFavoriteChangesPayload.TYPE, SyncFavoriteChangesPayload.STREAM_CODEC);
+        PayloadTypeRegistry.playS2C().register(ServerConfigStatusPayload.TYPE, ServerConfigStatusPayload.STREAM_CODEC);
     }
 
     public static void registerServerReceivers() {
@@ -50,9 +56,27 @@ public final class FabricFavoriteNetworking {
         ServerPlayNetworking.registerGlobalReceiver(BypassKeyStatePayload.TYPE, (payload, context) ->
             context.server().execute(() -> ServerFavoriteService.updateBypassState(context.player(), payload.held()))
         );
+        ServerPlayNetworking.registerGlobalReceiver(RequestServerConfigPayload.TYPE, (payload, context) ->
+            context.server().execute(() -> sendServerConfigStatus(context.player()))
+        );
+        ServerPlayNetworking.registerGlobalReceiver(UpdateServerConfigPayload.TYPE, (payload, context) ->
+            context.server().execute(() -> {
+                ServerPlayer player = context.player();
+                if (player.hasPermissions(2)) {
+                    payload.rules().applyTo(ConfigManager.getInstance().getConfig());
+                    ConfigManager.getInstance().saveServerConfig();
+                }
+                sendServerConfigStatus(player);
+            })
+        );
     }
 
     public static void registerClientReceivers() {
+        ServerConfigAccess.configureClient(
+            () -> ClientPlayNetworking.canSend(RequestServerConfigPayload.TYPE),
+            () -> ClientPlayNetworking.send(RequestServerConfigPayload.INSTANCE),
+            rules -> ClientPlayNetworking.send(new UpdateServerConfigPayload(rules))
+        );
         ClientPlayNetworking.registerGlobalReceiver(SyncFavoritesPayload.TYPE, (payload, context) ->
             context.client().execute(() -> ClientFavoriteSyncService.applyFullSync(payload.revision(), payload.favoriteSlots()))
         );
@@ -64,6 +88,9 @@ public final class FabricFavoriteNetworking {
                     requestFullSync();
                 }
             })
+        );
+        ClientPlayNetworking.registerGlobalReceiver(ServerConfigStatusPayload.TYPE, (payload, context) ->
+            context.client().execute(() -> ServerConfigAccess.receive(true, payload.allowed(), payload.rules()))
         );
     }
 
@@ -122,6 +149,14 @@ public final class FabricFavoriteNetworking {
 
     private static boolean canSendTo(ServerPlayer player, CustomPacketPayload.Type<?> payloadType) {
         return player != null && ServerPlayNetworking.canSend(player, payloadType);
+    }
+
+    private static void sendServerConfigStatus(ServerPlayer player) {
+        if (!canSendTo(player, ServerConfigStatusPayload.TYPE)) return;
+        boolean allowed = player.hasPermissions(2);
+        ServerPlayNetworking.send(player, new ServerConfigStatusPayload(
+            allowed, allowed ? ServerRulesSnapshot.from(ConfigManager.getInstance().getConfig()) : null
+        ));
     }
 
     public record ToggleFavoritePayload(int inventoryIndex) implements CustomPacketPayload {
@@ -185,6 +220,44 @@ public final class FabricFavoriteNetworking {
         public Type<? extends CustomPacketPayload> type() {
             return TYPE;
         }
+    }
+
+    public record RequestServerConfigPayload() implements CustomPacketPayload {
+        public static final RequestServerConfigPayload INSTANCE = new RequestServerConfigPayload();
+        public static final Type<RequestServerConfigPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "request_server_config")
+        );
+        public static final StreamCodec<FriendlyByteBuf, RequestServerConfigPayload> STREAM_CODEC =
+            StreamCodec.of((buffer, payload) -> {}, buffer -> INSTANCE);
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    public record UpdateServerConfigPayload(ServerRulesSnapshot rules) implements CustomPacketPayload {
+        public static final Type<UpdateServerConfigPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "update_server_config")
+        );
+        public static final StreamCodec<FriendlyByteBuf, UpdateServerConfigPayload> STREAM_CODEC = StreamCodec.of(
+            (buffer, payload) -> payload.rules.write(buffer),
+            buffer -> new UpdateServerConfigPayload(ServerRulesSnapshot.read(buffer))
+        );
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    public record ServerConfigStatusPayload(boolean allowed, ServerRulesSnapshot rules) implements CustomPacketPayload {
+        public static final Type<ServerConfigStatusPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "server_config_status")
+        );
+        public static final StreamCodec<FriendlyByteBuf, ServerConfigStatusPayload> STREAM_CODEC = StreamCodec.of(
+            (buffer, payload) -> {
+                buffer.writeBoolean(payload.allowed);
+                if (payload.allowed) payload.rules.write(buffer);
+            },
+            buffer -> {
+                boolean allowed = buffer.readBoolean();
+                return new ServerConfigStatusPayload(allowed, allowed ? ServerRulesSnapshot.read(buffer) : null);
+            }
+        );
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
     public record SyncFavoritesPayload(long revision, Set<Integer> favoriteSlots) implements CustomPacketPayload {

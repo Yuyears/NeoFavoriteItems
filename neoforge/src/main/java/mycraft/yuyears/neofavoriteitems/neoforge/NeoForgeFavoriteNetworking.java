@@ -3,6 +3,9 @@ package mycraft.yuyears.neofavoriteitems.neoforge;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
+import mycraft.yuyears.neofavoriteitems.ConfigManager;
+import mycraft.yuyears.neofavoriteitems.ServerConfigAccess;
+import mycraft.yuyears.neofavoriteitems.ServerRulesSnapshot;
 import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
 import mycraft.yuyears.neofavoriteitems.application.InstantSwapCompatService;
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
@@ -33,8 +36,19 @@ public final class NeoForgeFavoriteNetworking {
         optionalRegistrar.playToServer(PrepareInstantSwapPayload.TYPE, PrepareInstantSwapPayload.STREAM_CODEC, PrepareInstantSwapPayload::handle);
         optionalRegistrar.playToServer(CompleteInstantSwapPayload.TYPE, CompleteInstantSwapPayload.STREAM_CODEC, CompleteInstantSwapPayload::handle);
         optionalRegistrar.playToServer(MoveCreativeFavoritePairsPayload.TYPE, MoveCreativeFavoritePairsPayload.STREAM_CODEC, MoveCreativeFavoritePairsPayload::handle);
+        optionalRegistrar.playToServer(RequestServerConfigPayload.TYPE, RequestServerConfigPayload.STREAM_CODEC, RequestServerConfigPayload::handle);
+        optionalRegistrar.playToServer(UpdateServerConfigPayload.TYPE, UpdateServerConfigPayload.STREAM_CODEC, UpdateServerConfigPayload::handle);
         optionalRegistrar.playToClient(SyncFavoritesPayload.TYPE, SyncFavoritesPayload.STREAM_CODEC, SyncFavoritesPayload::handle);
         optionalRegistrar.playToClient(SyncFavoriteChangesPayload.TYPE, SyncFavoriteChangesPayload.STREAM_CODEC, SyncFavoriteChangesPayload::handle);
+        optionalRegistrar.playToClient(ServerConfigStatusPayload.TYPE, ServerConfigStatusPayload.STREAM_CODEC, ServerConfigStatusPayload::handle);
+    }
+
+    public static void configureClient() {
+        ServerConfigAccess.configureClient(
+            () -> hasServerChannel(RequestServerConfigPayload.TYPE.id()),
+            () -> PacketDistributor.sendToServer(RequestServerConfigPayload.INSTANCE),
+            rules -> PacketDistributor.sendToServer(new UpdateServerConfigPayload(rules))
+        );
     }
 
     public static boolean trySendToggle(int inventoryIndex) {
@@ -421,5 +435,67 @@ public final class NeoForgeFavoriteNetworking {
     private static boolean canSendTo(ServerPlayer player, ResourceLocation payloadId) {
         return player != null
             && NetworkRegistry.hasChannel(player.connection.getConnection(), ConnectionProtocol.PLAY, payloadId);
+    }
+
+    public record RequestServerConfigPayload() implements CustomPacketPayload {
+        public static final RequestServerConfigPayload INSTANCE = new RequestServerConfigPayload();
+        public static final Type<RequestServerConfigPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "request_server_config")
+        );
+        public static final StreamCodec<FriendlyByteBuf, RequestServerConfigPayload> STREAM_CODEC =
+            StreamCodec.of((buffer, payload) -> {}, buffer -> INSTANCE);
+        public static void handle(RequestServerConfigPayload payload, IPayloadContext context) {
+            context.enqueueWork(() -> sendServerConfigStatus((ServerPlayer) context.player()));
+        }
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    public record UpdateServerConfigPayload(ServerRulesSnapshot rules) implements CustomPacketPayload {
+        public static final Type<UpdateServerConfigPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "update_server_config")
+        );
+        public static final StreamCodec<FriendlyByteBuf, UpdateServerConfigPayload> STREAM_CODEC = StreamCodec.of(
+            (buffer, payload) -> payload.rules.write(buffer),
+            buffer -> new UpdateServerConfigPayload(ServerRulesSnapshot.read(buffer))
+        );
+        public static void handle(UpdateServerConfigPayload payload, IPayloadContext context) {
+            context.enqueueWork(() -> {
+                ServerPlayer player = (ServerPlayer) context.player();
+                if (player.hasPermissions(2)) {
+                    payload.rules.applyTo(ConfigManager.getInstance().getConfig());
+                    ConfigManager.getInstance().saveServerConfig();
+                }
+                sendServerConfigStatus(player);
+            });
+        }
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    public record ServerConfigStatusPayload(boolean allowed, ServerRulesSnapshot rules) implements CustomPacketPayload {
+        public static final Type<ServerConfigStatusPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "server_config_status")
+        );
+        public static final StreamCodec<FriendlyByteBuf, ServerConfigStatusPayload> STREAM_CODEC = StreamCodec.of(
+            (buffer, payload) -> {
+                buffer.writeBoolean(payload.allowed);
+                if (payload.allowed) payload.rules.write(buffer);
+            },
+            buffer -> {
+                boolean allowed = buffer.readBoolean();
+                return new ServerConfigStatusPayload(allowed, allowed ? ServerRulesSnapshot.read(buffer) : null);
+            }
+        );
+        public static void handle(ServerConfigStatusPayload payload, IPayloadContext context) {
+            context.enqueueWork(() -> ServerConfigAccess.receive(true, payload.allowed, payload.rules));
+        }
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    private static void sendServerConfigStatus(ServerPlayer player) {
+        if (!canSendTo(player, ServerConfigStatusPayload.TYPE.id())) return;
+        boolean allowed = player.hasPermissions(2);
+        PacketDistributor.sendToPlayer(player, new ServerConfigStatusPayload(
+            allowed, allowed ? ServerRulesSnapshot.from(ConfigManager.getInstance().getConfig()) : null
+        ));
     }
 }

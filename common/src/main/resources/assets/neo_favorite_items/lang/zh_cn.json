@@ -1,7 +1,114 @@
 {
+  "screen.neo_favorite_items.external_change": "配置文件已在外部修改，请 Reload 或 Apply 处理。",
+  "screen.neo_favorite_items.no_more": "没有更多了",
+  "screen.neo_favorite_items.open_assets_folder": "打开自定义材质文件夹",
   "key.neo_favorite_items.lock_operation": "收藏槽位",
   "key.neo_favorite_items.bypass_lock": "绕过收藏",
   "category.neo_favorite_items": "Neo 物品收藏",
   "text.neo_favorite_items.slot_marked": "槽位已锁定！",
-  "text.neo_favorite_items.slot_unmarked": "槽位已解锁！"
+  "text.neo_favorite_items.slot_unmarked": "槽位已解锁！",
+  "key.neo_favorite_items.config_ui": "打开配置界面",
+  "screen.neo_favorite_items.assets": "%s",
+  "screen.neo_favorite_items.title": "Neo 物品收藏",
+  "screen.neo_favorite_items.profiles": "样式配置",
+  "screen.neo_favorite_items.title": "Neo 物品收藏",
+  "screen.neo_favorite_items.preview": "预览",
+  "screen.neo_favorite_items.opacity": "锁定透明度：%s%%",
+  "screen.neo_favorite_items.locked_style": "锁定：%s",
+  "screen.neo_favorite_items.bypass_style": "旁路：%s",
+  "screen.neo_favorite_items.highlight_style": "提示：%s",
+  "screen.neo_favorite_items.theme": "主题：%s",
+  "screen.neo_favorite_items.preview_mode": "预览状态：%s",
+  "screen.neo_favorite_items.theme": "主题：%s",
+  "screen.neo_favorite_items.color": "颜色：%s",
+  "screen.neo_favorite_items.locked_label": "锁定槽位样式",
+  "screen.neo_favorite_items.bypass_label": "Ctrl 旁路样式",
+  "screen.neo_favorite_items.highlight_label": "Alt 锁定提示样式",
+  "screen.neo_favorite_items.unlockable_label": "Alt 解锁提示",
+  "screen.neo_favorite_items.tab.normal": "常态",
+  "screen.neo_favorite_items.tab.ctrl": "Ctrl",
+  "screen.neo_favorite_items.tab.alt_lock": "Alt 锁定",
+  "screen.neo_favorite_items.tab.alt_unlock": "Alt 解锁",
+  "screen.neo_favorite_items.theme_label": "界面主题",
+  "screen.neo_favorite_items.style_label": "材质模式",
+  "screen.neo_favorite_items.material_mode_label": "材质模式",
+  "screen.neo_favorite_items.material_mode.material": "材质",
+  "screen.neo_favorite_items.material_mode.no_material": "无材质",
+  "screen.neo_favorite_items.custom_assets_label": "自定义材质",
+  "screen.neo_favorite_items.color_mode_label": "着色模式",
+  "screen.neo_favorite_items.color_mode.tint": "着色",
+  "screen.neo_favorite_items.color_mode.native": "原生模式",
+  "screen.neo_favorite_items.color_mode.multiply": "正片叠底",
+  "screen.neo_favorite_items.color_mode.grayscale": "灰度",
+  "screen.neo_favorite_items.color_mode.replace": "替换",
+  "screen.neo_favorite_items.color_mode.tooltip.tint": "保留原图 OKLab 感知明度，应用选择颜色的色相和色度。",
+  "screen.neo_favorite_items.color_mode.tooltip.native": "使用材质原本颜色。",
+  "screen.neo_favorite_items.color_mode.tooltip.multiply": "材质 RGB 与选择颜色逐通道相乘；互补色通道可能变黑。",
+  "screen.neo_favorite_items.color_mode.tooltip.grayscale": "将材质转换为灰度。",
+  "screen.neo_favorite_items.color_mode.tooltip.replace": "替换材质 RGB，保留透明度。",
+  "screen.neo_favorite_items.color_label": "覆盖层颜色",
+  "screen.neo_favorite_items.preview_mode_label": "预览默认状态",
+  "screen.neo_favorite_items.opacity_label": "覆盖层透明度",
+  "screen.neo_favorite_items.profile_tab": "配置页：%s",
+  "screen.neo_favorite_items.profile_style": "样式：%s",
+  "screen.neo_favorite_items.color_picker": "RGBA / HSV 颜色",
+  "screen.neo_favorite_items.color_hex": "十六进制颜色",
+  "screen.neo_favorite_items.refresh_assets": "刷新材质",
+  "screen.neo_favorite_items.refresh_assets_count": "刷新材质（%s）",
+  "screen.neo_favorite_items.reload": "重载",
+  "screen.neo_favorite_items.apply": "应用",
+  "screen.neo_favorite_items.cancel": "取消",
+  "screen.neo_favorite_items.assets_unavailable": "材质目录不可用",
+  "screen.neo_favorite_items.assets_none": "材质：无",
+  "screen.neo_favorite_items.assets_count": "材质：%s 个",
+  "screen.neo_favorite_items.invalid_number": "无效数字"
+  ,"screen.neo_favorite_items.material_label": "材质选择"
+  ,"screen.neo_favorite_items.anchor.slot_top_left": "左上"
+  ,"screen.neo_favorite_items.anchor.slot_top_center": "上中"
+  ,"screen.neo_favorite_items.anchor.slot_top_right": "右上"
+  ,"screen.neo_favorite_items.anchor.slot_center_left": "左中"
+  ,"screen.neo_favorite_items.anchor.slot_center": "中心"
+  ,"screen.neo_favorite_items.anchor.slot_center_right": "右中"
+  ,"screen.neo_favorite_items.anchor.slot_bottom_left": "左下"
+  ,"screen.neo_favorite_items.anchor.slot_bottom_center": "下中"
+  ,"screen.neo_favorite_items.anchor.slot_bottom_right": "右下"
+  ,"screen.neo_favorite_items.opacity_behavior_label": "旁路透明行为"
+  ,"screen.neo_favorite_items.opacity_behavior.fixed": "固定值"
+  ,"screen.neo_favorite_items.opacity_behavior.multiply_locked": "叠加锁定透明度"
+  ,"screen.neo_favorite_items.anchor_label": "材质锚点"
+  ,"screen.neo_favorite_items.offset_x": "X 偏移"
+  ,"screen.neo_favorite_items.offset_y": "Y 偏移"
+  ,"screen.neo_favorite_items.width": "宽度"
+  ,"screen.neo_favorite_items.height": "高度"
+  ,"screen.neo_favorite_items.scale": "缩放"
+  ,"screen.neo_favorite_items.rotation": "旋转"
+  ,"screen.neo_favorite_items.z_index": "Z 层级"
+  ,"screen.neo_favorite_items.overflow": "允许溢出"
+  ,"screen.neo_favorite_items.clip": "裁剪到格子"
+  ,"screen.neo_favorite_items.reset": "重置当前页"
+  ,"screen.neo_favorite_items.page.rendering": "渲染样式"
+  ,"screen.neo_favorite_items.page.client_logic": "客户端行为"
+  ,"screen.neo_favorite_items.page.server_rules": "服务端规则"
+  ,"screen.neo_favorite_items.logic.visual_feedback": "视觉反馈"
+  ,"screen.neo_favorite_items.logic.sound_feedback": "声音反馈"
+  ,"screen.neo_favorite_items.logic.sound_id": "音效 ID"
+  ,"screen.neo_favorite_items.logic.volume": "音量"
+  ,"screen.neo_favorite_items.logic.pitch": "音高"
+  ,"screen.neo_favorite_items.logic.volume_value": "%s%%"
+  ,"screen.neo_favorite_items.logic.pitch_value": "%s"
+  ,"screen.neo_favorite_items.server.auto_unlock_empty": "自动解锁空槽位"
+  ,"screen.neo_favorite_items.server.lock_empty": "允许锁定空槽位"
+  ,"screen.neo_favorite_items.server.allow_into_locked_empty": "允许物品进入锁定空槽位"
+  ,"screen.neo_favorite_items.server.prevent_click": "阻止点击"
+  ,"screen.neo_favorite_items.server.prevent_drop": "阻止丢弃"
+  ,"screen.neo_favorite_items.server.prevent_quick_move": "阻止快速移动"
+  ,"screen.neo_favorite_items.server.prevent_shift_click": "阻止 Shift 点击"
+  ,"screen.neo_favorite_items.server.prevent_drag": "阻止拖拽"
+  ,"screen.neo_favorite_items.server.prevent_swap": "阻止交换"
+  ,"screen.neo_favorite_items.server.allow_bypass": "允许旁路键"
+  ,"screen.neo_favorite_items.server.move_behavior": "收藏状态移动方式"
+  ,"screen.neo_favorite_items.server.move_behavior.follow_item": "跟随物品"
+  ,"screen.neo_favorite_items.server.move_behavior.stay_at_position": "固定在槽位"
+  ,"screen.neo_favorite_items.server.preserve_on_death": "死亡时保留"
+  ,"screen.neo_favorite_items.server.debug": "调试日志"
 }

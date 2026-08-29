@@ -2,6 +2,7 @@ package mycraft.yuyears.neofavoriteitems.fabric;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import mycraft.yuyears.neofavoriteitems.ConfigManager;
+import mycraft.yuyears.neofavoriteitems.client.NeoFavoriteItemsConfigScreen;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
@@ -21,6 +22,7 @@ import org.lwjgl.glfw.GLFW;
 public class NeoFavoriteItemsFabricClient implements ClientModInitializer {
     private static KeyMapping lockOperationKey;
     private static KeyMapping bypassLockKey;
+    private static KeyMapping configUiKey;
     private static boolean lastLoggedLockOperationKeyState;
     private static boolean lastLoggedBypassLockKeyState;
 
@@ -80,6 +82,10 @@ public class NeoFavoriteItemsFabricClient implements ClientModInitializer {
         registerKeybindings();
         FabricFavoriteNetworking.registerClientReceivers();
         ClientTickEvents.END_CLIENT_TICK.register(client1 -> {
+            PlatformFavoriteSupport.reloadClientConfigIfChanged();
+            while (configUiKey != null && configUiKey.consumeClick()) {
+                NeoFavoriteItemsConfigScreen.open(client1);
+            }
             if (client1.player != null) {
                 logKeyStatesIfChanged();
             }
@@ -97,6 +103,11 @@ public class NeoFavoriteItemsFabricClient implements ClientModInitializer {
         bypassLockKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             NeoFavoriteItemsConstants.BYPASS_LOCK_KEY_ID,
             NeoFavoriteItemsConstants.DEFAULT_BYPASS_LOCK_KEY_CODE,
+            NeoFavoriteItemsConstants.KEY_CATEGORY
+        ));
+        configUiKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+            NeoFavoriteItemsConstants.CONFIG_UI_KEY_ID,
+            NeoFavoriteItemsConstants.DEFAULT_CONFIG_UI_KEY_CODE,
             NeoFavoriteItemsConstants.KEY_CATEGORY
         ));
         DebugLogger.debug("Registered Fabric keybindings: lockOperation default=LEFT_ALT, bypass default=LEFT_CONTROL");

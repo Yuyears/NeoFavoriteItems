@@ -5,6 +5,7 @@ import mycraft.yuyears.neofavoriteitems.ConfigManager;
 import mycraft.yuyears.neofavoriteitems.FavoritesManager;
 import mycraft.yuyears.neofavoriteitems.application.FavoriteLockRules;
 import mycraft.yuyears.neofavoriteitems.application.InteractionGuardService;
+import mycraft.yuyears.neofavoriteitems.client.ClientInteractionFeedback;
 import mycraft.yuyears.neofavoriteitems.domain.InteractionType;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
 import net.minecraft.client.Minecraft;
@@ -68,6 +69,7 @@ public final class NeoForgeSlotInteractionHandler {
         int inventoryIndex = NeoForgeSlotResolver.getPlayerInventoryIndex(slot);
         if (clickType == ClickType.SWAP && shouldCancelSwap(inventoryIndex, button, NeoForgeSlotResolver.hasItem(slot))) {
             DebugLogger.debug("NeoForge slot swap canceled: inventoryIndex={} button={}", inventoryIndex, button);
+            ClientInteractionFeedback.playDeniedSound();
             return true;
         }
 
@@ -79,6 +81,7 @@ public final class NeoForgeSlotInteractionHandler {
         );
         if (decision.denied()) {
             DebugLogger.debug("NeoForge slot interaction canceled: inventoryIndex={} clickType={}", inventoryIndex, clickType);
+            ClientInteractionFeedback.playDeniedSound();
             return true;
         }
         return false;

@@ -5,6 +5,8 @@ import mycraft.yuyears.neofavoriteitems.forge.ForgeMouseTweaksBridge;
 import mycraft.yuyears.neofavoriteitems.forge.ForgeSlotInteractionHandler;
 import mycraft.yuyears.neofavoriteitems.forge.ForgeSlotResolver;
 import mycraft.yuyears.neofavoriteitems.forge.NeoFavoriteItemsForge;
+import mycraft.yuyears.neofavoriteitems.forge.render.ForgeOverlayRenderer;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
@@ -18,6 +20,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(AbstractContainerScreen.class)
 public abstract class AbstractContainerScreenMixin {
+    @Inject(method = "renderSlot", at = @At("HEAD"))
+    private void neoFavoriteItems$renderBelowItem(GuiGraphics graphics, Slot slot, CallbackInfo ci) {
+        ForgeOverlayRenderer.renderSlotBelow((AbstractContainerScreen<?>)(Object)this, graphics, slot);
+    }
+
+    @Inject(method = "renderTooltip", at = @At("HEAD"))
+    private void neoFavoriteItems$renderAboveItem(GuiGraphics graphics, int mouseX, int mouseY, CallbackInfo ci) {
+        ForgeOverlayRenderer.renderScreenAbove((AbstractContainerScreen<?>)(Object)this, graphics);
+    }
+
     @Unique
     private static final int neoFavoriteItems$LEFT_BUTTON = 0;
     @Shadow

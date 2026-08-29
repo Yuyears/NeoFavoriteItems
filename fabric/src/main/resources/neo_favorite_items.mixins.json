@@ -8,6 +8,8 @@
     "AbstractContainerScreenMixin",
     "CreativeModeInventoryScreenMixin",
     "CreativeSlotWrapperAccessor",
+    "GuiMixin",
+    "GuiGraphicsMixin",
     "KeyMappingAccessor",
     "MinecraftMixin"
   ],

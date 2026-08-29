@@ -48,25 +48,61 @@ public class NeoFavoriteItemsConfig {
         public OverlayStyle lockedStyle = OverlayStyle.MARK;
         public OverlayStyle holdingKeyLockedStyle = OverlayStyle.MARK;
         public OverlayStyle highlightStyle = OverlayStyle.BORDER;
-        public int lockedOverlayColor = 0xFAFF413C;
-        public float lockedOverlayOpacity = 0.7f;
-        public int lockableHighlightColor = 0xC823E600;
-        public float lockableHighlightOpacity = 0.55f;
-        public int unlockableHighlightColor = 0xB4FFC335;
-        public float unlockableHighlightOpacity = 0.65f;
+        public int lockedOverlayColor = OverlayProfileConfig.DEFAULT_LOCKED_COLOR;
+        public float lockedOverlayOpacity = OverlayProfileConfig.DEFAULT_LOCKED_OPACITY;
+        public int lockableHighlightColor = OverlayProfileConfig.DEFAULT_LOCKABLE_COLOR;
+        public float lockableHighlightOpacity = 1.0f;
+        public int unlockableHighlightColor = OverlayProfileConfig.DEFAULT_UNLOCKABLE_COLOR;
+        public float unlockableHighlightOpacity = 1.0f;
         public float colorOverlayOpacity = 0.35f;
         public float bypassOverlayOpacityMultiplier = 0.35f;
         public boolean renderLockedOverlayInFront = true;
         public boolean renderLockableHighlightInFront = true;
         public boolean renderUnlockableHighlightInFront = true;
+        public OverlayProfileConfig locked = OverlayProfileConfig.defaultLocked();
+        public OverlayProfileConfig bypass = OverlayProfileConfig.defaultBypass();
+        public OverlayProfileConfig lockable = OverlayProfileConfig.defaultLockable();
+        public OverlayProfileConfig unlockable = OverlayProfileConfig.defaultUnlockable();
+
+        public void syncProfilesFromLegacy() {
+            locked.style = lockedStyle;
+            locked.materialId = mycraft.yuyears.neofavoriteitems.render.OverlayTextureCatalog.presetId(lockedStyle);
+            locked.color = lockedOverlayColor;
+            locked.opacity = lockedOverlayOpacity;
+            locked.zIndex = renderLockedOverlayInFront
+                ? mycraft.yuyears.neofavoriteitems.render.OverlayZIndex.ABOVE_ITEM
+                : mycraft.yuyears.neofavoriteitems.render.OverlayZIndex.BELOW_ITEM;
+            bypass.style = holdingKeyLockedStyle;
+            bypass.materialId = mycraft.yuyears.neofavoriteitems.render.OverlayTextureCatalog.presetId(holdingKeyLockedStyle);
+            bypass.color = lockedOverlayColor;
+            bypass.opacity = bypassOverlayOpacityMultiplier;
+            bypass.opacityBehavior = OverlayProfileConfig.OpacityBehavior.MULTIPLY_LOCKED;
+            bypass.zIndex = locked.zIndex;
+            lockable.style = highlightStyle;
+            lockable.materialId = mycraft.yuyears.neofavoriteitems.render.OverlayTextureCatalog.presetId(highlightStyle);
+            lockable.color = lockableHighlightColor;
+            lockable.opacity = lockableHighlightOpacity;
+            lockable.zIndex = renderLockableHighlightInFront
+                ? mycraft.yuyears.neofavoriteitems.render.OverlayZIndex.ABOVE_ITEM
+                : mycraft.yuyears.neofavoriteitems.render.OverlayZIndex.BELOW_ITEM;
+            unlockable.style = highlightStyle;
+            unlockable.materialId = mycraft.yuyears.neofavoriteitems.render.OverlayTextureCatalog.presetId(highlightStyle);
+            unlockable.color = unlockableHighlightColor;
+            unlockable.opacity = unlockableHighlightOpacity;
+            unlockable.zIndex = renderUnlockableHighlightInFront
+                ? mycraft.yuyears.neofavoriteitems.render.OverlayZIndex.ABOVE_ITEM
+                : mycraft.yuyears.neofavoriteitems.render.OverlayZIndex.BELOW_ITEM;
+        }
     }
 
     public static class Feedback {
         public boolean showVisualFeedback = true;
         public boolean playSoundFeedback = true;
-        public String feedbackSound = "minecraft:block.note_block.hat";
-        public float feedbackVolume = 0.5f;
-        public float feedbackPitch = 1.0f;
+        public String feedbackSound = "minecraft:block.chain.break";
+        public float feedbackVolume = 0.25f;
+        public float feedbackPitch = 1.5f;
+        /** Persisted client UI theme name; parsed defensively by ConfigManager. */
+        public String uiTheme = "DEFAULT";
     }
 
     public static class Debug {

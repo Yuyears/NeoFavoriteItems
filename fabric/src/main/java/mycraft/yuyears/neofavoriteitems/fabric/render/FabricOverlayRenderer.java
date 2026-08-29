@@ -1,46 +1,38 @@
 
 package mycraft.yuyears.neofavoriteitems.fabric.render;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.NativeImage;
 import mycraft.yuyears.neofavoriteitems.fabric.FabricSlotResolver;
 import mycraft.yuyears.neofavoriteitems.fabric.NeoFavoriteItemsFabricClient;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
-import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.integration.SlotMappingService;
-import mycraft.yuyears.neofavoriteitems.render.OverlayRenderDescriptor;
+import mycraft.yuyears.neofavoriteitems.render.HotbarSlotLayout;
+import mycraft.yuyears.neofavoriteitems.render.HudSlotProbe;
+import mycraft.yuyears.neofavoriteitems.render.HudSlotLayouts;
+import mycraft.yuyears.neofavoriteitems.render.OverlayProfile;
 import mycraft.yuyears.neofavoriteitems.render.OverlayRenderer;
+import mycraft.yuyears.neofavoriteitems.render.OverlayRenderPhase;
+import mycraft.yuyears.neofavoriteitems.render.SlotRenderTarget;
+import mycraft.yuyears.neofavoriteitems.render.pipeline.OverlayDrawEngine;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 import mycraft.yuyears.neofavoriteitems.common.util.ReflectionHelper;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
 public class FabricOverlayRenderer extends OverlayRenderer {
-    private static final float OVERLAY_Z_OFFSET = 300.0f;
-    private static final ResourceLocation BORDER_TEXTURE = ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, BORDER_TEXTURE_PATH);
-    private static final ResourceLocation CLASSIC_TEXTURE = ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, CLASSIC_TEXTURE_PATH);
-    private static final ResourceLocation FRAMEWORK_TEXTURE = ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, FRAMEWORK_TEXTURE_PATH);
-    private static final ResourceLocation HIGHLIGHT_TEXTURE = ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, HIGHLIGHT_TEXTURE_PATH);
-    private static final ResourceLocation BRACKETS_TEXTURE = ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, BRACKETS_TEXTURE_PATH);
-    private static final ResourceLocation LOCK_TEXTURE = ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, LOCK_TEXTURE_PATH);
-    private static final ResourceLocation MARK_TEXTURE = ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, MARK_TEXTURE_PATH);
-    private static final ResourceLocation TAG_TEXTURE = ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, TAG_TEXTURE_PATH);
-    private static final ResourceLocation STAR_TEXTURE = ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, STAR_TEXTURE_PATH);
-    private final Map<ResourceLocation, TextureSize> textureSizes = new HashMap<>();
+    private static FabricOverlayRenderer instance;
+    private final OverlayDrawEngine drawEngine = new OverlayDrawEngine();
     private boolean lastLoggedLockOperationKeyState;
 
     public FabricOverlayRenderer() {
+        instance = this;
         registerEvents();
         registerHudEvents();
         DebugLogger.debug("Fabric overlay renderer registered");
@@ -55,11 +47,6 @@ public class FabricOverlayRenderer extends OverlayRenderer {
                         return allowMouseClick(containerScreen, mouseX, mouseY, button);
                     }
                     return true;
-                });
-                ScreenEvents.afterRender(screen).register((screen1, context, mouseX, mouseY, delta) -> {
-                    if (screen1 instanceof AbstractContainerScreen<?>) {
-                        renderHandledScreenOverlays((AbstractContainerScreen<?>) screen1, context, mouseX, mouseY, delta);
-                    }
                 });
             }
         });
@@ -78,7 +65,11 @@ public class FabricOverlayRenderer extends OverlayRenderer {
         HudRenderCallback.EVENT.register((context, tickCounter) -> renderHotbarOverlays(context));
     }
 
-    private void renderHandledScreenOverlays(AbstractContainerScreen<?> screen, GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public static void renderScreenAbove(AbstractContainerScreen<?> screen, GuiGraphics graphics) {
+        if (instance != null) instance.renderHandledScreenOverlays(screen, graphics);
+    }
+
+    private void renderHandledScreenOverlays(AbstractContainerScreen<?> screen, GuiGraphics context) {
         boolean isHoldingBypassKey = NeoFavoriteItemsFabricClient.isBypassKeyHeld();
         boolean isHoldingLockOperationKey = NeoFavoriteItemsFabricClient.isLockOperationKeyHeld();
         NeoFavoriteItemsFabricClient.logKeyStatesIfChanged();
@@ -89,6 +80,7 @@ public class FabricOverlayRenderer extends OverlayRenderer {
         }
         int highlightableSlots = 0;
         int lockedSlots = 0;
+        drawEngine.beginFrame();
         for (Slot slot : screen.getMenu().slots) {
             // 只处理属于玩家物品栏的槽位
             if (!FabricSlotResolver.isPlayerInventorySlot(slot, player)) {
@@ -107,12 +99,18 @@ public class FabricOverlayRenderer extends OverlayRenderer {
             if (shouldRenderOverlay(logicalSlot.get())) {
                 lockedSlots++;
             }
-            if (hasItem || shouldRenderOverlay(logicalSlot.get())) {
+            if (isLockableSlot(logicalSlot.get(), hasItem) || shouldRenderOverlay(logicalSlot.get())) {
                 int x = slot.x + getScreenLeft(screen);
                 int y = slot.y + getScreenTop(screen);
-                renderSlotOverlay(context, x, y, logicalSlot.get(), hasItem, isHoldingBypassKey, isHoldingLockOperationKey);
+                submitSlotOverlay(
+                    SlotRenderTarget.standard(logicalSlot.get(), hasItem, x, y),
+                    isHoldingBypassKey,
+                    isHoldingLockOperationKey,
+                    OverlayRenderPhase.ABOVE_ITEM
+                );
             }
         }
+        drawEngine.render(context);
         if (isHoldingLockOperationKey != lastLoggedLockOperationKeyState) {
             DebugLogger.debug(
                 "Fabric overlay lock-operation render state: active={} screen={} highlightableSlots={} lockedSlots={}",
@@ -126,111 +124,121 @@ public class FabricOverlayRenderer extends OverlayRenderer {
     }
 
     public void renderSlotOverlay(GuiGraphics context, int x, int y, LogicalSlotIndex slotIndex, boolean isHoldingBypassKey) {
-        renderSlotOverlay(context, x, y, slotIndex, true, isHoldingBypassKey, false);
+        renderSlotOverlay(context, SlotRenderTarget.standard(slotIndex, true, x, y), isHoldingBypassKey, false);
     }
 
     public void renderSlotOverlay(GuiGraphics context, int x, int y, LogicalSlotIndex slotIndex, boolean hasItem, boolean isHoldingBypassKey, boolean isHoldingLockOperationKey) {
-        if (isHoldingLockOperationKey && (hasItem || shouldRenderOverlay(slotIndex))) {
-            renderStyle(context, x, y, highlightOverlayDescriptor(slotIndex, hasItem));
-            return;
-        }
+        renderSlotOverlay(
+            context,
+            SlotRenderTarget.standard(slotIndex, hasItem, x, y),
+            isHoldingBypassKey,
+            isHoldingLockOperationKey
+        );
+    }
 
-        if (shouldRenderOverlay(slotIndex)) {
-            renderStyle(context, x, y, lockedOverlayDescriptor(slotIndex, isHoldingBypassKey));
+    private void renderSlotOverlay(GuiGraphics context, SlotRenderTarget target, boolean isHoldingBypassKey, boolean isHoldingLockOperationKey) {
+        OverlayProfile profile = resolveProfile(target, isHoldingBypassKey, isHoldingLockOperationKey);
+        if (profile != null) {
+            drawEngine.renderOne(context, target, profile);
         }
+    }
+
+    private void submitSlotOverlay(SlotRenderTarget target, boolean isHoldingBypassKey,
+                                   boolean isHoldingLockOperationKey, OverlayRenderPhase phase) {
+        OverlayProfile profile = resolveProfile(target, isHoldingBypassKey, isHoldingLockOperationKey);
+        if (profile != null) {
+            drawEngine.submit(target, profile, phase);
+        }
+    }
+
+    private void submitHudSlotOverlay(SlotRenderTarget target, boolean isHoldingBypassKey, OverlayRenderPhase phase) {
+        OverlayProfile profile = resolveHudProfile(target, isHoldingBypassKey);
+        if (profile != null) drawEngine.submit(target, profile, phase);
+    }
+
+    public static void renderSlotBelow(AbstractContainerScreen<?> screen, GuiGraphics graphics, Slot slot) {
+        if (instance != null) instance.renderSlotBelowInternal(screen, graphics, slot);
+    }
+
+    private void renderSlotBelowInternal(AbstractContainerScreen<?> screen, GuiGraphics graphics, Slot slot) {
+        var player = Minecraft.getInstance().player;
+        if (player == null || !FabricSlotResolver.isPlayerInventorySlot(slot, player)) return;
+        var logicalSlot = SlotMappingService.fromPlayerInventoryIndex(FabricSlotResolver.getPlayerInventoryIndex(slot));
+        if (logicalSlot.isEmpty()) return;
+        boolean hasItem = FabricSlotResolver.hasItem(slot);
+        if (!isLockableSlot(logicalSlot.get(), hasItem) && !shouldRenderOverlay(logicalSlot.get())) return;
+        SlotRenderTarget target = SlotRenderTarget.standard(
+            logicalSlot.get(), hasItem, slot.x, slot.y
+        );
+        OverlayProfile profile = resolveProfile(
+            target,
+            NeoFavoriteItemsFabricClient.isBypassKeyHeld(),
+            NeoFavoriteItemsFabricClient.isLockOperationKeyHeld()
+        );
+        if (profile != null) drawEngine.renderOne(graphics, target, profile, OverlayRenderPhase.BELOW_ITEM);
     }
 
     public void renderHotbarOverlays(GuiGraphics context) {
         var client = Minecraft.getInstance();
-        if (client.player == null) {
+        if (client.player == null || client.options.hideGui) {
             return;
         }
 
         int screenWidth = client.getWindow().getGuiScaledWidth();
         int screenHeight = client.getWindow().getGuiScaledHeight();
-        int y = screenHeight - 19;
-
-        for (int hotbarSlot = 0; hotbarSlot < 9; hotbarSlot++) {
+        boolean isHoldingBypassKey = NeoFavoriteItemsFabricClient.isBypassKeyHeld();
+        drawEngine.beginFrame();
+        boolean supplied = HudSlotLayouts.collect(client.player, screenWidth, screenHeight, target -> {
+            if (!target.hasItem() || !HudSlotProbe.wasObserved(target.logicalSlot(), target.x(), target.y()))
+                submitHudSlotOverlay(target, isHoldingBypassKey, OverlayRenderPhase.ALL);
+        });
+        for (int hotbarSlot = 0; !supplied && hotbarSlot < 9; hotbarSlot++) {
             LogicalSlotIndex slotIndex = LogicalSlotIndex.of(hotbarSlot);
-            if (shouldRenderOverlay(slotIndex)) {
-                int x = screenWidth / 2 - 88 + hotbarSlot * 20;
-                renderStyle(context, x, y, lockedOverlayDescriptor(slotIndex, false));
-            }
+            boolean hasItem = !client.player.getInventory().getItem(hotbarSlot).isEmpty();
+            if (hasItem) continue;
+            submitHudSlotOverlay(
+                SlotRenderTarget.standard(
+                    slotIndex,
+                    hasItem,
+                    HotbarSlotLayout.x(screenWidth, hotbarSlot),
+                    HotbarSlotLayout.y(screenHeight)
+                ),
+                isHoldingBypassKey,
+                OverlayRenderPhase.ALL
+            );
         }
+        drawEngine.render(context);
+        HudSlotProbe.clearObserved();
     }
 
-    private void renderStyle(GuiGraphics context, int x, int y, OverlayRenderDescriptor descriptor) {
-        context.pose().pushPose();
-        if (descriptor.renderInFront()) {
-            context.pose().translate(0.0f, 0.0f, OVERLAY_Z_OFFSET);
-        }
-        try {
-            switch (descriptor.style()) {
-                case BORDER -> renderTextureOverlay(context, x, y, BORDER_TEXTURE, descriptor);
-                case CLASSIC -> renderTextureOverlay(context, x, y, CLASSIC_TEXTURE, descriptor);
-                case FRAMEWORK -> renderTextureOverlay(context, x, y, FRAMEWORK_TEXTURE, descriptor);
-                case HIGHLIGHT -> renderTextureOverlay(context, x, y, HIGHLIGHT_TEXTURE, descriptor);
-                case BRACKETS -> renderTextureOverlay(context, x, y, BRACKETS_TEXTURE, descriptor);
-                case LOCK -> renderTextureOverlay(context, x, y, LOCK_TEXTURE, descriptor);
-                case MARK -> renderTextureOverlay(context, x, y, MARK_TEXTURE, descriptor);
-                case TAG -> renderTextureOverlay(context, x, y, TAG_TEXTURE, descriptor);
-                case STAR -> renderTextureOverlay(context, x, y, STAR_TEXTURE, descriptor);
-                case COLOR_OVERLAY -> renderColorOverlay(context, x, y, descriptor.color(), getColorOverlayOpacity(), descriptor.multiplier());
-            }
-        } finally {
-            context.pose().popPose();
-        }
+    public static void renderHudSlot(GuiGraphics graphics, Player player, ItemStack stack, int x, int y,
+                                     OverlayRenderPhase phase) {
+        if (instance != null) instance.renderHudSlotInternal(graphics, player, stack, x, y, phase);
+    }
+
+    private void renderHudSlotInternal(GuiGraphics graphics, Player player, ItemStack stack, int x, int y,
+                                       OverlayRenderPhase phase) {
+        var client = Minecraft.getInstance();
+        if (client.player == null || client.options.hideGui) return;
+        var logicalSlot = HudSlotProbe.resolve(player, stack);
+        if (logicalSlot.isEmpty()) return;
+        HudSlotProbe.markObserved(logicalSlot.get(), x, y);
+        SlotRenderTarget target = SlotRenderTarget.standard(
+            logicalSlot.get(), true, x, y
+        );
+        drawEngine.beginFrame();
+        submitHudSlotOverlay(
+            target,
+            NeoFavoriteItemsFabricClient.isBypassKeyHeld(),
+            phase
+        );
+        drawEngine.render(graphics);
     }
 
     public void renderTooltipOverlay(GuiGraphics context, int x, int y, String text) {
         context.renderTooltip(Minecraft.getInstance().font, net.minecraft.network.chat.Component.literal(text), x, y);
     }
 
-    private void renderTextureOverlay(GuiGraphics context, int x, int y, ResourceLocation texture, OverlayRenderDescriptor descriptor) {
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        applyOverlayTint(descriptor.color(), descriptor.opacity(), descriptor.multiplier());
-        TextureSize size = getTextureSize(texture);
-        context.blit(texture, x, y, 16, 16, 0.0f, 0.0f, size.width(), size.height(), size.width(), size.height());
-        resetOverlayTint();
-    }
-
-    private TextureSize getTextureSize(ResourceLocation texture) {
-        return textureSizes.computeIfAbsent(texture, this::readTextureSize);
-    }
-
-    private TextureSize readTextureSize(ResourceLocation texture) {
-        try {
-            var resource = Minecraft.getInstance().getResourceManager().getResource(texture);
-            if (resource.isPresent()) {
-                try (var stream = resource.get().open(); NativeImage image = NativeImage.read(stream)) {
-                    return new TextureSize(image.getWidth(), image.getHeight());
-                }
-            }
-        } catch (IOException e) {
-            DebugLogger.debug("Fabric overlay texture size fallback: texture={} error={}", texture, e.toString());
-        }
-        return TextureSize.DEFAULT;
-    }
-
-    private void renderColorOverlay(GuiGraphics context, int x, int y, int color, float opacity, float multiplier) {
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        context.fill(x, y, x + 16, y + 16, getColorArgb(color, opacity, multiplier));
-    }
-
-    private void applyOverlayTint(int color, float opacity, float multiplier) {
-        RenderSystem.setShaderColor(
-            getColorRed(color),
-            getColorGreen(color),
-            getColorBlue(color),
-            getColorAlpha(color, opacity, multiplier)
-        );
-    }
-
-    private void resetOverlayTint() {
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-    }
 
     private int getScreenLeft(AbstractContainerScreen<?> screen) {
         Integer value = ReflectionHelper.readIntField(screen, "leftPos");
@@ -242,7 +250,4 @@ public class FabricOverlayRenderer extends OverlayRenderer {
         return value == null ? 0 : value;
     }
 
-    private record TextureSize(int width, int height) {
-        private static final TextureSize DEFAULT = new TextureSize(16, 16);
-    }
 }

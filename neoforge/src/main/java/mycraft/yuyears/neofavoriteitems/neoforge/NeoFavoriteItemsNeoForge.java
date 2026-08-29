@@ -3,6 +3,7 @@ package mycraft.yuyears.neofavoriteitems.neoforge;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import mycraft.yuyears.neofavoriteitems.ConfigManager;
+import mycraft.yuyears.neofavoriteitems.client.NeoFavoriteItemsConfigScreen;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
@@ -19,7 +20,6 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLLoader;
@@ -49,10 +49,7 @@ public class NeoFavoriteItemsNeoForge {
 
         modBus.addListener(this::setup);
         modBus.addListener(this::registerPayloadHandlers);
-        modBus.addListener(NeoForgeFavoriteItemsConfig::onModConfig);
-        modContainer.registerConfig(ModConfig.Type.COMMON, NeoForgeFavoriteItemsConfig.COMMON_SPEC, NeoFavoriteItemsConstants.COMMON_CONFIG_FILE_NAME);
-        modContainer.registerConfig(ModConfig.Type.CLIENT, NeoForgeFavoriteItemsConfig.CLIENT_SPEC, NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME);
-        
+
         // 仅客户端注册客户端相关监听器
         if (IS_CLIENT) {
             // 创建客户端事件处理器实例并注册到模组总线和 Forge 总线
@@ -122,6 +119,7 @@ public class NeoFavoriteItemsNeoForge {
     public static class ClientEventHandler {
         private static net.minecraft.client.KeyMapping lockOperationKey;
         private static net.minecraft.client.KeyMapping bypassLockKey;
+        private static net.minecraft.client.KeyMapping configUiKey;
         private static boolean lastLoggedLockOperationKeyState;
         private static boolean lastLoggedBypassLockKeyState;
         private static boolean previousLockOperationKeyState;
@@ -143,14 +141,21 @@ public class NeoFavoriteItemsNeoForge {
                 NeoFavoriteItemsConstants.DEFAULT_BYPASS_LOCK_KEY_CODE,
                 NeoFavoriteItemsConstants.KEY_CATEGORY
             );
+            configUiKey = new net.minecraft.client.KeyMapping(
+                NeoFavoriteItemsConstants.CONFIG_UI_KEY_ID,
+                NeoFavoriteItemsConstants.DEFAULT_CONFIG_UI_KEY_CODE,
+                NeoFavoriteItemsConstants.KEY_CATEGORY
+            );
             
             event.register(lockOperationKey);
             event.register(bypassLockKey);
+            event.register(configUiKey);
             DebugLogger.debug("Registered NeoForge keybindings: lockOperation default=LEFT_ALT, bypass default=LEFT_CONTROL");
         }
 
         public void onClientSetup(FMLClientSetupEvent event) {
             NeoFavoriteItemsMod.getInstance().onClientInitialize();
+            NeoForgeFavoriteNetworking.configureClient();
             
             var gameDirectory = FMLLoader.getGamePath();
             PlatformFavoriteSupport.initializeClient(gameDirectory, false);
@@ -174,6 +179,10 @@ public class NeoFavoriteItemsNeoForge {
         @SubscribeEvent
         public void onClientTick(ClientTickEvent.Post event) {
             var minecraft = Minecraft.getInstance();
+            PlatformFavoriteSupport.reloadClientConfigIfChanged();
+            while (configUiKey != null && configUiKey.consumeClick()) {
+                NeoFavoriteItemsConfigScreen.open(minecraft);
+            }
             if (minecraft.player != null) {
                 updateModifierMode();
                 logKeyStatesIfChanged();

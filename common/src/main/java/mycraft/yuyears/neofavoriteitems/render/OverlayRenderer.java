@@ -20,136 +20,55 @@ public abstract class OverlayRenderer {
     
     protected final FavoritesManager favoritesManager;
     protected final ConfigManager configManager;
+    private final OverlayProfileCompiler profileCompiler = new OverlayProfileCompiler();
 
     public OverlayRenderer() {
         this.favoritesManager = FavoritesManager.getInstance();
         this.configManager = ConfigManager.getInstance();
     }
 
-    protected NeoFavoriteItemsConfig.OverlayStyle getOverlayStyle(LogicalSlotIndex slotIndex, boolean isHoldingBypassKey) {
-        NeoFavoriteItemsConfig config = configManager.getConfig();
-        return isHoldingBypassKey ? config.overlay.holdingKeyLockedStyle : config.overlay.lockedStyle;
-    }
-
-    protected int getLockedOverlayColor() {
-        return configManager.getConfig().overlay.lockedOverlayColor;
-    }
-
-    protected float getLockedOverlayOpacity() {
-        return configManager.getConfig().overlay.lockedOverlayOpacity;
-    }
-
-    protected int getLockableHighlightColor() {
-        return configManager.getConfig().overlay.lockableHighlightColor;
-    }
-
-    protected float getLockableHighlightOpacity() {
-        return configManager.getConfig().overlay.lockableHighlightOpacity;
-    }
-
-    protected int getUnlockableHighlightColor() {
-        return configManager.getConfig().overlay.unlockableHighlightColor;
-    }
-
-    protected float getUnlockableHighlightOpacity() {
-        return configManager.getConfig().overlay.unlockableHighlightOpacity;
-    }
-
-    protected float getColorOverlayOpacity() {
-        return configManager.getConfig().overlay.colorOverlayOpacity;
-    }
-
-    protected float getBypassOverlayOpacityMultiplier() {
-        return configManager.getConfig().overlay.bypassOverlayOpacityMultiplier;
-    }
-
-    protected boolean shouldRenderLockedOverlayInFront() {
-        return configManager.getConfig().overlay.renderLockedOverlayInFront;
-    }
-
-    protected boolean shouldRenderLockableHighlightInFront() {
-        return configManager.getConfig().overlay.renderLockableHighlightInFront;
-    }
-
-    protected boolean shouldRenderUnlockableHighlightInFront() {
-        return configManager.getConfig().overlay.renderUnlockableHighlightInFront;
-    }
-
-    protected OverlayRenderDescriptor lockedOverlayDescriptor(LogicalSlotIndex slotIndex, boolean isHoldingBypassKey) {
-        return overlayDescriptor(
-            getOverlayStyle(slotIndex, isHoldingBypassKey),
-            getLockedOverlayColor(),
-            getLockedOverlayOpacity(),
-            isHoldingBypassKey ? getBypassOverlayOpacityMultiplier() : 1.0f,
-            shouldRenderLockedOverlayInFront()
+    protected OverlayProfile lockedOverlayProfile(LogicalSlotIndex slotIndex, boolean isHoldingBypassKey) {
+        NeoFavoriteItemsConfig.Overlay overlay = configManager.getConfig().overlay;
+        return profileCompiler.resolve(
+            overlay,
+            isHoldingBypassKey ? OverlayMode.BYPASS_LOCKED : OverlayMode.LOCKED,
+            configManager.getRevision()
         );
     }
 
-    protected OverlayRenderDescriptor highlightOverlayDescriptor(LogicalSlotIndex slotIndex, boolean hasItem) {
-        boolean isFavorite = favoritesManager.isSlotFavorite(slotIndex);
-        return overlayDescriptor(
-            getHighlightStyle(),
-            isFavorite ? getUnlockableHighlightColor() : getLockableHighlightColor(),
-            isFavorite ? getUnlockableHighlightOpacity() : getLockableHighlightOpacity(),
-            1.0f,
-            isFavorite ? shouldRenderUnlockableHighlightInFront() : shouldRenderLockableHighlightInFront()
+    protected OverlayProfile highlightOverlayProfile(LogicalSlotIndex slotIndex, boolean hasItem) {
+        NeoFavoriteItemsConfig.Overlay overlay = configManager.getConfig().overlay;
+        boolean unlockable = favoritesManager.isSlotFavorite(slotIndex);
+        return profileCompiler.resolve(
+            overlay,
+            unlockable ? OverlayMode.UNLOCKABLE : OverlayMode.LOCKABLE,
+            configManager.getRevision()
         );
-    }
-
-    private OverlayRenderDescriptor overlayDescriptor(
-        NeoFavoriteItemsConfig.OverlayStyle style,
-        int color,
-        float opacity,
-        float multiplier,
-        boolean renderInFront
-    ) {
-        return new OverlayRenderDescriptor(
-            style,
-            color,
-            opacity,
-            multiplier,
-            renderInFront
-        );
-    }
-
-    protected float getColorRed(int color) {
-        return ((color >> 16) & 0xFF) / 255.0f;
-    }
-
-    protected float getColorGreen(int color) {
-        return ((color >> 8) & 0xFF) / 255.0f;
-    }
-
-    protected float getColorBlue(int color) {
-        return (color & 0xFF) / 255.0f;
-    }
-
-    protected float getColorAlpha(int color, float opacity, float multiplier) {
-        float configuredAlpha = ((color >>> 24) & 0xFF) / 255.0f;
-        return clamp01(configuredAlpha * opacity * multiplier);
-    }
-
-    protected int getColorArgb(int color, float opacity, float multiplier) {
-        int alpha = Math.round(getColorAlpha(color, opacity, multiplier) * 255.0f);
-        return (alpha << 24) | (color & 0x00FFFFFF);
-    }
-
-    protected NeoFavoriteItemsConfig.OverlayStyle getHighlightStyle() {
-        return configManager.getConfig().overlay.highlightStyle;
     }
 
     protected boolean isLockableSlot(LogicalSlotIndex slotIndex, boolean hasItem) {
         return hasItem || FavoriteLockRules.canKeepEmptySlotLocked(configManager.getConfig());
     }
 
-    private float clamp01(float value) {
-        if (value < 0.0f) {
-            return 0.0f;
-        }
-        return Math.min(value, 1.0f);
-    }
-
     protected boolean shouldRenderOverlay(LogicalSlotIndex slotIndex) {
         return favoritesManager.isSlotFavorite(slotIndex);
+    }
+
+    protected OverlayProfile resolveProfile(SlotRenderTarget target, boolean isHoldingBypassKey,
+                                            boolean isHoldingLockOperationKey) {
+        if (isHoldingLockOperationKey && isLockableSlot(target.logicalSlot(), target.hasItem())) {
+            return highlightOverlayProfile(target.logicalSlot(), target.hasItem());
+        }
+        if (shouldRenderOverlay(target.logicalSlot())) {
+            return lockedOverlayProfile(target.logicalSlot(), isHoldingBypassKey);
+        }
+        return null;
+    }
+
+    /** HUD has no lock-operation preview; CTRL only selects bypass profile. */
+    protected OverlayProfile resolveHudProfile(SlotRenderTarget target, boolean isHoldingBypassKey) {
+        return shouldRenderOverlay(target.logicalSlot())
+            ? lockedOverlayProfile(target.logicalSlot(), isHoldingBypassKey)
+            : null;
     }
 }

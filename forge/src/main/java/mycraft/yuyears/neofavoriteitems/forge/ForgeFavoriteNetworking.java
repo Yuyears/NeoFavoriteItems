@@ -3,6 +3,9 @@ package mycraft.yuyears.neofavoriteitems.forge;
 import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConstants;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsMod;
+import mycraft.yuyears.neofavoriteitems.ConfigManager;
+import mycraft.yuyears.neofavoriteitems.ServerConfigAccess;
+import mycraft.yuyears.neofavoriteitems.ServerRulesSnapshot;
 import mycraft.yuyears.neofavoriteitems.application.ClientFavoriteSyncService;
 import mycraft.yuyears.neofavoriteitems.application.ServerFavoriteService;
 import net.minecraft.client.Minecraft;
@@ -50,6 +53,26 @@ public final class ForgeFavoriteNetworking {
             .codec(BypassKeyStatePayload.STREAM_CODEC)
             .consumerMainThread(ForgeFavoriteNetworking::handleBypassKeyState)
             .add();
+        CHANNEL.messageBuilder(RequestServerConfigPayload.class, 5)
+            .codec(RequestServerConfigPayload.STREAM_CODEC)
+            .consumerMainThread(ForgeFavoriteNetworking::handleRequestServerConfig)
+            .add();
+        CHANNEL.messageBuilder(UpdateServerConfigPayload.class, 6)
+            .codec(UpdateServerConfigPayload.STREAM_CODEC)
+            .consumerMainThread(ForgeFavoriteNetworking::handleUpdateServerConfig)
+            .add();
+        CHANNEL.messageBuilder(ServerConfigStatusPayload.class, 7)
+            .codec(ServerConfigStatusPayload.STREAM_CODEC)
+            .consumerMainThread(ForgeFavoriteNetworking::handleServerConfigStatus)
+            .add();
+    }
+
+    public static void configureClient() {
+        ServerConfigAccess.configureClient(
+            ForgeFavoriteNetworking::isServerPresent,
+            () -> CHANNEL.send(RequestServerConfigPayload.INSTANCE, PacketDistributor.SERVER.noArg()),
+            rules -> CHANNEL.send(new UpdateServerConfigPayload(rules), PacketDistributor.SERVER.noArg())
+        );
     }
 
     public static boolean trySendToggle(int inventoryIndex) {
@@ -152,6 +175,36 @@ public final class ForgeFavoriteNetworking {
         context.setPacketHandled(true);
     }
 
+    private static void handleRequestServerConfig(RequestServerConfigPayload payload, CustomPayloadEvent.Context context) {
+        context.enqueueWork(() -> sendServerConfigStatus(context.getSender()));
+        context.setPacketHandled(true);
+    }
+
+    private static void handleUpdateServerConfig(UpdateServerConfigPayload payload, CustomPayloadEvent.Context context) {
+        context.enqueueWork(() -> {
+            ServerPlayer player = context.getSender();
+            if (player != null && player.hasPermissions(2)) {
+                payload.rules().applyTo(ConfigManager.getInstance().getConfig());
+                ConfigManager.getInstance().saveServerConfig();
+            }
+            sendServerConfigStatus(player);
+        });
+        context.setPacketHandled(true);
+    }
+
+    private static void handleServerConfigStatus(ServerConfigStatusPayload payload, CustomPayloadEvent.Context context) {
+        context.enqueueWork(() -> ServerConfigAccess.receive(true, payload.allowed(), payload.rules()));
+        context.setPacketHandled(true);
+    }
+
+    private static void sendServerConfigStatus(ServerPlayer player) {
+        if (!canSendTo(player)) return;
+        boolean allowed = player.hasPermissions(2);
+        CHANNEL.send(new ServerConfigStatusPayload(
+            allowed, allowed ? ServerRulesSnapshot.from(ConfigManager.getInstance().getConfig()) : null
+        ), PacketDistributor.PLAYER.with(player));
+    }
+
     private static void sendIncrementalSync(ServerPlayer player, SyncFavoriteChangesPayload payload) {
         if (!canSendTo(player)) {
             DebugLogger.debug("Forge incremental sync skipped: client_channel_unavailable player={}", player.getGameProfile().getName());
@@ -225,6 +278,44 @@ public final class ForgeFavoriteNetworking {
         public Type<? extends CustomPacketPayload> type() {
             return TYPE;
         }
+    }
+
+    public record RequestServerConfigPayload() implements CustomPacketPayload {
+        public static final RequestServerConfigPayload INSTANCE = new RequestServerConfigPayload();
+        public static final Type<RequestServerConfigPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "request_server_config")
+        );
+        public static final StreamCodec<FriendlyByteBuf, RequestServerConfigPayload> STREAM_CODEC =
+            StreamCodec.of((buffer, payload) -> {}, buffer -> INSTANCE);
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    public record UpdateServerConfigPayload(ServerRulesSnapshot rules) implements CustomPacketPayload {
+        public static final Type<UpdateServerConfigPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "update_server_config")
+        );
+        public static final StreamCodec<FriendlyByteBuf, UpdateServerConfigPayload> STREAM_CODEC = StreamCodec.of(
+            (buffer, payload) -> payload.rules.write(buffer),
+            buffer -> new UpdateServerConfigPayload(ServerRulesSnapshot.read(buffer))
+        );
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    public record ServerConfigStatusPayload(boolean allowed, ServerRulesSnapshot rules) implements CustomPacketPayload {
+        public static final Type<ServerConfigStatusPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "server_config_status")
+        );
+        public static final StreamCodec<FriendlyByteBuf, ServerConfigStatusPayload> STREAM_CODEC = StreamCodec.of(
+            (buffer, payload) -> {
+                buffer.writeBoolean(payload.allowed);
+                if (payload.allowed) payload.rules.write(buffer);
+            },
+            buffer -> {
+                boolean allowed = buffer.readBoolean();
+                return new ServerConfigStatusPayload(allowed, allowed ? ServerRulesSnapshot.read(buffer) : null);
+            }
+        );
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
     public record SyncFavoritesPayload(long revision, Set<Integer> favoriteSlots) implements CustomPacketPayload {

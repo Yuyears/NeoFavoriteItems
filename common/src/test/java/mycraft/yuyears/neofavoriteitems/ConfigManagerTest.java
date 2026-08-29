@@ -13,8 +13,59 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConfigManagerTest {
+    @Test
+    void rgbaIntegerOneIsOneByteNotNormalizedWhite() {
+        assertEquals(0xB201960B, ConfigManager.parseColorValue("rgba(1,150,11,178)"));
+        assertEquals(0x80FF0000, ConfigManager.parseColorValue("rgba(1.0,0,0,0.5)"));
+    }
+
     @TempDir
     Path tempDir;
+
+    @Test
+    void dirtyDraftOnlyReportsExternalChangeWhenFilesActuallyChanged() throws Exception {
+        Path configDir = tempDir.resolve("config-dirty-draft");
+        ConfigManager manager = ConfigManager.getInstance();
+        manager.initialize(configDir);
+        manager.setDraftDirty(true);
+
+        Thread.sleep(550L);
+        assertFalse(manager.reloadIfChanged());
+        assertFalse(manager.isExternalChangeDetected());
+
+        Path rendering = configDir.resolve(NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME);
+        Files.writeString(rendering, "\n# external edit\n", StandardCharsets.UTF_8,
+            java.nio.file.StandardOpenOption.APPEND);
+        Thread.sleep(550L);
+        assertFalse(manager.reloadIfChanged());
+        assertTrue(manager.isExternalChangeDetected());
+        manager.setDraftDirty(false);
+    }
+
+    @Test
+    void normalizesOverlayZIndexWithoutRounding() {
+        assertEquals(0, ConfigManager.normalizeOverlayZIndex(-4.2));
+        assertEquals(0, ConfigManager.normalizeOverlayZIndex(0.9));
+        assertEquals(2, ConfigManager.normalizeOverlayZIndex(1.9));
+        assertEquals(8, ConfigManager.normalizeOverlayZIndex(8.99));
+        assertEquals(1000, ConfigManager.normalizeOverlayZIndex(5000.0));
+    }
+
+    @Test
+    void rewritesNormalizedOverlayZIndexAtConfigBoundary() throws IOException {
+        Path configDir = tempDir.resolve("config-z-index");
+        ConfigManager manager = ConfigManager.getInstance();
+        manager.initialize(configDir);
+        Path rendering = configDir.resolve(NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME);
+        String content = Files.readString(rendering, StandardCharsets.UTF_8)
+            .replaceFirst("zIndex = 2", "zIndex = -4.2");
+        Files.writeString(rendering, content, StandardCharsets.UTF_8);
+
+        manager.reload();
+
+        assertEquals(0, manager.getConfig().overlay.locked.zIndex);
+        assertTrue(Files.readString(rendering, StandardCharsets.UTF_8).contains("zIndex = 0"));
+    }
 
     @Test
     void writesDefaultConfigUsingUtf8AndAlignedDefaults() throws IOException {
@@ -23,19 +74,25 @@ class ConfigManagerTest {
 
         Path commonConfigFile = tempDir.resolve("config").resolve(NeoFavoriteItemsConstants.COMMON_CONFIG_FILE_NAME);
         Path clientConfigFile = tempDir.resolve("config").resolve(NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME);
+        Path clientLogicConfigFile = tempDir.resolve("config").resolve(NeoFavoriteItemsConstants.CLIENT_LOGIC_CONFIG_FILE_NAME);
         Path legacyConfigFile = tempDir.resolve("config").resolve(NeoFavoriteItemsConstants.CONFIG_FILE_NAME);
         assertTrue(Files.exists(commonConfigFile));
         assertTrue(Files.exists(clientConfigFile));
+        assertTrue(Files.exists(clientLogicConfigFile));
         assertFalse(Files.exists(legacyConfigFile));
         assertTrue(Files.readString(commonConfigFile, StandardCharsets.UTF_8).contains("通用配置"));
         assertTrue(Files.readString(clientConfigFile, StandardCharsets.UTF_8).contains("客户端配置"));
         assertTrue(manager.getConfig().general.lockEmptySlots);
         assertFalse(manager.getConfig().general.autoUnlockEmptySlots);
+        assertEquals("minecraft:block.chain.break", manager.getConfig().feedback.feedbackSound);
+        assertEquals(0.25f, manager.getConfig().feedback.feedbackVolume);
+        assertEquals(1.5f, manager.getConfig().feedback.feedbackPitch);
         assertTrue(manager.getConfig().slotBehavior.moveBehavior == NeoFavoriteItemsConfig.SlotMoveBehavior.STAY_AT_POSITION);
         assertFalse(manager.getConfig().deathBehavior.preserveLockedSlotContents);
         assertFalse(Files.readString(clientConfigFile, StandardCharsets.UTF_8).contains("renderForegroundContrastBackdrop"));
         String commonConfig = Files.readString(commonConfigFile, StandardCharsets.UTF_8);
         String clientConfig = Files.readString(clientConfigFile, StandardCharsets.UTF_8);
+        String clientLogicConfig = Files.readString(clientLogicConfigFile, StandardCharsets.UTF_8);
         assertTrue(commonConfig.contains("[deathBehavior]"));
         assertTrue(commonConfig.contains("preserveLockedSlotContents = false"));
         assertTrue(commonConfig.contains("picked-up ground items skip locked empty main-inventory slots"));
@@ -44,6 +101,74 @@ class ConfigManagerTest {
         assertTrue(commonConfig.contains("死亡保留由 [deathBehavior] 配置"));
         assertTrue(clientConfig.contains("server-side lock rules are still controlled by the common config"));
         assertTrue(clientConfig.contains("服务端锁定规则仍由 common 配置控制"));
+        assertTrue(clientConfig.contains("[profile.locked]"));
+        assertTrue(clientConfig.contains("colorMode = \"NATIVE\""));
+        assertTrue(clientConfig.contains("scale = 0.5"));
+        assertFalse(clientConfig.contains("[overlay]"));
+        assertFalse(clientConfig.contains("lockedStyle"));
+        assertFalse(clientConfig.contains("[feedback]"));
+        assertTrue(clientLogicConfig.contains("[feedback]"));
+        assertFalse(clientLogicConfig.contains("[overlay]"));
+    }
+
+    @Test
+    void roundTripsIndependentProfileRenderingValues() {
+        Path configDir = tempDir.resolve("config-profiles");
+        ConfigManager manager = ConfigManager.getInstance();
+        manager.initialize(configDir);
+        var bypass = manager.getConfig().overlay.bypass;
+        bypass.colorMode = mycraft.yuyears.neofavoriteitems.render.OverlayColorMode.NATIVE;
+        bypass.materialMode = mycraft.yuyears.neofavoriteitems.render.OverlayMaterialMode.NO_MATERIAL;
+        bypass.materialId = mycraft.yuyears.neofavoriteitems.render.OverlayTextureCatalog.NO_MATERIAL;
+        bypass.materialId = "custom:wide image.png";
+        bypass.opacityBehavior = OverlayProfileConfig.OpacityBehavior.FIXED;
+        bypass.opacity = 0.42f;
+        bypass.offsetX = -2.5f;
+        bypass.width = 23.0f;
+        bypass.height = 11.0f;
+        bypass.scale = 1.25f;
+        bypass.rotationDegrees = 37.0f;
+        bypass.zIndex = 125;
+        bypass.allowOverflow = true;
+        manager.saveConfig();
+
+        manager.reload();
+        bypass = manager.getConfig().overlay.bypass;
+        assertEquals(mycraft.yuyears.neofavoriteitems.render.OverlayColorMode.NATIVE, bypass.colorMode);
+        assertEquals(mycraft.yuyears.neofavoriteitems.render.OverlayMaterialMode.NO_MATERIAL, bypass.materialMode);
+        assertEquals("custom:wide image.png", bypass.materialId);
+        assertEquals(OverlayProfileConfig.OpacityBehavior.FIXED, bypass.opacityBehavior);
+        assertEquals(0.42f, bypass.opacity);
+        assertEquals(-2.5f, bypass.offsetX);
+        assertEquals(23.0f, bypass.width);
+        assertEquals(11.0f, bypass.height);
+        assertEquals(1.25f, bypass.scale);
+        assertEquals(37.0f, bypass.rotationDegrees);
+        assertEquals(125, bypass.zIndex);
+        assertTrue(bypass.allowOverflow);
+    }
+
+    @Test
+    void normalizesInvalidProfileGeometryAtConfigBoundary() throws IOException {
+        Path configDir = tempDir.resolve("config-profile-normalization");
+        ConfigManager manager = ConfigManager.getInstance();
+        manager.initialize(configDir);
+        Path rendering = configDir.resolve(NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME);
+        String content = Files.readString(rendering, StandardCharsets.UTF_8)
+            .replaceFirst("opacity = 0.7", "opacity = 3.5")
+            .replaceFirst("width = 16.0", "width = -2.0")
+            .replaceFirst("offsetX = 0.0", "offsetX = NaN");
+        Files.writeString(rendering, content, StandardCharsets.UTF_8);
+
+        manager.reload();
+
+        assertEquals(1.0f, manager.getConfig().overlay.locked.opacity);
+        assertEquals(16.0f, manager.getConfig().overlay.locked.width);
+        assertEquals(0.0f, manager.getConfig().overlay.locked.offsetX);
+        String normalized = Files.readString(rendering, StandardCharsets.UTF_8);
+        assertTrue(normalized.contains("opacity = 1.0"));
+        assertTrue(normalized.contains("width = 16.0"));
+        assertTrue(normalized.contains("offsetX = 0.0"));
     }
 
     @Test
@@ -118,8 +243,9 @@ class ConfigManagerTest {
         assertTrue(repairedCommon.contains("lockEmptySlots = true"));
         assertTrue(repairedCommon.contains("preventDrop = false"));
         assertTrue(repairedCommon.contains("preserveLockedSlotContents = true"));
-        assertTrue(repairedClient.contains("lockedStyle = \"LOCK\""));
-        assertTrue(repairedClient.contains("lockedOverlayOpacity = 0.7"));
+        assertTrue(repairedClient.contains("[profile.locked]"));
+        assertTrue(repairedClient.contains("style = \"LOCK\""));
+        assertTrue(repairedClient.contains("opacity = 1.0"));
         assertFalse(repairedClient.contains("renderForegroundContrastBackdrop"));
         assertFalse(repairedClient.contains("unknownOverlayOption"));
         assertFalse(repairedCommon.contains("broken line"));
@@ -129,7 +255,8 @@ class ConfigManagerTest {
     @Test
     void deletesStaleLegacyConfigWhenSplitFilesAlreadyExist() throws IOException {
         Path configDir = tempDir.resolve("config-stale-legacy");
-        Files.createDirectories(configDir);
+        Files.createDirectories(configDir.resolve(NeoFavoriteItemsConstants.COMMON_CONFIG_FILE_NAME).getParent());
+        Files.createDirectories(configDir.resolve(NeoFavoriteItemsConstants.CLIENT_CONFIG_FILE_NAME).getParent());
         Files.writeString(
             configDir.resolve(NeoFavoriteItemsConstants.COMMON_CONFIG_FILE_NAME),
             """
@@ -180,7 +307,7 @@ class ConfigManagerTest {
             [feedback]
             showVisualFeedback = true
             playSoundFeedback = true
-            feedbackSound = "minecraft:block.note_block.hat"
+            feedbackSound = "minecraft:block.chain.break"
             feedbackVolume = 0.5
             feedbackPitch = 1.0
             """,

@@ -9,6 +9,8 @@
   ],
   "client": [
     "AbstractContainerScreenMixin",
+    "GuiMixin",
+    "GuiGraphicsMixin",
     "MinecraftMixin",
     "MouseHandlerMixin"
   ],
