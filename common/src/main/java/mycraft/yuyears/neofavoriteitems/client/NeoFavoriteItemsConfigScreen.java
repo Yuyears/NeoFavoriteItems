@@ -227,6 +227,7 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             buildServerRuleControls();
         }
         configPanel.finalizeLayout();
+        syncMaterialPopupBounds();
         configPanel.sectionHeaders().forEach(this::addRenderableWidget);
         DebugLogger.debug("UI-DIAG init widgets gen={} panel={} headers={} page={} profile={}", generation,
             System.identityHashCode(configPanel), configPanel.sectionHeaders().size(), configPage, profileTab);
@@ -955,7 +956,12 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         for (LayerControlSet controls : layerControls.values()) {
             NfiDropdown<String> material = controls.material();
             if (material != null && material.button().visible && material.button().active
-                && material.mouseClicked(mouseX, mouseY, button)) {
+                && material.button().isMouseOver(mouseX, mouseY)) {
+                // Handle trigger explicitly; relying on Screen widget dispatch can
+                // miss composite dropdowns after nested reflow.
+                material.mouseClicked(mouseX, mouseY, button);
+                if (!material.isOpen()) material.open();
+                material.layoutPopup(height);
             dropdownCapturedMouse = material.isOpen();
             if (feedbackSoundControl != null) feedbackSoundControl.close();
             setFocused(material.button());
@@ -1012,7 +1018,8 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             colorPicker.close();
             return true;
         }
-        if (materialControl != null && materialControl.keyPressed(keyCode)) return true;
+        if (layerControls.values().stream().map(LayerControlSet::material)
+            .filter(java.util.Objects::nonNull).anyMatch(control -> control.keyPressed(keyCode))) return true;
         if (feedbackSoundControl != null && feedbackSoundControl.keyPressed(keyCode)) return true;
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
@@ -1023,17 +1030,20 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             feedbackSoundControl.mouseScrolled(mouseX, mouseY, verticalDelta);
             return true;
         }
-        if (materialControl != null && materialControl.isOpen()) {
-            materialControl.mouseScrolled(mouseX, mouseY, verticalDelta);
+        if (layerControls.values().stream().map(LayerControlSet::material)
+            .filter(java.util.Objects::nonNull).anyMatch(control -> {
+                if (!control.isOpen()) return false;
+                control.mouseScrolled(mouseX, mouseY, verticalDelta);
+                return true;
+            })) {
             return true;
         }
-        if (materialControl != null && materialControl.mouseScrolled(mouseX, mouseY, verticalDelta)) return true;
+        if (layerControls.values().stream().map(LayerControlSet::material)
+            .filter(java.util.Objects::nonNull).anyMatch(control -> control.mouseScrolled(mouseX, mouseY, verticalDelta))) return true;
         if (feedbackSoundControl != null && feedbackSoundControl.mouseScrolled(mouseX, mouseY, verticalDelta)) return true;
         if (configPanel != null && configPanel.mouseScrolled(mouseX, mouseY, verticalDelta)) {
-            if (materialControl != null) {
-                materialControl.close();
-                materialControl.layoutPopup(height);
-            }
+            layerControls.values().stream().map(LayerControlSet::material)
+                .filter(java.util.Objects::nonNull).forEach(control -> { control.close(); control.layoutPopup(height); });
             if (colorPicker != null) colorPicker.close();
             return true;
         }
@@ -1054,10 +1064,13 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         if (assetsButton != null) {
             assetsButton.setMessage(Component.translatable("screen.neo_favorite_items.refresh_assets_count", entries.size()));
         }
-        if (materialControl != null) {
-            materialControl.setValues(materialValues());
-            materialControl.layoutPopup(height);
-        }
+        layerControls.values().stream().map(LayerControlSet::material)
+            .filter(java.util.Objects::nonNull).forEach(control -> { control.setValues(materialValues()); control.layoutPopup(height); });
+    }
+
+    private void syncMaterialPopupBounds() {
+        layerControls.values().stream().map(LayerControlSet::material)
+            .filter(java.util.Objects::nonNull).forEach(NfiDropdown::syncPopupToButton);
     }
 
     private void syncControls() {
@@ -1124,6 +1137,7 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             stateRequiresRebuild = true;
         }
         if (stateRequiresRebuild) rebuildWidgetsNow();
+        syncMaterialPopupBounds();
         graphics.fill(0, 0, width, height, 0x30101010);
         NfiUiRenderer.panel(graphics, contentLeft, 8, contentWidth, height - 16, theme.background);
         NfiUiRenderer.centeredText(graphics, font, title, width / 2, 17, theme.text);
@@ -1146,11 +1160,14 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         NfiUiRenderer.divider(graphics, contentLeft + 10, configTop - 5, contentWidth - 20);
         configPanel.renderLabels(graphics, font, theme.text);
         NfiUiRenderer.divider(graphics, contentLeft + 10, configTop + configHeight + 3, contentWidth - 20);
-        boolean dropdownOpen = materialControl != null && materialControl.isOpen()
+        boolean dropdownOpen = layerControls.values().stream().map(LayerControlSet::material)
+            .filter(java.util.Objects::nonNull).anyMatch(NfiDropdown::isOpen)
             || feedbackSoundControl != null && feedbackSoundControl.isOpen();
         super.render(graphics, dropdownOpen ? Integer.MIN_VALUE : mouseX,
             dropdownOpen ? Integer.MIN_VALUE : mouseY, delta);
-        if (materialControl != null) materialControl.renderPopup(graphics, mouseX, mouseY, delta);
+        layerControls.values().stream().map(LayerControlSet::material)
+            .filter(java.util.Objects::nonNull).filter(NfiDropdown::isOpen)
+            .forEach(control -> control.renderPopup(graphics, mouseX, mouseY, delta));
         if (feedbackSoundControl != null) feedbackSoundControl.renderPopup(graphics, mouseX, mouseY, delta, height);
         if (colorPicker != null) {
             colorPicker.layoutPopup(height);

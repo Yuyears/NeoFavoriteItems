@@ -132,6 +132,13 @@ public final class NfiDropdown<T> {
         popupWidth = Math.max(selectionButton.getWidth(), width);
     }
 
+    /** Keeps popup aligned with resized/indented trigger button. */
+    public void syncPopupToButton() {
+        popupLeft = selectionButton.getX();
+        popupWidth = selectionButton.getWidth();
+        refreshOptions();
+    }
+
     public void setEndMessage(Component message) { endMessage = message; }
     public void setEndReached(boolean reached) {
         endReached = reached;
