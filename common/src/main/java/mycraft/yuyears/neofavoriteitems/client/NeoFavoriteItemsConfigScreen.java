@@ -762,7 +762,8 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
     }
 
     private void closeTransientPopups() {
-        if (materialControl != null) materialControl.close();
+        layerControls.values().stream().map(LayerControlSet::material)
+            .filter(java.util.Objects::nonNull).forEach(NfiDropdown::close);
         if (feedbackSoundControl != null) feedbackSoundControl.close();
         if (colorPicker != null) colorPicker.close();
         setFocused(null);
@@ -942,18 +943,24 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             handleFeedbackSoundClick(mouseX, mouseY, button);
             return true;
         }
-        if (materialControl != null && materialControl.isOpen()) {
+        NfiDropdown<String> openMaterial = layerControls.values().stream()
+            .map(LayerControlSet::material).filter(java.util.Objects::nonNull)
+            .filter(NfiDropdown::isOpen).findFirst().orElse(null);
+        if (openMaterial != null) {
             dropdownCapturedMouse = true;
-            materialControl.mouseClicked(mouseX, mouseY, button);
-            setFocused(materialControl.button());
+            openMaterial.mouseClicked(mouseX, mouseY, button);
+            setFocused(openMaterial.button());
             return true;
         }
-        if (materialControl != null && materialControl.button().visible && materialControl.button().active
-            && materialControl.mouseClicked(mouseX, mouseY, button)) {
-            dropdownCapturedMouse = materialControl.isOpen();
+        for (LayerControlSet controls : layerControls.values()) {
+            NfiDropdown<String> material = controls.material();
+            if (material != null && material.button().visible && material.button().active
+                && material.mouseClicked(mouseX, mouseY, button)) {
+            dropdownCapturedMouse = material.isOpen();
             if (feedbackSoundControl != null) feedbackSoundControl.close();
-            setFocused(materialControl.button());
+            setFocused(material.button());
             return true;
+            }
         }
         if (feedbackSoundControl != null && feedbackSoundControl.trigger().visible && feedbackSoundControl.trigger().active
             && feedbackSoundControl.mouseClicked(mouseX, mouseY, button)) {
