@@ -17,7 +17,6 @@ public final class OverlayFrameCollector {
         .thenComparing(command -> command.type().ordinal());
 
     private final List<OverlayDrawCommand> commands = new ArrayList<>();
-
     public void clear() {
         commands.clear();
     }

@@ -120,6 +120,7 @@ public final class OverlayDrawEngine {
         graphics.fill(command.x() + command.width() - 1, command.y() + 1, command.x() + command.width(), command.y() + command.height() - 1, color);
     }
 
+
     private void renderTexture(GuiGraphics graphics, OverlayDrawCommand command) {
         ResourceLocation sourceTexture = command.texture();
         if (sourceTexture == null) {

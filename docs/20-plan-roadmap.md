@@ -2,9 +2,9 @@
 
 # Neo Favorite Items 路线图
 
-Last updated: 2026-08-21
+Last updated: 2026-09-06
 
-最后更新：2026-08-21
+最后更新：2026-09-06
 
 ## Version Plan
 
@@ -27,7 +27,7 @@ Last updated: 2026-08-21
 neo_favorite_items-<minecraft>-<loader>-<channel>-<modVersion>-<build>.jar
 ```
 
-Example: `neo_favorite_items-1.21.1-neoforge-release-0.0.2-beta-build1.jar`.
+Example: `neo_favorite_items-1.21.1-neoforge-release-0.0.2-build1.jar`.
 
 Build number and channel come from CI or explicit Gradle properties. Gradle must not rewrite `gradle.properties`.
 

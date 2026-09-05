@@ -8,8 +8,8 @@
 - Mod ID：`neo_favorite_items`
 - Package: `mycraft.yuyears.neofavoriteitems`
 - 包名：`mycraft.yuyears.neofavoriteitems`
-- Version: `0.0.2-beta`
-- 版本：`0.0.2-beta`
+- Version: `0.0.2`
+- 版本：`0.0.2`
 - Java: 21
 - Java：21
 - Build system: Gradle Kotlin DSL + Architectury Loom
@@ -41,10 +41,16 @@
   - `40`：副手
 - Favorite slots render overlays in GUI screens and on the hotbar HUD.
 - 已收藏槽位会在 GUI 和快捷栏 HUD 中显示 Overlay。
-- Supported PNG overlay textures: `border`, `classic`, `framework`, `highlight`, `brackets`, `lock`, `mark`, `tag`, `star`.
+- In-game configuration screen with bindable key, profile/layer editing, live client updates, manual reload, and automatic external-change detection.
+- 提供可绑定按键打开的局内配置页，支持 Profile/Layer 编辑、客户端配置即时生效、手动 Reload 和外部修改自动检测。
+- Overlay rendering supports up to four ordered layers per profile, custom PNG/JPG assets, arbitrary bounded dimensions, anchors, offsets, scale, rotation, clipping, overflow, z-index, and multiple color modes.
+- Overlay 支持每个 Profile 最多四个有序渲染层、自定义 PNG/JPG 材质、受限任意尺寸、锚点、偏移、缩放、旋转、裁剪、溢出、z-index 和多种着色模式。
+- Configurable sound feedback supports registered sound ID search, lazy paging, subtitle tooltips, and preview playback with cooldown.
+- 音效反馈支持注册音效 ID 搜索、懒加载分页、subtitle 提示和带冷却的预览播放。
+- Built-in overlay textures include `border`, `classic`, `framework`, `highlight`, `brackets`, `lock`, `mark`, `tag`, `star`, `heart`, and `arrow_down`; custom assets are loaded from `NFI Assets`.
 - 支持的 PNG Overlay 材质：`border`、`classic`、`framework`、`highlight`、`brackets`、`lock`、`mark`、`tag`、`star`。
 - Overlay colors support both `0xAARRGGBB` and `luv(L, u, v, alpha)` formats.
-- Overlay 颜色支持 `0xAARRGGBB` 和 `luv(L, u, v, alpha)` 两种写法。
+- Overlay 颜色支持 `0xAARRGGBB`、`rgba(r,g,b,a)` 和 `luv(L, u, v, alpha)` 写法。
 - Configurable guards can block click, drop, quick move, Shift-click, drag, and swap actions.
 - 可配置的交互守卫可阻止点击、丢弃、快速移动、Shift 点击、拖拽和交换等行为。
 - Composite moves now guard both sides of the operation: locked slots are treated as blocked sources when an item would be removed and blocked targets when an item would be inserted. This covers GUI and GUI-outside offhand swaps plus quick-moving equipment into locked armor/offhand slots.
@@ -181,9 +187,9 @@ Build outputs:
 
 构建产物：
 
-- `fabric/build/libs/neo_favorite_items-1.21.1-fabric-release-0.0.2-beta-build1.jar`
-- `forge/build/libs/neo_favorite_items-1.21.1-forge-release-0.0.2-beta-build1.jar`
-- `neoforge/build/libs/neo_favorite_items-1.21.1-neoforge-release-0.0.2-beta-build1.jar`
+- `fabric/build/libs/neo_favorite_items-1.21.1-fabric-release-0.0.2-build1.jar`
+- `forge/build/libs/neo_favorite_items-1.21.1-forge-release-0.0.2-build1.jar`
+- `neoforge/build/libs/neo_favorite_items-1.21.1-neoforge-release-0.0.2-build1.jar`
 - `build/result/neo_favorite_items-<minecraft>-<loader>-<channel>-<modVersion>-<build>.jar`
 
 `build_number` and `release_channel` are read-only defaults from `gradle.properties` and may be overridden explicitly, for example `-Pbuild_number=build5 -Prelease_channel=dev`. CI supplies its own build number. Gradle never rewrites `gradle.properties`.

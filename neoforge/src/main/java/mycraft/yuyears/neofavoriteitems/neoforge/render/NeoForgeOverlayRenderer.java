@@ -275,11 +275,6 @@ public class NeoForgeOverlayRenderer extends OverlayRenderer {
         drawEngine.render(graphics);
     }
 
-    public void renderTooltipOverlay(GuiGraphics context, int x, int y, String text) {
-        context.renderTooltip(Minecraft.getInstance().font, Component.literal(text), x, y);
-    }
-
-
     private Slot findSlotAt(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
         Slot lockSlot = NeoForgeLockOperationStateMachine.INSTANCE.findLockOperationSlot(screen, mouseX, mouseY);
         if (lockSlot != null) {

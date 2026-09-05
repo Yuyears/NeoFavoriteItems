@@ -65,6 +65,10 @@ public final class ForgeFavoriteNetworking {
             .codec(ServerConfigStatusPayload.STREAM_CODEC)
             .consumerMainThread(ForgeFavoriteNetworking::handleServerConfigStatus)
             .add();
+        CHANNEL.messageBuilder(HotbarRowSwapPayload.class, 8)
+            .codec(HotbarRowSwapPayload.STREAM_CODEC)
+            .consumerMainThread(ForgeFavoriteNetworking::handleHotbarRowSwap)
+            .add();
     }
 
     public static void configureClient() {
@@ -121,6 +125,14 @@ public final class ForgeFavoriteNetworking {
             && CHANNEL.isRemotePresent(minecraft.getConnection().getConnection());
     }
 
+    public static boolean canSendHotbarRowSwap() {
+        return isServerPresent();
+    }
+
+    public static void sendHotbarRowSwap(int rowIndex, int columnMask) {
+        CHANNEL.send(new HotbarRowSwapPayload(rowIndex, columnMask), PacketDistributor.SERVER.noArg());
+    }
+
     private static void handleToggleFavorite(ToggleFavoritePayload payload, CustomPayloadEvent.Context context) {
         context.enqueueWork(() -> {
             ServerPlayer player = context.getSender();
@@ -170,6 +182,17 @@ public final class ForgeFavoriteNetworking {
             ServerPlayer player = context.getSender();
             if (player != null) {
                 ServerFavoriteService.updateBypassState(player, payload.held());
+            }
+        });
+        context.setPacketHandled(true);
+    }
+
+    private static void handleHotbarRowSwap(HotbarRowSwapPayload payload, CustomPayloadEvent.Context context) {
+        context.enqueueWork(() -> {
+            ServerPlayer player = context.getSender();
+            if (player != null) {
+                ServerFavoriteService.executeHotbarRowSwap(player, payload.rowIndex(), payload.columnMask());
+                sendFullSync(player);
             }
         });
         context.setPacketHandled(true);
@@ -273,6 +296,24 @@ public final class ForgeFavoriteNetworking {
         private static BypassKeyStatePayload read(FriendlyByteBuf buffer) {
             return new BypassKeyStatePayload(buffer.readBoolean());
         }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record HotbarRowSwapPayload(int rowIndex, int columnMask) implements CustomPacketPayload {
+        public static final Type<HotbarRowSwapPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "hotbar_row_swap")
+        );
+        public static final StreamCodec<FriendlyByteBuf, HotbarRowSwapPayload> STREAM_CODEC = StreamCodec.of(
+            (buffer, payload) -> {
+                buffer.writeByte(payload.rowIndex);
+                buffer.writeVarInt(payload.columnMask);
+            },
+            buffer -> new HotbarRowSwapPayload(buffer.readByte(), buffer.readVarInt())
+        );
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

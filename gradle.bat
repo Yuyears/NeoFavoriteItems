@@ -2,6 +2,9 @@
 setlocal
 
 if not defined GRADLE_USER_HOME set "GRADLE_USER_HOME=%~dp0.gradle-home"
+set "TEMP=%~dp0.gradle-tmp"
+set "TMP=%TEMP%"
+if not exist "%TEMP%" mkdir "%TEMP%"
 
 if defined GRADLE_HOME (
     set "GRADLE_CMD=%GRADLE_HOME%\bin\gradle.bat"

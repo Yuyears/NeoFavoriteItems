@@ -24,6 +24,8 @@ public final class NfiButton extends Button {
     private int contentRightInset;
     private boolean embeddedDropdownTrigger;
     private boolean silent;
+    private boolean sectionHeader;
+    private boolean plain;
 
     public NfiButton(int x, int y, int width, int height, Component message, OnPress onPress) {
         super(x, y, width, height, message, onPress, DEFAULT_NARRATION);
@@ -42,6 +44,8 @@ public final class NfiButton extends Button {
     public void setContentRightInset(int inset) { contentRightInset = Math.max(0, inset); }
     public void setEmbeddedDropdownTrigger(boolean embedded) { embeddedDropdownTrigger = embedded; }
     public void setSilent(boolean silent) { this.silent = silent; }
+    public void setSectionHeader(boolean value) { sectionHeader = value; }
+    public void setPlain(boolean value) { plain = value; }
 
     @Override
     public void playDownSound(SoundManager soundManager) {
@@ -64,7 +68,17 @@ public final class NfiButton extends Button {
 
     @Override
     protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-        if (embeddedDropdownTrigger) {
+        if (plain) {
+            NfiUiRenderer.centeredText(graphics, Minecraft.getInstance().font, getMessage(),
+                getX() + getWidth() / 2,
+                getY() + (getHeight() - Minecraft.getInstance().font.lineHeight) / 2 + 1,
+                NfiUiRenderer.controlTextColor(active || isHoveredOrFocused()));
+            return;
+        } else if (sectionHeader) {
+            NfiUiRenderer.sectionHeader(graphics, Minecraft.getInstance().font, getMessage(),
+                getX(), getY(), getWidth(), getHeight(), isHoveredOrFocused(), active);
+            return;
+        } else if (embeddedDropdownTrigger) {
             NfiUiRenderer.dropdownTrigger(graphics, getX(), getY(), getWidth(), getHeight(),
                 isHoveredOrFocused(), active);
             if (canvas == null) {

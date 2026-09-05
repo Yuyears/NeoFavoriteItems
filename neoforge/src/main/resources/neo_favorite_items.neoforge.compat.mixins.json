@@ -7,6 +7,7 @@
   "mixins": [
     "Ae2MenuCompatMixin",
     "Ae2StorageMenuCompatMixin",
+    "WcwtStorageMenuCompatMixin",
     "BetterExperienceStorageManagerCompatMixin",
     "ClientSortCollectHandlerCompatMixin",
     "ClientSortSchemaValidatorCompatMixin",
@@ -19,6 +20,7 @@
     "SophisticatedSorterCoreUtilsCompatMixin"
   ],
   "client": [
+    "HotbarSwapperCompatMixin",
     "MouseTweaksMainCompatMixin",
     "QuarkEasyTransferringClientCompatMixin",
     "SusInstantSwapEngineCompatMixin",

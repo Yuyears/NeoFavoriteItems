@@ -110,6 +110,15 @@ public final class NfiUiRenderer {
         graphics.fill(x, y, x + width, y + 1, DIVIDER);
     }
 
+    public static void sectionHeader(GuiGraphics graphics, Font font, Component value,
+                                     int x, int y, int width, int height, boolean hovered, boolean active) {
+        int textColor = controlTextColor(active);
+        text(graphics, font, value, x + 4, y + (height - font.lineHeight) / 2, textColor);
+        int lineX = x + 6 + font.width(value);
+        int lineColor = hovered && active ? CONTROL_BORDER_HOVER : DIVIDER;
+        if (lineX < x + width - 4) graphics.fill(lineX, y + height / 2, x + width - 4, y + height / 2 + 1, lineColor);
+    }
+
     public static void control(GuiGraphics graphics, int x, int y, int width, int height,
                                boolean hovered, boolean active, boolean selected) {
         int border = !active ? CONTROL_BORDER_DISABLED : hovered ? CONTROL_BORDER_HOVER : CONTROL_BORDER;

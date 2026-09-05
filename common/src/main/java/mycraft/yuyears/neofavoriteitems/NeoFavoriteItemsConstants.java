@@ -14,8 +14,8 @@ public final class NeoFavoriteItemsConstants {
     public static final int DEFAULT_LOCK_OPERATION_KEY_CODE = 342; // GLFW_KEY_LEFT_ALT
     public static final int DEFAULT_BYPASS_LOCK_KEY_CODE = 341; // GLFW_KEY_LEFT_CONTROL
     public static final int DEFAULT_CONFIG_UI_KEY_CODE = 79; // GLFW_KEY_O
-    public static final int NETWORK_PROTOCOL_VERSION = 1;
-    public static final String NETWORK_PROTOCOL_VERSION_STRING = "1";
+    public static final int NETWORK_PROTOCOL_VERSION = 2;
+    public static final String NETWORK_PROTOCOL_VERSION_STRING = "2";
     public static final String PLAYER_DATA_DIRECTORY = "players";
     public static final String CLIENT_SAVE_DIRECTORY = "favoriteitems";
     public static final String LEGACY_CLIENT_SAVE_DIRECTORY = "itemfavorites";

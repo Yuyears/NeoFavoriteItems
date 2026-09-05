@@ -33,6 +33,7 @@ public final class NeoForgeFavoriteNetworking {
         optionalRegistrar.playToServer(ToggleFavoritePayload.TYPE, ToggleFavoritePayload.STREAM_CODEC, ToggleFavoritePayload::handle);
         optionalRegistrar.playToServer(RequestFavoriteSyncPayload.TYPE, RequestFavoriteSyncPayload.STREAM_CODEC, RequestFavoriteSyncPayload::handle);
         optionalRegistrar.playToServer(BypassKeyStatePayload.TYPE, BypassKeyStatePayload.STREAM_CODEC, BypassKeyStatePayload::handle);
+        optionalRegistrar.playToServer(HotbarRowSwapPayload.TYPE, HotbarRowSwapPayload.STREAM_CODEC, HotbarRowSwapPayload::handle);
         optionalRegistrar.playToServer(PrepareInstantSwapPayload.TYPE, PrepareInstantSwapPayload.STREAM_CODEC, PrepareInstantSwapPayload::handle);
         optionalRegistrar.playToServer(CompleteInstantSwapPayload.TYPE, CompleteInstantSwapPayload.STREAM_CODEC, CompleteInstantSwapPayload::handle);
         optionalRegistrar.playToServer(MoveCreativeFavoritePairsPayload.TYPE, MoveCreativeFavoritePairsPayload.STREAM_CODEC, MoveCreativeFavoritePairsPayload::handle);
@@ -133,6 +134,14 @@ public final class NeoForgeFavoriteNetworking {
         return hasServerChannel(ToggleFavoritePayload.TYPE.id());
     }
 
+    public static boolean canSendHotbarRowSwap() {
+        return hasServerChannel(HotbarRowSwapPayload.TYPE.id());
+    }
+
+    public static void sendHotbarRowSwap(int rowIndex, int columnMask) {
+        PacketDistributor.sendToServer(new HotbarRowSwapPayload(rowIndex, columnMask));
+    }
+
     private static boolean hasServerChannel(ResourceLocation payloadId) {
         Minecraft minecraft = Minecraft.getInstance();
         return minecraft.getConnection() != null
@@ -216,6 +225,32 @@ public final class NeoForgeFavoriteNetworking {
 
         public static void handle(BypassKeyStatePayload payload, IPayloadContext context) {
             context.enqueueWork(() -> ServerFavoriteService.updateBypassState((ServerPlayer) context.player(), payload.held()));
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record HotbarRowSwapPayload(int rowIndex, int columnMask) implements CustomPacketPayload {
+        public static final Type<HotbarRowSwapPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "hotbar_row_swap")
+        );
+        public static final StreamCodec<FriendlyByteBuf, HotbarRowSwapPayload> STREAM_CODEC = StreamCodec.of(
+            (buffer, payload) -> {
+                buffer.writeByte(payload.rowIndex);
+                buffer.writeVarInt(payload.columnMask);
+            },
+            buffer -> new HotbarRowSwapPayload(buffer.readByte(), buffer.readVarInt())
+        );
+
+        public static void handle(HotbarRowSwapPayload payload, IPayloadContext context) {
+            context.enqueueWork(() -> {
+                ServerPlayer player = (ServerPlayer) context.player();
+                ServerFavoriteService.executeHotbarRowSwap(player, payload.rowIndex(), payload.columnMask());
+                sendFullSync(player);
+            });
         }
 
         @Override

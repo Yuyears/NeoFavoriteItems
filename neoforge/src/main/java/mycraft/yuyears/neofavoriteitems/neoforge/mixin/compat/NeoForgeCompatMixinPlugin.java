@@ -16,6 +16,8 @@ public class NeoForgeCompatMixinPlugin implements IMixinConfigPlugin {
     private static final String CLIENT_SORT_MOD_ID = "clientsort";
     private static final String BETTER_EXPERIENCE_MOD_ID = "better_experience";
     private static final String SUS_INSTANT_SWAP_MOD_ID = "susinstantswap";
+    private static final String HOTBAR_SWAPPER_MOD_ID = "hotbarswapper";
+    private static final String WCWT_MOD_ID = "wcwt";
     
     @Override
     public void onLoad(String mixinPackage) {
@@ -72,6 +74,11 @@ public class NeoForgeCompatMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("SusInstantSwapEngineCompatMixin")) {
             return isModLoaded(SUS_INSTANT_SWAP_MOD_ID);
         }
+
+        if (mixinClassName.endsWith("HotbarSwapperCompatMixin")) {
+            return isModLoaded(HOTBAR_SWAPPER_MOD_ID);
+        }
+        if (mixinClassName.endsWith("WcwtStorageMenuCompatMixin")) return isModLoaded(WCWT_MOD_ID);
         
         // Apply other mixins by default
         return true;

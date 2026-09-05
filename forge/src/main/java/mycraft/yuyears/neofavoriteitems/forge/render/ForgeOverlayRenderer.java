@@ -232,11 +232,6 @@ public class ForgeOverlayRenderer extends OverlayRenderer {
         drawEngine.render(graphics);
     }
 
-    public void renderTooltipOverlay(GuiGraphics context, int x, int y, String text) {
-        context.renderTooltip(Minecraft.getInstance().font, Component.literal(text), x, y);
-    }
-
-
     private Slot findSlotAt(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
         Slot screenSlot = invokeScreenFindSlot(screen, mouseX, mouseY);
         if (screenSlot != null) {

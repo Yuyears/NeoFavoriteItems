@@ -132,14 +132,14 @@ public final class TintedTextureRegistry {
         int[] lut = new int[TINT_LUT_SIZE];
         for (int index = 0; index < lut.length; index++) {
             double sourceLightness = index / (double) (lut.length - 1);
-            double lightness = target[0] * sourceLightness;
-            double chroma = targetChroma * sourceLightness;
+            double transfer = Math.sqrt(sourceLightness);
+            double lightness = Math.sqrt(target[0]) * transfer;
+            double chroma = targetChroma * transfer;
             double usableChroma = inGamut(lightness, chroma, hue)
                 ? chroma
                 : maxInGamutChroma(lightness, chroma, hue);
             lut[index] = oklchToRgb(lightness, usableChroma, hue);
         }
-        lut[lut.length - 1] = (blue << 16) | (green << 8) | red;
         return lut;
     }
 

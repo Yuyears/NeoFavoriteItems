@@ -13,6 +13,7 @@ public class FabricCompatMixinPlugin implements IMixinConfigPlugin {
     private static final String APPENG_MENU_CLASS = "appeng.menu.AEBaseMenu";
     private static final String APPENG_STORAGE_MENU_CLASS = "appeng.menu.me.common.MEStorageMenu";
     private static final String CLIENT_SORT_HANDLER_CLASS = "dev.terminalmc.clientsort.network.handler.SortHandler";
+    private static final String HOTBAR_SWAPPER_HANDLER_CLASS = "me.ichun.mods.hotbarswapper.common.core.EventHandlerClient";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -40,6 +41,12 @@ public class FabricCompatMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.endsWith("ClientSortStackFillHandlerCompatMixin")
             || mixinClassName.endsWith("ClientSortTransferHandlerCompatMixin")) {
             return isClassPresent(CLIENT_SORT_HANDLER_CLASS);
+        }
+        if (mixinClassName.endsWith("HotbarSwapperCompatMixin")) {
+            return isClassPresent(HOTBAR_SWAPPER_HANDLER_CLASS);
+        }
+        if (mixinClassName.endsWith("WcwtStorageMenuCompatMixin")) {
+            return isClassPresent("com.lhy.wcwt.pull.WcwtTerminalPullService");
         }
         return true;
     }

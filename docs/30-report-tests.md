@@ -2,6 +2,18 @@
 
 # 测试报告
 
+## 0.0.2 Delivery Snapshot
+
+- Full build passed for common, Fabric, Forge, and NeoForge.
+- Common tests cover layer normalization, compiler, texture registry, transfer compatibility, and recursive layout.
+- Remaining gap: real-game resolution/GUI-scale matrix and performance sampling (Step 23).
+
+## 0.0.2 交付快照
+
+- common、Fabric、Forge、NeoForge 完整构建通过。
+- common 测试覆盖 Layer 归一化、编译器、纹理缓存、转移兼容和递归布局。
+- 剩余缺口：实机分辨率/GUI Scale 矩阵与性能采样（Step 23）。
+
 Date: 2026-08-16
 
 日期：2026-08-16

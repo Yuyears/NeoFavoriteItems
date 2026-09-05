@@ -13,6 +13,7 @@ public class ForgeCompatMixinPlugin implements IMixinConfigPlugin {
     
     private static final String SOPHISTICATED_SORTER_MOD_ID = "sophisticatedsorter";
     private static final String CLIENT_SORT_MOD_ID = "clientsort";
+    private static final String HOTBAR_SWAPPER_MOD_ID = "hotbarswapper";
     
     @Override
     public void onLoad(String mixinPackage) {
@@ -49,6 +50,11 @@ public class ForgeCompatMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.endsWith("ClientSortTransferHandlerCompatMixin")) {
             return isModLoaded(CLIENT_SORT_MOD_ID);
         }
+
+        if (mixinClassName.endsWith("HotbarSwapperCompatMixin")) {
+            return isModLoaded(HOTBAR_SWAPPER_MOD_ID);
+        }
+        if (mixinClassName.endsWith("WcwtStorageMenuCompatMixin")) return isModLoaded("wcwt");
         
         // Apply other mixins by default
         return true;

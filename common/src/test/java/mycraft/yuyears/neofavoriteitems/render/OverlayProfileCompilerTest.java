@@ -37,4 +37,5 @@ class OverlayProfileCompilerTest {
         assertNotSame(first, changed);
         assertEquals(0.2f, changed.layers().getFirst().material().opacity());
     }
+
 }

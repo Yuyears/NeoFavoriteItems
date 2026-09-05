@@ -2,6 +2,12 @@
 
 # Neo Favorite Items 架构说明
 
+## Current UI/Rendering Contract
+
+局内配置页采用递归 Section 树；新增嵌套 UI 优先使用 `NfiConfigSectionHandle`，旧 `beginSection/endSection` 仅作兼容包装。每个 Profile 最多四个独立 Layer，每层拥有材质、颜色、几何、溢出配置；预览、GUI 与 HUD 共用同一份 common 编译结果。控件实例按所属 Layer 管理，避免跨 Layer 绑定覆盖。
+
+The in-game UI uses a recursive section tree. New nested UI should use `NfiConfigSectionHandle`; legacy begin/end APIs remain compatibility wrappers. Each profile owns up to four independent layers, and preview, GUI, and HUD share the same common compiled model.
+
 Last updated: 2026-08-16
 
 最后更新：2026-08-16

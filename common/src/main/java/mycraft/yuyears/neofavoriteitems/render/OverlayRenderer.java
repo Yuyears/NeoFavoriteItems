@@ -71,4 +71,5 @@ public abstract class OverlayRenderer {
             ? lockedOverlayProfile(target.logicalSlot(), isHoldingBypassKey)
             : null;
     }
+
 }

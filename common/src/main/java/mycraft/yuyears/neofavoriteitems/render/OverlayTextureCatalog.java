@@ -9,15 +9,48 @@ import java.util.List;
 public final class OverlayTextureCatalog {
     public static final String NO_MATERIAL = "builtin:none";
     private enum BuiltinMaterial {
-        HEART("preset:heart", "heart"),
-        ARROW("preset:arrow", "arrow_down");
+        BORDER("border", NeoFavoriteItemsConfig.OverlayStyle.BORDER),
+        BRACKETS("brackets", NeoFavoriteItemsConfig.OverlayStyle.BRACKETS),
+        CLASSIC("classic", NeoFavoriteItemsConfig.OverlayStyle.CLASSIC),
+        FRAMEWORK("framework", NeoFavoriteItemsConfig.OverlayStyle.FRAMEWORK),
+        HEART_0("heart_0", null),
+        HEART_1("heart_1", null),
+        HEART_2("heart_2", null),
+        HEART("heart", null),
+        HIGHLIGHT("highlight", NeoFavoriteItemsConfig.OverlayStyle.HIGHLIGHT),
+        LOCK_0("lock_0", null),
+        LOCK_1("lock_1", null),
+        LOCK_2("lock_2", null),
+        LOCK("lock", NeoFavoriteItemsConfig.OverlayStyle.LOCK),
+        LOCK_FLAT("lock_flat", null),
+        MARK("mark", NeoFavoriteItemsConfig.OverlayStyle.MARK),
+        STAR("star", NeoFavoriteItemsConfig.OverlayStyle.STAR),
+        TAG("tag", NeoFavoriteItemsConfig.OverlayStyle.TAG),
+        ARROW_DOWN("arrow_down", null);
 
         private final String id;
         private final String filename;
+        private final NeoFavoriteItemsConfig.OverlayStyle legacyStyle;
 
-        BuiltinMaterial(String id, String filename) {
-            this.id = id;
+        BuiltinMaterial(String filename, NeoFavoriteItemsConfig.OverlayStyle legacyStyle) {
+            this.id = "preset:" + filename;
             this.filename = filename;
+            this.legacyStyle = legacyStyle;
+        }
+
+        private static BuiltinMaterial fromId(String id) {
+            if ("preset:arrow".equals(id)) return ARROW_DOWN;
+            for (BuiltinMaterial material : values()) {
+                if (material.id.equals(id)) return material;
+            }
+            return null;
+        }
+
+        private static BuiltinMaterial fromLegacyStyle(NeoFavoriteItemsConfig.OverlayStyle style) {
+            for (BuiltinMaterial material : values()) {
+                if (material.legacyStyle == style) return material;
+            }
+            return null;
         }
     }
 
@@ -25,26 +58,23 @@ public final class OverlayTextureCatalog {
 
     public static List<String> presetIds() {
         List<String> ids = new java.util.ArrayList<>();
-        for (NeoFavoriteItemsConfig.OverlayStyle style : NeoFavoriteItemsConfig.OverlayStyle.values()) {
-            if (style != NeoFavoriteItemsConfig.OverlayStyle.COLOR_OVERLAY) ids.add(presetId(style));
-        }
         for (BuiltinMaterial material : BuiltinMaterial.values()) ids.add(material.id);
         return List.copyOf(ids);
     }
 
     public static String presetId(NeoFavoriteItemsConfig.OverlayStyle style) {
-        return "preset:" + style.name().toLowerCase(java.util.Locale.ROOT);
+        BuiltinMaterial material = BuiltinMaterial.fromLegacyStyle(style);
+        return material == null ? "preset:" + style.name().toLowerCase(java.util.Locale.ROOT) : material.id;
     }
 
     public static NeoFavoriteItemsConfig.OverlayStyle presetStyle(String materialId) {
-        if (materialId == null || !materialId.startsWith("preset:")) return null;
-        try {
-            return NeoFavoriteItemsConfig.OverlayStyle.valueOf(
-                materialId.substring("preset:".length()).toUpperCase(java.util.Locale.ROOT)
-            );
-        } catch (IllegalArgumentException exception) {
-            return null;
-        }
+        BuiltinMaterial material = BuiltinMaterial.fromId(materialId);
+        return material == null ? null : material.legacyStyle;
+    }
+
+    public static String canonicalPresetId(String materialId) {
+        BuiltinMaterial material = BuiltinMaterial.fromId(materialId);
+        return material == null ? materialId : material.id;
     }
 
     static ResourceLocation textureFor(NeoFavoriteItemsConfig.OverlayStyle style, String materialId) {
@@ -54,29 +84,15 @@ public final class OverlayTextureCatalog {
             ResourceLocation custom = manager == null ? null : manager.resolve(materialId);
             if (custom != null) return custom;
         }
-        for (BuiltinMaterial material : BuiltinMaterial.values()) {
-            if (material.id.equals(materialId)) return texture(material.filename);
-        }
+        BuiltinMaterial material = BuiltinMaterial.fromId(materialId);
+        if (material != null) return texture(material.filename);
         NeoFavoriteItemsConfig.OverlayStyle selectedPreset = presetStyle(materialId);
         return textureFor(selectedPreset == null ? style : selectedPreset);
     }
 
     static ResourceLocation textureFor(NeoFavoriteItemsConfig.OverlayStyle style) {
-        String filename = switch (style) {
-            case BORDER -> "border";
-            case CLASSIC -> "classic";
-            case FRAMEWORK -> "framework";
-            case HIGHLIGHT -> "highlight";
-            case BRACKETS -> "brackets";
-            case LOCK -> "lock";
-            case MARK -> "mark";
-            case TAG -> "tag";
-            case STAR -> "star";
-            case COLOR_OVERLAY -> "color_overlay";
-        };
-        return style == NeoFavoriteItemsConfig.OverlayStyle.COLOR_OVERLAY
-            ? null
-            : texture(filename);
+        BuiltinMaterial material = BuiltinMaterial.fromLegacyStyle(style);
+        return material == null ? null : texture(material.filename);
     }
 
     private static ResourceLocation texture(String filename) {

@@ -5,10 +5,12 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import mycraft.yuyears.neofavoriteitems.render.OverlayMaterialMode;
 import mycraft.yuyears.neofavoriteitems.render.OverlayTextureCatalog;
+import mycraft.yuyears.neofavoriteitems.render.OverlayLayerList;
 
 public class ConfigManager {
     private enum ConfigFileKind {
@@ -236,6 +238,8 @@ public class ConfigManager {
     private boolean profileConfigSeen;
     private long revision;
     private int normalizationCount;
+    private boolean layerListSeen;
+    private boolean legacyProfileSeen;
 
     private ConfigManager() {
         this.config = new NeoFavoriteItemsConfig();
@@ -308,6 +312,14 @@ public class ConfigManager {
         return draftDirty;
     }
 
+    /** Accept current draft as authoritative without reloading changed files. */
+    public synchronized void keepDraftAfterExternalChange() {
+        commonStamp = FileStamp.read(commonConfigPath);
+        clientStamp = FileStamp.read(clientConfigPath);
+        clientLogicStamp = FileStamp.read(clientLogicConfigPath);
+        externalChangeDetected = false;
+    }
+
     public NeoFavoriteItemsConfig getConfig() {
         return config;
     }
@@ -322,6 +334,10 @@ public class ConfigManager {
         return revision;
     }
 
+    public synchronized void markRuntimeConfigChanged() {
+        revision++;
+    }
+
     public List<String> getLoadIssues() {
         return List.copyOf(loadIssues);
     }
@@ -332,6 +348,8 @@ public class ConfigManager {
         loadIssues.clear();
         profileConfigSeen = false;
         normalizationCount = 0;
+        layerListSeen = false;
+        legacyProfileSeen = false;
 
         boolean commonNeedsRewrite = !Files.exists(commonConfigPath);
         boolean clientNeedsRewrite = !Files.exists(clientConfigPath);
@@ -362,6 +380,20 @@ public class ConfigManager {
         if (!profileConfigSeen) {
             config.overlay.syncProfilesFromLegacy();
             clientNeedsRewrite = true;
+        }
+        if (!layerListSeen) {
+            config.overlay.lockedLayers = List.of(config.overlay.locked.copy());
+            config.overlay.bypassLayers = List.of(config.overlay.bypass.copy());
+            config.overlay.lockableLayers = List.of(config.overlay.lockable.copy());
+            config.overlay.unlockableLayers = List.of(config.overlay.unlockable.copy());
+            clientNeedsRewrite = true;
+        } else {
+            config.overlay.lockedLayers = OverlayLayerList.normalize(config.overlay.lockedLayers, OverlayProfileConfig::defaultLocked);
+            config.overlay.bypassLayers = OverlayLayerList.normalize(config.overlay.bypassLayers, OverlayProfileConfig::defaultBypass);
+            config.overlay.lockableLayers = OverlayLayerList.normalize(config.overlay.lockableLayers, OverlayProfileConfig::defaultLockable);
+            config.overlay.unlockableLayers = OverlayLayerList.normalize(config.overlay.unlockableLayers, OverlayProfileConfig::defaultUnlockable);
+            if (legacyProfileSeen) syncFirstLayersFromLegacy();
+            else syncLegacyProfilesFromLayers();
         }
 
         boolean commonSaved = true;
@@ -445,6 +477,17 @@ public class ConfigManager {
                 continue;
             }
             
+            if (line.startsWith("[[")) {
+                if (!line.endsWith("]]")) {
+                    recordLoadIssue("Malformed array config section header: " + line, new IllegalArgumentException(line));
+                    continue;
+                }
+                currentSection = line.substring(2, line.length() - 2) + ".__new__";
+                if (currentSection.startsWith("profile.") && currentSection.endsWith(".layers.__new__")) {
+                    beginProfileLayer(currentSection.substring(0, currentSection.length() - ".__new__".length()));
+                }
+                continue;
+            }
             if (line.startsWith("[")) {
                 if (!line.endsWith("]")) {
                     recordLoadIssue("Malformed config section header: " + line, new IllegalArgumentException(line));
@@ -470,6 +513,10 @@ public class ConfigManager {
 
     private void setConfigValue(String section, String key, String value, ConfigFileKind kind) {
         try {
+            if (section.endsWith(".__new__")) {
+                setProfileLayerValue(section.substring(0, section.length() - ".__new__".length()), key, value);
+                return;
+            }
             if (!isKnownConfigValue(section, key, kind)) {
                 recordLoadIssue(
                     "Unknown config value [" + section + "] " + key + "; rewriting config without it",
@@ -795,8 +842,7 @@ public class ConfigManager {
 
     private boolean saveCommonConfig() {
         try {
-            Files.createDirectories(commonConfigPath.getParent());
-            Files.writeString(commonConfigPath, renderCommonConfig(config), StandardCharsets.UTF_8);
+            writeConfigAtomically(commonConfigPath, renderCommonConfig(config));
             return true;
         } catch (IOException e) {
             DebugLogger.error("Failed to write common config file: {}", commonConfigPath);
@@ -807,8 +853,7 @@ public class ConfigManager {
 
     private boolean saveClientRenderingConfig() {
         try {
-            Files.createDirectories(clientConfigPath.getParent());
-            Files.writeString(clientConfigPath, renderClientRenderingConfig(config), StandardCharsets.UTF_8);
+            writeConfigAtomically(clientConfigPath, renderClientRenderingConfig(config));
             return true;
         } catch (IOException e) {
             DebugLogger.error("Failed to write client config file: {}", clientConfigPath);
@@ -848,7 +893,7 @@ public class ConfigManager {
             case "style" -> profile.style = parseOverlayStyle(value, profile.style);
             case "materialMode" -> profile.materialMode = parseMaterialMode(value, profile.materialMode);
             case "materialId" -> {
-                profile.materialId = parseConfigString(value);
+                profile.materialId = OverlayTextureCatalog.canonicalPresetId(parseConfigString(value));
                 if (OverlayTextureCatalog.NO_MATERIAL.equals(profile.materialId)
                     || OverlayTextureCatalog.presetStyle(profile.materialId) == NeoFavoriteItemsConfig.OverlayStyle.COLOR_OVERLAY) {
                     profile.materialMode = OverlayMaterialMode.NO_MATERIAL;
@@ -871,6 +916,100 @@ public class ConfigManager {
             case "clipToSlot" -> profile.clipToSlot = parseBoolean(value);
         }
         profileConfigSeen = true;
+        legacyProfileSeen = true;
+    }
+
+    private void beginProfileLayer(String section) {
+        layerListSeen = true;
+        List<OverlayProfileConfig> layers = switch (section) {
+            case "profile.locked.layers" -> config.overlay.lockedLayers;
+            case "profile.bypass.layers" -> config.overlay.bypassLayers;
+            case "profile.lockable.layers" -> config.overlay.lockableLayers;
+            case "profile.unlockable.layers" -> config.overlay.unlockableLayers;
+            default -> null;
+        };
+        if (layers == null) return;
+        if (layers.size() == 1 && isStandardLayer(layers.getFirst(), section)) {
+            layers = new ArrayList<>();
+        } else {
+            layers = new ArrayList<>(layers);
+        }
+        layers.add(defaultLayerFor(section));
+        switch (section) {
+            case "profile.locked.layers" -> config.overlay.lockedLayers = layers;
+            case "profile.bypass.layers" -> config.overlay.bypassLayers = layers;
+            case "profile.lockable.layers" -> config.overlay.lockableLayers = layers;
+            case "profile.unlockable.layers" -> config.overlay.unlockableLayers = layers;
+        }
+    }
+
+    private void setProfileLayerValue(String section, String key, String value) {
+        List<OverlayProfileConfig> layers = switch (section) {
+            case "profile.locked.layers" -> config.overlay.lockedLayers;
+            case "profile.bypass.layers" -> config.overlay.bypassLayers;
+            case "profile.lockable.layers" -> config.overlay.lockableLayers;
+            case "profile.unlockable.layers" -> config.overlay.unlockableLayers;
+            default -> List.of();
+        };
+        if (layers.isEmpty()) return;
+        setProfileValueOn(layers.getLast(), key, value);
+        profileConfigSeen = true;
+    }
+
+    private void setProfileValueOn(OverlayProfileConfig profile, String key, String value) {
+        switch (key) {
+            case "style" -> profile.style = parseOverlayStyle(value, profile.style);
+            case "materialMode" -> profile.materialMode = parseMaterialMode(value, profile.materialMode);
+            case "materialId" -> {
+                profile.materialId = OverlayTextureCatalog.canonicalPresetId(parseConfigString(value));
+                if (OverlayTextureCatalog.NO_MATERIAL.equals(profile.materialId)
+                    || OverlayTextureCatalog.presetStyle(profile.materialId) == NeoFavoriteItemsConfig.OverlayStyle.COLOR_OVERLAY) {
+                    profile.materialMode = OverlayMaterialMode.NO_MATERIAL;
+                    profile.materialId = OverlayTextureCatalog.NO_MATERIAL;
+                }
+            }
+            case "color" -> profile.color = parseColorValue(value);
+            case "opacity" -> profile.opacity = parseClampedProfileFloat(value, 0.0f, 1.0f);
+            case "colorMode" -> profile.colorMode = mycraft.yuyears.neofavoriteitems.render.OverlayColorMode.valueOf(value.replace("\"", ""));
+            case "opacityBehavior" -> profile.opacityBehavior = OverlayProfileConfig.OpacityBehavior.valueOf(value.replace("\"", ""));
+            case "anchor" -> profile.anchor = mycraft.yuyears.neofavoriteitems.render.OverlayPlacement.Anchor.valueOf(value.replace("\"", ""));
+            case "offsetX" -> profile.offsetX = parseFiniteProfileFloat(value);
+            case "offsetY" -> profile.offsetY = parseFiniteProfileFloat(value);
+            case "width" -> profile.width = parsePositiveProfileFloat(value);
+            case "height" -> profile.height = parsePositiveProfileFloat(value);
+            case "scale" -> profile.scale = parsePositiveProfileFloat(value);
+            case "rotationDegrees" -> profile.rotationDegrees = parseFiniteProfileFloat(value);
+            case "zIndex" -> profile.zIndex = parseOverlayZIndex(value);
+            case "allowOverflow" -> profile.allowOverflow = parseBoolean(value);
+            case "clipToSlot" -> profile.clipToSlot = parseBoolean(value);
+        }
+    }
+
+    private static OverlayProfileConfig defaultLayerFor(String section) {
+        return switch (section) {
+            case "profile.bypass.layers" -> OverlayProfileConfig.defaultBypass();
+            case "profile.lockable.layers" -> OverlayProfileConfig.defaultLockable();
+            case "profile.unlockable.layers" -> OverlayProfileConfig.defaultUnlockable();
+            default -> OverlayProfileConfig.defaultLocked();
+        };
+    }
+
+    private static boolean isStandardLayer(OverlayProfileConfig p, String section) {
+        return p.sameValues(defaultLayerFor(section));
+    }
+
+    private void syncLegacyProfilesFromLayers() {
+        if (!config.overlay.lockedLayers.isEmpty()) config.overlay.locked.copyFrom(config.overlay.lockedLayers.getFirst());
+        if (!config.overlay.bypassLayers.isEmpty()) config.overlay.bypass.copyFrom(config.overlay.bypassLayers.getFirst());
+        if (!config.overlay.lockableLayers.isEmpty()) config.overlay.lockable.copyFrom(config.overlay.lockableLayers.getFirst());
+        if (!config.overlay.unlockableLayers.isEmpty()) config.overlay.unlockable.copyFrom(config.overlay.unlockableLayers.getFirst());
+    }
+
+    private void syncFirstLayersFromLegacy() {
+        config.overlay.lockedLayers = replaceFirst(config.overlay.lockedLayers, config.overlay.locked);
+        config.overlay.bypassLayers = replaceFirst(config.overlay.bypassLayers, config.overlay.bypass);
+        config.overlay.lockableLayers = replaceFirst(config.overlay.lockableLayers, config.overlay.lockable);
+        config.overlay.unlockableLayers = replaceFirst(config.overlay.unlockableLayers, config.overlay.unlockable);
     }
 
     private float parseFiniteProfileFloat(String value) {
@@ -909,13 +1048,28 @@ public class ConfigManager {
 
     private boolean saveClientLogicConfig() {
         try {
-            Files.createDirectories(clientLogicConfigPath.getParent());
-            Files.writeString(clientLogicConfigPath, renderClientLogicConfig(config), StandardCharsets.UTF_8);
+            writeConfigAtomically(clientLogicConfigPath, renderClientLogicConfig(config));
             return true;
         } catch (IOException e) {
             DebugLogger.error("Failed to write client logic config file: {}", clientLogicConfigPath);
             DebugLogger.error("Client logic config write failure", e);
             return false;
+        }
+    }
+
+    private static void writeConfigAtomically(Path target, String content) throws IOException {
+        Path parent = target.getParent();
+        Files.createDirectories(parent);
+        Path temporary = Files.createTempFile(parent, target.getFileName().toString(), ".tmp");
+        try {
+            Files.writeString(temporary, content, StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
         }
     }
 
@@ -1114,7 +1268,47 @@ public class ConfigManager {
             + renderProfile("locked", config.overlay.locked)
             + renderProfile("bypass", config.overlay.bypass)
             + renderProfile("lockable", config.overlay.lockable)
-            + renderProfile("unlockable", config.overlay.unlockable);
+            + renderProfile("unlockable", config.overlay.unlockable)
+            + renderProfileLayers("locked", config.overlay.lockedLayers)
+            + renderProfileLayers("bypass", config.overlay.bypassLayers)
+            + renderProfileLayers("lockable", config.overlay.lockableLayers)
+            + renderProfileLayers("unlockable", config.overlay.unlockableLayers);
+    }
+
+    private static List<OverlayProfileConfig> replaceFirst(List<OverlayProfileConfig> layers, OverlayProfileConfig first) {
+        List<OverlayProfileConfig> result = new ArrayList<>(OverlayLayerList.normalize(layers, first::copy));
+        result.set(0, first.copy());
+        return List.copyOf(result);
+    }
+
+    private String renderProfileLayers(String name, List<OverlayProfileConfig> layers) {
+        StringBuilder result = new StringBuilder();
+        List<OverlayProfileConfig> normalized = OverlayLayerList.normalize(layers, OverlayProfileConfig::defaultLocked);
+        for (OverlayProfileConfig profile : normalized) {
+            result.append("[[profile.").append(name).append(".layers]]\n")
+                .append(renderProfileFields(profile)).append("\n");
+        }
+        return result.toString();
+    }
+
+    private String renderProfileFields(OverlayProfileConfig profile) {
+        return "style = \"" + profile.style.name() + "\"\n"
+            + "materialMode = \"" + profile.materialMode.name() + "\"\n"
+            + "materialId = \"" + escapeConfigString(profile.materialId) + "\"\n"
+            + "color = \"" + colorToRgba(profile.color) + "\"\n"
+            + "opacity = " + floatToConfig(profile.opacity) + "\n"
+            + "colorMode = \"" + profile.colorMode.name() + "\"\n"
+            + "opacityBehavior = \"" + profile.opacityBehavior.name() + "\"\n"
+            + "anchor = \"" + profile.anchor.name() + "\"\n"
+            + "offsetX = " + floatToConfig(profile.offsetX) + "\n"
+            + "offsetY = " + floatToConfig(profile.offsetY) + "\n"
+            + "width = " + floatToConfig(profile.width) + "\n"
+            + "height = " + floatToConfig(profile.height) + "\n"
+            + "scale = " + floatToConfig(profile.scale) + "\n"
+            + "rotationDegrees = " + floatToConfig(profile.rotationDegrees) + "\n"
+            + "zIndex = " + profile.zIndex + "\n"
+            + "allowOverflow = " + profile.allowOverflow + "\n"
+            + "clipToSlot = " + profile.clipToSlot + "\n";
     }
 
     private String renderProfile(String name, OverlayProfileConfig profile) {

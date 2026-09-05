@@ -53,6 +53,8 @@ public final class NfiWidgetGroup {
         return List.copyOf(result);
     }
 
+    public void clear() { children.clear(); }
+
     private void add(Child child) {
         children.add(child);
         place(child);

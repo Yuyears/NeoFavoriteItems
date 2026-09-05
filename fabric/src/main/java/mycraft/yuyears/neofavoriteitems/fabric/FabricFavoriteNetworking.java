@@ -26,6 +26,7 @@ public final class FabricFavoriteNetworking {
         PayloadTypeRegistry.playC2S().register(ToggleFavoritePayload.TYPE, ToggleFavoritePayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(RequestFavoriteSyncPayload.TYPE, RequestFavoriteSyncPayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(BypassKeyStatePayload.TYPE, BypassKeyStatePayload.STREAM_CODEC);
+        PayloadTypeRegistry.playC2S().register(HotbarRowSwapPayload.TYPE, HotbarRowSwapPayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(RequestServerConfigPayload.TYPE, RequestServerConfigPayload.STREAM_CODEC);
         PayloadTypeRegistry.playC2S().register(UpdateServerConfigPayload.TYPE, UpdateServerConfigPayload.STREAM_CODEC);
         PayloadTypeRegistry.playS2C().register(SyncFavoritesPayload.TYPE, SyncFavoritesPayload.STREAM_CODEC);
@@ -55,6 +56,12 @@ public final class FabricFavoriteNetworking {
 
         ServerPlayNetworking.registerGlobalReceiver(BypassKeyStatePayload.TYPE, (payload, context) ->
             context.server().execute(() -> ServerFavoriteService.updateBypassState(context.player(), payload.held()))
+        );
+        ServerPlayNetworking.registerGlobalReceiver(HotbarRowSwapPayload.TYPE, (payload, context) ->
+            context.server().execute(() -> {
+                ServerFavoriteService.executeHotbarRowSwap(context.player(), payload.rowIndex(), payload.columnMask());
+                sendFullSync(context.player());
+            })
         );
         ServerPlayNetworking.registerGlobalReceiver(RequestServerConfigPayload.TYPE, (payload, context) ->
             context.server().execute(() -> sendServerConfigStatus(context.player()))
@@ -125,6 +132,14 @@ public final class FabricFavoriteNetworking {
 
     public static boolean isServerPresent() {
         return ClientPlayNetworking.canSend(ToggleFavoritePayload.TYPE);
+    }
+
+    public static boolean canSendHotbarRowSwap() {
+        return ClientPlayNetworking.canSend(HotbarRowSwapPayload.TYPE);
+    }
+
+    public static void sendHotbarRowSwap(int rowIndex, int columnMask) {
+        ClientPlayNetworking.send(new HotbarRowSwapPayload(rowIndex, columnMask));
     }
 
     public static SyncFavoritesPayload createFullSyncPayload(ServerPlayer player) {
@@ -215,6 +230,24 @@ public final class FabricFavoriteNetworking {
         private static BypassKeyStatePayload read(FriendlyByteBuf buffer) {
             return new BypassKeyStatePayload(buffer.readBoolean());
         }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record HotbarRowSwapPayload(int rowIndex, int columnMask) implements CustomPacketPayload {
+        public static final Type<HotbarRowSwapPayload> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(NeoFavoriteItemsMod.MOD_ID, "hotbar_row_swap")
+        );
+        public static final StreamCodec<FriendlyByteBuf, HotbarRowSwapPayload> STREAM_CODEC = StreamCodec.of(
+            (buffer, payload) -> {
+                buffer.writeByte(payload.rowIndex);
+                buffer.writeVarInt(payload.columnMask);
+            },
+            buffer -> new HotbarRowSwapPayload(buffer.readByte(), buffer.readVarInt())
+        );
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

@@ -235,11 +235,6 @@ public class FabricOverlayRenderer extends OverlayRenderer {
         drawEngine.render(graphics);
     }
 
-    public void renderTooltipOverlay(GuiGraphics context, int x, int y, String text) {
-        context.renderTooltip(Minecraft.getInstance().font, net.minecraft.network.chat.Component.literal(text), x, y);
-    }
-
-
     private int getScreenLeft(AbstractContainerScreen<?> screen) {
         Integer value = ReflectionHelper.readIntField(screen, "leftPos");
         return value == null ? 0 : value;

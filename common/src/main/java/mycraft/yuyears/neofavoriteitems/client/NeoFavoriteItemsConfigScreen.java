@@ -1,7 +1,10 @@
 package mycraft.yuyears.neofavoriteitems.client;
 
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import mycraft.yuyears.neofavoriteitems.ConfigManager;
+import mycraft.yuyears.neofavoriteitems.DebugLogger;
 import mycraft.yuyears.neofavoriteitems.NeoFavoriteItemsConfig;
 import mycraft.yuyears.neofavoriteitems.PlatformFavoriteSupport;
 import mycraft.yuyears.neofavoriteitems.OverlayProfileConfig;
@@ -20,16 +23,20 @@ import mycraft.yuyears.neofavoriteitems.client.ui.control.NfiSearchDropdown;
 import mycraft.yuyears.neofavoriteitems.client.ui.control.NfiNumberField;
 import mycraft.yuyears.neofavoriteitems.client.ui.control.NfiButton;
 import mycraft.yuyears.neofavoriteitems.client.ui.control.NfiToggle;
+import mycraft.yuyears.neofavoriteitems.client.ui.control.NfiEditBox;
 import mycraft.yuyears.neofavoriteitems.client.ui.layout.NfiConfigPanel;
+import mycraft.yuyears.neofavoriteitems.client.ui.layout.NfiConfigSection;
 import mycraft.yuyears.neofavoriteitems.client.ui.layout.NfiConfigRow;
 import mycraft.yuyears.neofavoriteitems.client.ui.layout.NfiWidgetGroup;
 import mycraft.yuyears.neofavoriteitems.domain.LogicalSlotIndex;
 import mycraft.yuyears.neofavoriteitems.render.OverlayMode;
 import mycraft.yuyears.neofavoriteitems.render.OverlayProfile;
+import mycraft.yuyears.neofavoriteitems.render.OverlayLayer;
 import mycraft.yuyears.neofavoriteitems.render.OverlayColorMode;
 import mycraft.yuyears.neofavoriteitems.render.OverlayPlacement;
 import mycraft.yuyears.neofavoriteitems.render.OverlayMaterialMode;
 import mycraft.yuyears.neofavoriteitems.render.OverlayTextureCatalog;
+import mycraft.yuyears.neofavoriteitems.render.OverlayLayerList;
 import mycraft.yuyears.neofavoriteitems.render.SlotRenderTarget;
 import mycraft.yuyears.neofavoriteitems.render.pipeline.OverlayDrawEngine;
 import net.minecraft.client.Minecraft;
@@ -70,6 +77,8 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
     private NfiUiTheme theme = NfiUiTheme.DEFAULT;
     private PreviewMode previewMode = PreviewMode.NORMAL;
     private PreviewMode profileTab = PreviewMode.NORMAL;
+    private int layerIndex;
+    private long lastLayerActionNanos;
     private ConfigPage configPage = ConfigPage.RENDERING;
     private String assetSummary = "";
     private NfiTabs<PreviewMode> profileTabs;
@@ -87,6 +96,7 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
     private NfiColorPicker colorPicker;
     private Button assetsButton;
     private NfiButton assetsFolderButton;
+    private NfiButton keepDraftButton;
     private NfiToggle showVisualFeedbackControl, playSoundFeedbackControl;
     private NfiSearchDropdown<String> feedbackSoundControl;
     private NfiSlider feedbackVolumeControl, feedbackPitchControl;
@@ -99,6 +109,9 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
     private final java.util.List<AbstractWidget> soundDependentControls = new java.util.ArrayList<>();
     private final java.util.List<AbstractWidget> serverRuleControls = new java.util.ArrayList<>();
     private long observedServerAccessRevision = -1L;
+    private long lastDraftMutationNanos;
+    private boolean autoSavedDraft;
+    private ClientDraftSnapshot openedSnapshot;
     private boolean dropdownCapturedMouse;
     private NfiConfigPanel configPanel;
     private int contentLeft;
@@ -107,6 +120,25 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
     private int configHeight;
     private int previewX;
     private int previewY;
+    private final Map<String, Boolean> sectionExpansion = new HashMap<>();
+    private final Map<PreviewMode, List<OverlayProfileConfig>> layerDrafts = new java.util.EnumMap<>(PreviewMode.class);
+    /** Runtime controls grouped by owning Layer; prevents one Layer build from overwriting another's sync state. */
+    private final Map<OverlayProfileConfig, LayerControlSet> layerControls = new java.util.IdentityHashMap<>();
+    private boolean rebuildRequested;
+    private int uiBuildGeneration;
+
+    private record LayerControlSet(
+        NfiCycleButton<OverlayMaterialMode> style,
+        NfiDropdown<String> material,
+        NfiCycleButton<OverlayColorMode> colorMode,
+        NfiCycleButton<OverlayProfileConfig.OpacityBehavior> opacityBehavior,
+        NfiCycleButton<OverlayPlacement.Anchor> anchor,
+        NfiSlider opacity,
+        NfiColorPicker colorPicker,
+        NfiNumberField<Float> offsetX, NfiNumberField<Float> offsetY,
+        NfiNumberField<Float> width, NfiNumberField<Float> height,
+        NfiNumberField<Float> scale, NfiNumberField<Float> rotation,
+        NfiNumberField<Float> zIndex, NfiToggle overflow, NfiToggle clip) {}
 
     private NeoFavoriteItemsConfigScreen(Screen previousScreen) {
         super(Component.translatable("screen.neo_favorite_items.title"));
@@ -123,6 +155,16 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
     public void tick() {
         // Poll split config files while screen is open; dirty drafts are never overwritten.
         ConfigManager.getInstance().reloadIfChanged();
+        if (ConfigManager.getInstance().isDraftDirty()
+            && !ConfigManager.getInstance().isExternalChangeDetected()
+            && lastDraftMutationNanos != 0L
+            && System.nanoTime() - lastDraftMutationNanos >= 400_000_000L) {
+            applyClientDraftToConfig();
+            ConfigManager.getInstance().saveClientConfig();
+            ConfigManager.getInstance().setDraftDirty(false);
+            autoSavedDraft = true;
+            lastDraftMutationNanos = 0L;
+        }
         if (feedbackSoundControl != null) feedbackSoundControl.tick();
         super.tick();
     }
@@ -136,6 +178,9 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
 
     @Override
     protected void init() {
+        int generation = ++uiBuildGeneration;
+        DebugLogger.debug("UI-DIAG init begin gen={} screen={} oldPanel={}", generation,
+            System.identityHashCode(this), configPanel == null ? 0 : System.identityHashCode(configPanel));
         clearPageControlReferences();
         contentWidth = Math.min(420, Math.max(300, width - 16));
         contentLeft = Math.max(8, (width - contentWidth) / 2);
@@ -171,16 +216,20 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         }
         configHeight = Math.max(24, height - configTop - 42);
         int labelWidth = Math.clamp(innerWidth / 3, 96, 128);
-        configPanel = new NfiConfigPanel(innerLeft, configTop, innerWidth, labelWidth);
+        configPanel = new NfiConfigPanel(innerLeft, configTop, innerWidth, labelWidth, sectionExpansion);
         configPanel.setViewportHeight(configHeight);
 
         if (configPage == ConfigPage.RENDERING) {
-            buildRenderingControls();
+            buildLayerControls();
         } else if (configPage == ConfigPage.CLIENT_LOGIC) {
             buildClientLogicControls();
         } else {
             buildServerRuleControls();
         }
+        configPanel.finalizeLayout();
+        configPanel.sectionHeaders().forEach(this::addRenderableWidget);
+        DebugLogger.debug("UI-DIAG init widgets gen={} panel={} headers={} page={} profile={}", generation,
+            System.identityHashCode(configPanel), configPanel.sectionHeaders().size(), configPage, profileTab);
 
         int buttonLeft = contentLeft + (contentWidth - 284) / 2;
         addRenderableWidget(new NfiButton(buttonLeft, height - 31, 68, 20,
@@ -191,11 +240,17 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             Component.translatable("screen.neo_favorite_items.apply"), ignored -> applyAndClose()));
         addRenderableWidget(new NfiButton(buttonLeft + 216, height - 31, 68, 20,
             Component.translatable("screen.neo_favorite_items.cancel"), ignored -> onClose()));
+        keepDraftButton = new NfiButton(contentLeft + contentWidth - 90, height - 50, 80, 16,
+            Component.translatable("screen.neo_favorite_items.keep_draft"), ignored -> keepDraft());
+        keepDraftButton.visible = false;
+        addRenderableWidget(keepDraftButton);
         if (configPage == ConfigPage.RENDERING) refreshAssets();
         syncControls();
     }
 
-    private void buildRenderingControls() {
+    private void buildRenderingControls(OverlayProfileConfig targetProfile) {
+
+        var materialsSection = configPanel.beginSection(Component.translatable("screen.neo_favorite_items.group.material"));
 
         int assetsWidth = Math.max(1, (configPanel.controlWidth() * 2) / 3);
         int folderWidth = Math.max(1, assetsWidth / 2);
@@ -211,64 +266,96 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         NfiWidgetGroup assetsGroup = new NfiWidgetGroup(0, 0);
         assetsGroup.addRelative(assetsButton, 0, 0);
         assetsGroup.addRelative(assetsFolderButton, assetsWidth, 0);
-        addRow(configPanel, Component.translatable("screen.neo_favorite_items.custom_assets_label"), assetsGroup, List.of(assetsButton, assetsFolderButton));
+        NfiConfigRow assetsRow = new NfiConfigRow(Component.translatable("screen.neo_favorite_items.custom_assets_label"), assetsGroup,
+            List.of(assetsButton, assetsFolderButton));
+        assetsRow.setWidgetGap(0);
+        configPanel.add(assetsRow);
+        addRenderableWidget(assetsButton);
+        addRenderableWidget(assetsFolderButton);
 
-        styleControl = new NfiCycleButton<>(0, 0, 1, 20, materialModeBinding(), MATERIAL_MODES,
+        styleControl = new NfiCycleButton<>(0, 0, 1, 20, materialModeBinding(targetProfile), MATERIAL_MODES,
             value -> Component.translatable("screen.neo_favorite_items.material_mode." + value.name().toLowerCase(java.util.Locale.ROOT)));
         addRow(configPanel, Component.translatable("screen.neo_favorite_items.material_mode_label"), styleControl.widget());
 
-        materialControl = new NfiDropdown<>(0, 0, configPanel.controlWidth(), 4, materialBinding(), materialValues(), value -> Component.literal(materialLabel(value)));
+        materialControl = new NfiDropdown<>(0, 0, configPanel.controlWidth(), 4, materialBinding(targetProfile), materialValues(), value -> Component.literal(materialLabel(value)));
         addRenderableWidget(materialControl.button());
         configPanel.add(new NfiConfigRow(Component.translatable("screen.neo_favorite_items.material_label"),
             materialControl.group(), List.of(materialControl.button())));
+        configPanel.endSection();
 
-        colorModeControl = new NfiCycleButton<>(0, 0, 1, 20, colorModeBinding(), COLOR_MODES,
+        configPanel.beginSection(Component.translatable("screen.neo_favorite_items.group.color"));
+
+        colorModeControl = new NfiCycleButton<>(0, 0, 1, 20, colorModeBinding(targetProfile), COLOR_MODES,
             value -> Component.translatable("screen.neo_favorite_items.color_mode." + value.name().toLowerCase(java.util.Locale.ROOT)));
         colorModeControl.setTooltipFactory(value -> Component.translatable(
             "screen.neo_favorite_items.color_mode.tooltip." + value.name().toLowerCase(java.util.Locale.ROOT)));
         addRow(configPanel, Component.translatable("screen.neo_favorite_items.color_mode_label"), colorModeControl.widget());
 
+        colorPicker = new NfiColorPicker(font, 0, 0, 1, colorBinding(targetProfile));
+        colorPicker.setWidth(configPanel.controlWidth());
+        configPanel.add(new NfiConfigRow(Component.translatable("screen.neo_favorite_items.color_label"),
+            colorPicker.group(), List.of(colorPicker.button())));
+        addRenderableWidget(colorPicker.button());
+        colorPicker.allPopupWidgets().forEach(this::addRenderableWidget);
+
         if (profileTab == PreviewMode.CTRL) {
-            opacityBehaviorControl = new NfiCycleButton<>(0, 0, 1, 20, opacityBehaviorBinding(), OPACITY_BEHAVIORS,
+            opacityBehaviorControl = new NfiCycleButton<>(0, 0, 1, 20, opacityBehaviorBinding(targetProfile), OPACITY_BEHAVIORS,
                 value -> Component.translatable("screen.neo_favorite_items.opacity_behavior." + value.name().toLowerCase(java.util.Locale.ROOT)));
             addRow(configPanel, Component.translatable("screen.neo_favorite_items.opacity_behavior_label"), opacityBehaviorControl.widget());
         } else {
             opacityBehaviorControl = null;
         }
 
-        anchorControl = new NfiCycleButton<>(0, 0, 1, 20, anchorBinding(), ANCHORS,
-            value -> Component.translatable("screen.neo_favorite_items.anchor." + value.name().toLowerCase(java.util.Locale.ROOT)));
-        addRow(configPanel, Component.translatable("screen.neo_favorite_items.anchor_label"), anchorControl.widget());
-
-        opacitySlider = new NfiSlider(0, 0, 1, 20, 0.0D, 1.0D, opacityBinding(),
+        opacitySlider = new NfiSlider(0, 0, 1, 20, 0.0D, 1.0D, opacityBinding(targetProfile),
             value -> Component.translatable("screen.neo_favorite_items.opacity", Math.round(value * 100.0D)));
         addRow(configPanel, Component.translatable("screen.neo_favorite_items.opacity_label"), opacitySlider);
 
-        offsetXControl = numberField(offsetXBinding());
-        offsetYControl = numberField(offsetYBinding());
-        widthControl = numberField(widthBinding());
-        heightControl = numberField(heightBinding());
-        scaleControl = numberField(scaleBinding());
-        rotationControl = numberField(rotationBinding());
-        zIndexControl = numberField(zIndexBinding());
-        overflowControl = new NfiToggle(0, 0, 1, 20, overflowBinding(), value -> Component.translatable(value ? "options.on" : "options.off"));
-        clipControl = new NfiToggle(0, 0, 1, 20, clipBinding(), value -> Component.translatable(value ? "options.on" : "options.off"));
-        addRow(configPanel, Component.translatable("screen.neo_favorite_items.offset_x"), offsetXControl.widget());
-        addRow(configPanel, Component.translatable("screen.neo_favorite_items.offset_y"), offsetYControl.widget());
-        addRow(configPanel, Component.translatable("screen.neo_favorite_items.width"), widthControl.widget());
-        addRow(configPanel, Component.translatable("screen.neo_favorite_items.height"), heightControl.widget());
+        configPanel.endSection();
+
+        configPanel.beginSection(Component.translatable("screen.neo_favorite_items.group.geometry"));
+
+        anchorControl = new NfiCycleButton<>(0, 0, 1, 20, anchorBinding(targetProfile), ANCHORS,
+            value -> Component.translatable("screen.neo_favorite_items.anchor." + value.name().toLowerCase(java.util.Locale.ROOT)));
+        addRow(configPanel, Component.translatable("screen.neo_favorite_items.anchor_label"), anchorControl.widget());
+
+        offsetXControl = numberField(offsetXBinding(targetProfile));
+        offsetYControl = numberField(offsetYBinding(targetProfile));
+        widthControl = numberField(widthBinding(targetProfile));
+        heightControl = numberField(heightBinding(targetProfile));
+        scaleControl = numberField(scaleBinding(targetProfile));
+        rotationControl = numberField(rotationBinding(targetProfile));
+        zIndexControl = numberField(zIndexBinding(targetProfile));
+        overflowControl = new NfiToggle(0, 0, 1, 20, overflowBinding(targetProfile), value -> Component.translatable(value ? "options.on" : "options.off"));
+        clipControl = new NfiToggle(0, 0, 1, 20, clipBinding(targetProfile), value -> Component.translatable(value ? "options.on" : "options.off"));
+        int pairWidth = Math.max(1, (configPanel.controlWidth() - 8) / 2);
+        offsetXControl.widget().setWidth(pairWidth);
+        offsetYControl.widget().setWidth(pairWidth);
+        widthControl.widget().setWidth(pairWidth);
+        heightControl.widget().setWidth(pairWidth);
+        NfiWidgetGroup offsetGroup = new NfiWidgetGroup(0, 0);
+        offsetGroup.addRelative(offsetXControl.widget(), 0, 0);
+        offsetGroup.addRelative(offsetYControl.widget(), pairWidth + 8, 0);
+        addRow(configPanel, Component.translatable("screen.neo_favorite_items.offset"), offsetGroup,
+            List.of(offsetXControl.widget(), offsetYControl.widget()));
+        NfiWidgetGroup sizeGroup = new NfiWidgetGroup(0, 0);
+        sizeGroup.addRelative(widthControl.widget(), 0, 0);
+        sizeGroup.addRelative(heightControl.widget(), pairWidth + 8, 0);
+        addRow(configPanel, Component.translatable("screen.neo_favorite_items.render_size"), sizeGroup,
+            List.of(widthControl.widget(), heightControl.widget()));
         addRow(configPanel, Component.translatable("screen.neo_favorite_items.scale"), scaleControl.widget());
         addRow(configPanel, Component.translatable("screen.neo_favorite_items.rotation"), rotationControl.widget());
         addRow(configPanel, Component.translatable("screen.neo_favorite_items.z_index"), zIndexControl.widget());
+        configPanel.endSection();
+
+        configPanel.beginSection(Component.translatable("screen.neo_favorite_items.group.bounds"));
         addRow(configPanel, Component.translatable("screen.neo_favorite_items.overflow"), overflowControl.widget());
         addRow(configPanel, Component.translatable("screen.neo_favorite_items.clip"), clipControl.widget());
+        configPanel.endSection();
 
-        colorPicker = new NfiColorPicker(font, 0, 0, 1, colorBinding());
-        colorPicker.setWidth(configPanel.controlWidth());
-        configPanel.add(new NfiConfigRow(Component.translatable("screen.neo_favorite_items.color_label"),
-            colorPicker.group(), List.of(colorPicker.button())));
-        addRenderableWidget(colorPicker.button());
-        colorPicker.allPopupWidgets().forEach(this::addRenderableWidget);
+        layerControls.put(targetProfile, new LayerControlSet(styleControl, materialControl, colorModeControl,
+            opacityBehaviorControl, anchorControl, opacitySlider, colorPicker, offsetXControl, offsetYControl,
+            widthControl, heightControl, scaleControl, rotationControl, zIndexControl, overflowControl, clipControl));
+
     }
 
     private void buildClientLogicControls() {
@@ -353,6 +440,7 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
     }
 
     private void clearPageControlReferences() {
+        layerControls.clear();
         profileTabs = null;
         styleControl = null;
         materialControl = null;
@@ -374,8 +462,7 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             if (value != ConfigPage.SERVER_RULES || ServerConfigAccess.canEdit()) configPage = value;
         },
             () -> ConfigPage.RENDERING, () -> {
-                clearWidgets();
-                init();
+                rebuildRenderingPage();
             });
     }
 
@@ -423,22 +510,19 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             () -> profileTab,
             value -> profileTab = value,
             () -> PreviewMode.NORMAL,
-            () -> {
-                clearWidgets();
-                init();
-            }
+            this::rebuildRenderingPage
         );
     }
 
-    private NfiValueBinding<OverlayMaterialMode> materialModeBinding() {
+    private NfiValueBinding<OverlayMaterialMode> materialModeBinding(OverlayProfileConfig profile) {
         return NfiValueBinding.unchecked(
-            () -> activeProfile().materialMode,
+            () -> profile.materialMode,
             value -> {
-                activeProfile().materialMode = value;
-                if (value == OverlayMaterialMode.MATERIAL && (OverlayTextureCatalog.NO_MATERIAL.equals(activeProfile().materialId)
-                    || OverlayTextureCatalog.presetStyle(activeProfile().materialId) == NeoFavoriteItemsConfig.OverlayStyle.COLOR_OVERLAY)) {
-                    activeProfile().materialId = OverlayTextureCatalog.presetId(NeoFavoriteItemsConfig.OverlayStyle.MARK);
-                    activeProfile().style = NeoFavoriteItemsConfig.OverlayStyle.MARK;
+                profile.materialMode = value;
+                if (value == OverlayMaterialMode.MATERIAL && (OverlayTextureCatalog.NO_MATERIAL.equals(profile.materialId)
+                    || OverlayTextureCatalog.presetStyle(profile.materialId) == NeoFavoriteItemsConfig.OverlayStyle.COLOR_OVERLAY)) {
+                    profile.materialId = OverlayTextureCatalog.presetId(NeoFavoriteItemsConfig.OverlayStyle.MARK);
+                    profile.style = NeoFavoriteItemsConfig.OverlayStyle.MARK;
                 }
             },
             () -> OverlayMaterialMode.MATERIAL,
@@ -449,12 +533,12 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         );
     }
 
-    private NfiValueBinding<String> materialBinding() {
-        return NfiValueBinding.unchecked(() -> activeProfile().materialId, value -> {
-            activeProfile().materialId = value;
+    private NfiValueBinding<String> materialBinding(OverlayProfileConfig profile) {
+        return NfiValueBinding.unchecked(() -> profile.materialId, value -> {
+            profile.materialId = value;
             var preset = OverlayTextureCatalog.presetStyle(value);
-            if (preset != null) activeProfile().style = preset;
-        }, () -> activeProfile().materialId, this::markDirty);
+            if (preset != null) profile.style = preset;
+        }, () -> profile.materialId, this::markDirty);
     }
 
     private List<String> materialValues() {
@@ -474,13 +558,13 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         return id == null ? "" : id.replace("custom:", "");
     }
 
-    private NfiValueBinding<OverlayProfileConfig.OpacityBehavior> opacityBehaviorBinding() {
-        return NfiValueBinding.unchecked(() -> activeProfile().opacityBehavior, v -> activeProfile().opacityBehavior = v,
+    private NfiValueBinding<OverlayProfileConfig.OpacityBehavior> opacityBehaviorBinding(OverlayProfileConfig profile) {
+        return NfiValueBinding.unchecked(() -> profile.opacityBehavior, v -> profile.opacityBehavior = v,
             () -> OverlayProfileConfig.OpacityBehavior.FIXED, this::markDirty);
     }
 
-    private NfiValueBinding<OverlayPlacement.Anchor> anchorBinding() {
-        return NfiValueBinding.unchecked(() -> activeProfile().anchor, v -> activeProfile().anchor = v,
+    private NfiValueBinding<OverlayPlacement.Anchor> anchorBinding(OverlayProfileConfig profile) {
+        return NfiValueBinding.unchecked(() -> profile.anchor, v -> profile.anchor = v,
             () -> OverlayPlacement.Anchor.SLOT_TOP_LEFT, this::markDirty);
     }
 
@@ -496,19 +580,19 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             : mycraft.yuyears.neofavoriteitems.client.ui.binding.NfiValidationResult.error(Component.translatable("screen.neo_favorite_items.invalid_number")), this::markDirty);
     }
 
-    private NfiValueBinding<Float> offsetXBinding() { return floatBinding(() -> activeProfile().offsetX, v -> activeProfile().offsetX = v, 0.0f, -1024.0f); }
-    private NfiValueBinding<Float> offsetYBinding() { return floatBinding(() -> activeProfile().offsetY, v -> activeProfile().offsetY = v, 0.0f, -1024.0f); }
-    private NfiValueBinding<Float> widthBinding() { return floatBinding(() -> activeProfile().width, v -> activeProfile().width = v, 16.0f, 0.01f); }
-    private NfiValueBinding<Float> heightBinding() { return floatBinding(() -> activeProfile().height, v -> activeProfile().height = v, 16.0f, 0.01f); }
-    private NfiValueBinding<Float> scaleBinding() { return floatBinding(() -> activeProfile().scale, v -> activeProfile().scale = v, 1.0f, 0.01f); }
-    private NfiValueBinding<Float> rotationBinding() { return floatBinding(() -> activeProfile().rotationDegrees, v -> activeProfile().rotationDegrees = v, 0.0f, -360.0f); }
-    private NfiValueBinding<Float> zIndexBinding() { return floatBinding(() -> (float) activeProfile().zIndex, v -> activeProfile().zIndex = normalizeZ(v), 2.0f, 0.0f); }
+    private NfiValueBinding<Float> offsetXBinding(OverlayProfileConfig p) { return floatBinding(() -> p.offsetX, v -> p.offsetX = v, 0.0f, -1024.0f); }
+    private NfiValueBinding<Float> offsetYBinding(OverlayProfileConfig p) { return floatBinding(() -> p.offsetY, v -> p.offsetY = v, 0.0f, -1024.0f); }
+    private NfiValueBinding<Float> widthBinding(OverlayProfileConfig p) { return floatBinding(() -> p.width, v -> p.width = v, 16.0f, 0.01f); }
+    private NfiValueBinding<Float> heightBinding(OverlayProfileConfig p) { return floatBinding(() -> p.height, v -> p.height = v, 16.0f, 0.01f); }
+    private NfiValueBinding<Float> scaleBinding(OverlayProfileConfig p) { return floatBinding(() -> p.scale, v -> p.scale = v, 1.0f, 0.01f); }
+    private NfiValueBinding<Float> rotationBinding(OverlayProfileConfig p) { return floatBinding(() -> p.rotationDegrees, v -> p.rotationDegrees = v, 0.0f, -360.0f); }
+    private NfiValueBinding<Float> zIndexBinding(OverlayProfileConfig p) { return floatBinding(() -> (float) p.zIndex, v -> p.zIndex = normalizeZ(v), 2.0f, 0.0f); }
     private int normalizeZ(float value) {
         int normalized = (int) Math.clamp(value, 0.0f, 1000.0f);
         return normalized == 1 ? 2 : normalized;
     }
-    private NfiValueBinding<Boolean> overflowBinding() { return NfiValueBinding.unchecked(() -> activeProfile().allowOverflow, v -> activeProfile().allowOverflow = v, () -> false, this::markDirty); }
-    private NfiValueBinding<Boolean> clipBinding() { return NfiValueBinding.unchecked(() -> activeProfile().clipToSlot, v -> activeProfile().clipToSlot = v, () -> false, this::markDirty); }
+    private NfiValueBinding<Boolean> overflowBinding(OverlayProfileConfig p) { return NfiValueBinding.unchecked(() -> p.allowOverflow, v -> p.allowOverflow = v, () -> false, this::markDirty); }
+    private NfiValueBinding<Boolean> clipBinding(OverlayProfileConfig p) { return NfiValueBinding.unchecked(() -> p.clipToSlot, v -> p.clipToSlot = v, () -> false, this::markDirty); }
 
     private void syncGeometryControls() {
         if (offsetXControl == null) return;
@@ -525,7 +609,8 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
                 case ALT -> OverlayProfileConfig.defaultLockable();
                 case UNLOCKABLE -> OverlayProfileConfig.defaultUnlockable();
             };
-            if (defaultProfile != null) activeProfile().copyFrom(defaultProfile);
+            activeLayers().set(Math.clamp(layerIndex, 0, activeLayers().size() - 1), defaultProfile);
+            syncDraftLegacyProfiles();
             syncControls();
         } else if (configPage == ConfigPage.CLIENT_LOGIC) {
             var defaults = new NeoFavoriteItemsConfig().feedback;
@@ -534,12 +619,10 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             feedbackSoundDraft = defaults.feedbackSound;
             feedbackVolumeDraft = defaults.feedbackVolume;
             feedbackPitchDraft = defaults.feedbackPitch;
-            clearWidgets();
-            init();
+            rebuildRenderingPage();
         } else if (ServerConfigAccess.canEdit()) {
             serverRulesDraft = ServerRulesDraft.from(ServerConfigAccess.snapshot());
-            clearWidgets();
-            init();
+            rebuildRenderingPage();
         }
         markDirty();
     }
@@ -548,10 +631,10 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         return NfiValueBinding.unchecked(() -> theme, value -> theme = value, () -> NfiUiTheme.DEFAULT, this::markDirty);
     }
 
-    private NfiValueBinding<OverlayColorMode> colorModeBinding() {
+    private NfiValueBinding<OverlayColorMode> colorModeBinding(OverlayProfileConfig p) {
         return NfiValueBinding.unchecked(
-            () -> activeProfile().colorMode,
-            value -> activeProfile().colorMode = value,
+            () -> p.colorMode,
+            value -> p.colorMode = value,
             () -> OverlayColorMode.MULTIPLY,
             this::markDirty
         );
@@ -566,29 +649,151 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         );
     }
 
-    private NfiValueBinding<Double> opacityBinding() {
+    private NfiValueBinding<Double> opacityBinding(OverlayProfileConfig p) {
         return NfiValueBinding.unchecked(
-            () -> (double) activeProfile().opacity,
-            value -> activeProfile().opacity = (float) Math.clamp(value, 0.0D, 1.0D),
+            () -> (double) p.opacity,
+            value -> p.opacity = (float) Math.clamp(value, 0.0D, 1.0D),
             () -> 0.7D,
             this::markDirty
         );
     }
 
-    private NfiValueBinding<Integer> colorBinding() {
+    private NfiValueBinding<Integer> colorBinding(OverlayProfileConfig p) {
         return NfiValueBinding.unchecked(
-            () -> activeProfile().color,
-            value -> activeProfile().color = value,
+            () -> p.color,
+            value -> p.color = value,
             () -> new NeoFavoriteItemsConfig().overlay.locked.color,
             this::markDirty
         );
     }
 
     private void markDirty() {
+        if (configPage != ConfigPage.SERVER_RULES) {
+            applyClientDraftToConfig();
+            ConfigManager.getInstance().markRuntimeConfigChanged();
+        }
         ConfigManager.getInstance().setDraftDirty(true);
+        lastDraftMutationNanos = System.nanoTime();
+    }
+
+    private void buildLayerControls() {
+        List<OverlayProfileConfig> layers = activeLayers();
+        // Stable outer container keeps Layer nodes and add action in one tree branch.
+        NfiConfigSection layerList = configPanel.beginSection(
+            Component.translatable("screen.neo_favorite_items.layer_label"),
+            "layer-list." + profileTab.name().toLowerCase(java.util.Locale.ROOT));
+        layerList.setExpandedSilently(true);
+        // Each layer is a child section; selected layer owns the editable groups.
+        for (int i = 0; i < layers.size(); i++) {
+            final int target = i;
+            String key = "layer." + profileTab.name().toLowerCase(java.util.Locale.ROOT) + "." + i;
+            NfiConfigSection layerSection = configPanel.beginSection(
+                Component.translatable("screen.neo_favorite_items.layer.name", i + 1), key);
+            if (i > 0) {
+                NfiButton remove = new NfiButton(0, 0, 20, 20, Component.literal("x"), ignored -> removeLayer(target));
+                remove.setPlain(true);
+                layerSection.setTrailingWidget(remove);
+            }
+            layerSection.setToggleListener(() -> {
+                if (layerIndex != target) {
+                    closeTransientPopups();
+                    layerIndex = target;
+                    // All layers already own real controls. Switching target must
+                    // not rebuild the tree: rebuilding resets widget visibility
+                    // while another layer may be expanded off-screen.
+                    syncControls();
+                }
+            });
+            // Build real controls for every layer. Each binding captures this
+            // layer's config object, so scrolling or switching layers cannot
+            // invalidate another layer's expanded subtree.
+            buildRenderingControls(layers.get(i));
+            configPanel.endSection();
+        }
+        if (layers.size() < OverlayLayerList.MAX_LAYERS) {
+            NfiButton add = new NfiButton(0, 0, configPanel.controlWidth(), 20,
+                Component.translatable("screen.neo_favorite_items.add_layer"), ignored -> addLayer());
+            addRenderableWidget(add);
+            configPanel.addLeftWidget(add);
+        }
+        configPanel.endSection();
+    }
+
+    private List<OverlayProfileConfig> activeLayers() {
+        return layerDrafts.computeIfAbsent(profileTab, ignored -> new java.util.ArrayList<>(switch (profileTab) {
+            case NORMAL -> OverlayLayerList.normalize(ConfigManager.getInstance().getConfig().overlay.lockedLayers, OverlayProfileConfig::defaultLocked);
+            case CTRL -> OverlayLayerList.normalize(ConfigManager.getInstance().getConfig().overlay.bypassLayers, OverlayProfileConfig::defaultBypass);
+            case ALT -> OverlayLayerList.normalize(ConfigManager.getInstance().getConfig().overlay.lockableLayers, OverlayProfileConfig::defaultLockable);
+            case UNLOCKABLE -> OverlayLayerList.normalize(ConfigManager.getInstance().getConfig().overlay.unlockableLayers, OverlayProfileConfig::defaultUnlockable);
+        }));
+    }
+
+    private void selectLayer(int index) {
+        layerIndex = Math.clamp(index, 0, activeLayers().size() - 1);
+        rebuildRenderingPage();
+    }
+
+    private void addLayer() {
+        if (!layerActionReady()) return;
+        List<OverlayProfileConfig> layers = activeLayers();
+        if (layers.size() >= OverlayLayerList.MAX_LAYERS) return;
+        layers.add(defaultLayerFor(profileTab));
+        markDirty();
+        lastLayerActionNanos = System.nanoTime();
+        rebuildRenderingPage();
+    }
+
+    private void removeLayer(int index) {
+        if (!layerActionReady()) return;
+        List<OverlayProfileConfig> layers = activeLayers();
+        if (index <= 0 || index >= layers.size()) return;
+        layers.remove(index);
+        closeTransientPopups();
+        String prefix = "layer." + profileTab.name().toLowerCase(java.util.Locale.ROOT) + "." + index;
+        sectionExpansion.keySet().removeIf(key -> key.equals(prefix) || key.startsWith(prefix + "."));
+        layerIndex = Math.min(layerIndex, layers.size() - 1);
+        markDirty();
+        lastLayerActionNanos = System.nanoTime();
+        rebuildRenderingPage();
+    }
+
+    private boolean layerActionReady() {
+        return System.nanoTime() - lastLayerActionNanos >= 200_000_000L;
+    }
+
+    private void closeTransientPopups() {
+        if (materialControl != null) materialControl.close();
+        if (feedbackSoundControl != null) feedbackSoundControl.close();
+        if (colorPicker != null) colorPicker.close();
+        setFocused(null);
+        dropdownCapturedMouse = false;
+    }
+
+    private static OverlayProfileConfig defaultLayerFor(PreviewMode mode) {
+        return switch (mode) {
+            case NORMAL -> OverlayProfileConfig.defaultLocked();
+            case CTRL -> OverlayProfileConfig.defaultBypass();
+            case ALT -> OverlayProfileConfig.defaultLockable();
+            case UNLOCKABLE -> OverlayProfileConfig.defaultUnlockable();
+        };
+    }
+
+    private void rebuildRenderingPage() {
+        rebuildRequested = true;
+    }
+
+    private void rebuildWidgetsNow() {
+        DebugLogger.debug("UI-DIAG rebuild begin screen={} panel={}", System.identityHashCode(this),
+            configPanel == null ? 0 : System.identityHashCode(configPanel));
+        rebuildRequested = false;
+        if (configPanel != null) configPanel.hideAllSectionWidgets();
+        clearWidgets();
+        init();
     }
 
     private void loadDraft() {
+        // Every screen opening starts collapsed; expansion state is session-local.
+        sectionExpansion.clear();
         var config = ConfigManager.getInstance().getConfig();
         try {
             theme = NfiUiTheme.valueOf(config.feedback.uiTheme);
@@ -600,6 +805,11 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         bypassProfile = overlay.bypass.copy();
         lockableProfile = overlay.lockable.copy();
         unlockableProfile = overlay.unlockable.copy();
+        layerDrafts.clear();
+        layerDrafts.put(PreviewMode.NORMAL, new java.util.ArrayList<>(overlay.layers(OverlayMode.LOCKED)));
+        layerDrafts.put(PreviewMode.CTRL, new java.util.ArrayList<>(overlay.layers(OverlayMode.BYPASS_LOCKED)));
+        layerDrafts.put(PreviewMode.ALT, new java.util.ArrayList<>(overlay.layers(OverlayMode.LOCKABLE)));
+        layerDrafts.put(PreviewMode.UNLOCKABLE, new java.util.ArrayList<>(overlay.layers(OverlayMode.UNLOCKABLE)));
         showVisualFeedbackDraft = config.feedback.showVisualFeedback;
         playSoundFeedbackDraft = config.feedback.playSoundFeedback;
         feedbackSoundDraft = config.feedback.feedbackSound;
@@ -609,42 +819,114 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             serverRulesDraft = ServerRulesDraft.from(ServerConfigAccess.snapshot());
         }
         ConfigManager.getInstance().setDraftDirty(false);
+        if (openedSnapshot == null) openedSnapshot = ClientDraftSnapshot.capture(config);
     }
 
     private void reloadDraft() {
         ConfigManager.getInstance().reload();
         ServerConfigAccess.request();
+        openedSnapshot = null;
+        autoSavedDraft = false;
         loadDraft();
-        clearWidgets();
-        init();
+        rebuildRenderingPage();
     }
 
     private void applyAndClose() {
+        applyClientDraftToConfig();
+        ConfigManager.getInstance().saveClientConfig();
+        if (serverRulesDraft != null && ServerConfigAccess.canEdit()) {
+            ServerConfigAccess.submit(serverRulesDraft.toSnapshot());
+        }
+        autoSavedDraft = false;
+        ConfigManager.getInstance().setDraftDirty(false);
+        onClose();
+    }
+
+    private void keepDraft() {
+        ConfigManager.getInstance().keepDraftAfterExternalChange();
+        lastDraftMutationNanos = System.nanoTime() - 400_000_000L;
+    }
+
+    private void applyClientDraftToConfig() {
         var config = ConfigManager.getInstance().getConfig();
         var overlay = config.overlay;
+        syncDraftLegacyProfiles();
         overlay.locked.copyFrom(lockedProfile);
         overlay.bypass.copyFrom(bypassProfile);
         overlay.lockable.copyFrom(lockableProfile);
         overlay.unlockable.copyFrom(unlockableProfile);
+        overlay.lockedLayers = List.copyOf(layerDrafts.getOrDefault(PreviewMode.NORMAL, List.of(lockedProfile.copy())));
+        overlay.bypassLayers = List.copyOf(layerDrafts.getOrDefault(PreviewMode.CTRL, List.of(bypassProfile.copy())));
+        overlay.lockableLayers = List.copyOf(layerDrafts.getOrDefault(PreviewMode.ALT, List.of(lockableProfile.copy())));
+        overlay.unlockableLayers = List.copyOf(layerDrafts.getOrDefault(PreviewMode.UNLOCKABLE, List.of(unlockableProfile.copy())));
         config.feedback.showVisualFeedback = showVisualFeedbackDraft;
         config.feedback.playSoundFeedback = playSoundFeedbackDraft;
         config.feedback.feedbackSound = feedbackSoundDraft;
         config.feedback.feedbackVolume = Math.clamp(feedbackVolumeDraft, 0.0f, 1.0f);
         config.feedback.feedbackPitch = Math.clamp(feedbackPitchDraft, 0.0f, 2.0f);
         config.feedback.uiTheme = theme.name();
-        ConfigManager.getInstance().saveClientConfig();
-        if (serverRulesDraft != null && ServerConfigAccess.canEdit()) {
-            ServerConfigAccess.submit(serverRulesDraft.toSnapshot());
-        }
-        ConfigManager.getInstance().setDraftDirty(false);
-        onClose();
+    }
+
+    private void syncDraftLegacyProfiles() {
+        if (layerDrafts.get(PreviewMode.NORMAL) != null && !layerDrafts.get(PreviewMode.NORMAL).isEmpty()) lockedProfile.copyFrom(layerDrafts.get(PreviewMode.NORMAL).getFirst());
+        if (layerDrafts.get(PreviewMode.CTRL) != null && !layerDrafts.get(PreviewMode.CTRL).isEmpty()) bypassProfile.copyFrom(layerDrafts.get(PreviewMode.CTRL).getFirst());
+        if (layerDrafts.get(PreviewMode.ALT) != null && !layerDrafts.get(PreviewMode.ALT).isEmpty()) lockableProfile.copyFrom(layerDrafts.get(PreviewMode.ALT).getFirst());
+        if (layerDrafts.get(PreviewMode.UNLOCKABLE) != null && !layerDrafts.get(PreviewMode.UNLOCKABLE).isEmpty()) unlockableProfile.copyFrom(layerDrafts.get(PreviewMode.UNLOCKABLE).getFirst());
     }
 
     @Override
     public void onClose() {
         stopSoundPreview();
+        if (autoSavedDraft && openedSnapshot != null) {
+            openedSnapshot.restore(ConfigManager.getInstance().getConfig());
+            ConfigManager.getInstance().saveClientConfig();
+        }
         ConfigManager.getInstance().setDraftDirty(false);
         minecraft.setScreen(previousScreen);
+    }
+
+    private static final class ClientDraftSnapshot {
+        private final OverlayProfileConfig locked, bypass, lockable, unlockable;
+        private final List<OverlayProfileConfig> lockedLayers, bypassLayers, lockableLayers, unlockableLayers;
+        private final boolean visual, sound;
+        private final String soundId, theme;
+        private final float volume, pitch;
+
+        private ClientDraftSnapshot(NeoFavoriteItemsConfig config) {
+            locked = config.overlay.locked.copy();
+            bypass = config.overlay.bypass.copy();
+            lockable = config.overlay.lockable.copy();
+            unlockable = config.overlay.unlockable.copy();
+            lockedLayers = new java.util.ArrayList<>(config.overlay.lockedLayers).stream().map(OverlayProfileConfig::copy).toList();
+            bypassLayers = new java.util.ArrayList<>(config.overlay.bypassLayers).stream().map(OverlayProfileConfig::copy).toList();
+            lockableLayers = new java.util.ArrayList<>(config.overlay.lockableLayers).stream().map(OverlayProfileConfig::copy).toList();
+            unlockableLayers = new java.util.ArrayList<>(config.overlay.unlockableLayers).stream().map(OverlayProfileConfig::copy).toList();
+            visual = config.feedback.showVisualFeedback;
+            sound = config.feedback.playSoundFeedback;
+            soundId = config.feedback.feedbackSound;
+            volume = config.feedback.feedbackVolume;
+            pitch = config.feedback.feedbackPitch;
+            theme = config.feedback.uiTheme;
+        }
+
+        static ClientDraftSnapshot capture(NeoFavoriteItemsConfig config) { return new ClientDraftSnapshot(config); }
+
+        void restore(NeoFavoriteItemsConfig config) {
+            config.overlay.locked.copyFrom(locked);
+            config.overlay.bypass.copyFrom(bypass);
+            config.overlay.lockable.copyFrom(lockable);
+            config.overlay.unlockable.copyFrom(unlockable);
+            config.overlay.lockedLayers = lockedLayers;
+            config.overlay.bypassLayers = bypassLayers;
+            config.overlay.lockableLayers = lockableLayers;
+            config.overlay.unlockableLayers = unlockableLayers;
+            config.feedback.showVisualFeedback = visual;
+            config.feedback.playSoundFeedback = sound;
+            config.feedback.feedbackSound = soundId;
+            config.feedback.feedbackVolume = volume;
+            config.feedback.feedbackPitch = pitch;
+            config.feedback.uiTheme = theme;
+        }
     }
 
     @Override
@@ -652,6 +934,7 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         if (colorPicker != null && colorPicker.isOpen()) {
             boolean handled = colorPicker.mouseClicked(mouseX, mouseY, button);
             setFocused(colorPicker.activePopupWidget());
+            if (!handled) setFocused(null);
             return handled;
         }
         if (feedbackSoundControl != null && feedbackSoundControl.isOpen()) {
@@ -665,19 +948,27 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             setFocused(materialControl.button());
             return true;
         }
-        if (materialControl != null && materialControl.mouseClicked(mouseX, mouseY, button)) {
+        if (materialControl != null && materialControl.button().visible && materialControl.button().active
+            && materialControl.mouseClicked(mouseX, mouseY, button)) {
             dropdownCapturedMouse = materialControl.isOpen();
             if (feedbackSoundControl != null) feedbackSoundControl.close();
             setFocused(materialControl.button());
             return true;
         }
-        if (feedbackSoundControl != null && feedbackSoundControl.mouseClicked(mouseX, mouseY, button)) {
+        if (feedbackSoundControl != null && feedbackSoundControl.trigger().visible && feedbackSoundControl.trigger().active
+            && feedbackSoundControl.mouseClicked(mouseX, mouseY, button)) {
             dropdownCapturedMouse = feedbackSoundControl.isOpen();
             if (materialControl != null) materialControl.close();
             focusFeedbackSoundControl();
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        if (configPanel != null && configPanel.mouseClicked(mouseX, mouseY, button)) {
+            setFocused(null);
+            return true;
+        }
+        boolean handled = super.mouseClicked(mouseX, mouseY, button);
+        if (!handled) setFocused(null);
+        return handled;
     }
 
     private void handleFeedbackSoundClick(double mouseX, double mouseY, int button) {
@@ -766,24 +1057,29 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
         if (configTabs != null) configTabs.syncFromBinding();
         if (profileTabs == null) return;
         profileTabs.syncFromBinding();
-        styleControl.syncFromBinding();
-        if (materialControl != null) materialControl.syncFromBinding();
+        LayerControlSet controls = layerControls.get(activeProfile());
+        if (controls == null) return;
+        controls.style().syncFromBinding();
+        if (controls.material() != null) controls.material().syncFromBinding();
         syncMaterialControlAvailability();
-        colorModeControl.syncFromBinding();
-        if (opacityBehaviorControl != null) opacityBehaviorControl.syncFromBinding();
-        if (anchorControl != null) anchorControl.syncFromBinding();
+        controls.colorMode().syncFromBinding();
+        if (controls.opacityBehavior() != null) controls.opacityBehavior().syncFromBinding();
+        if (controls.anchor() != null) controls.anchor().syncFromBinding();
         themeControl.syncFromBinding();
         previewModeControl.syncFromBinding();
-        opacitySlider.syncFromBinding();
-        colorPicker.syncFromBinding();
-        syncGeometryControls();
+        controls.opacity().syncFromBinding();
+        controls.colorPicker().syncFromBinding();
+        controls.offsetX().syncFromBinding(); controls.offsetY().syncFromBinding(); controls.width().syncFromBinding();
+        controls.height().syncFromBinding(); controls.scale().syncFromBinding(); controls.rotation().syncFromBinding();
+        controls.zIndex().syncFromBinding(); controls.overflow().syncFromBinding(); controls.clip().syncFromBinding();
     }
 
     private void syncMaterialControlAvailability() {
-        if (materialControl == null) return;
+        LayerControlSet controls = layerControls.get(activeProfile());
+        if (controls == null || controls.material() == null) return;
         boolean enabled = activeProfile().materialMode == OverlayMaterialMode.MATERIAL;
-        materialControl.button().active = enabled;
-        if (!enabled) materialControl.close();
+        controls.material().button().active = enabled;
+        if (!enabled) controls.material().close();
     }
 
     private Component profileLabel(PreviewMode mode) {
@@ -796,18 +1092,15 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
     }
 
     private OverlayProfileConfig activeProfile() {
-        return switch (profileTab) {
-            case NORMAL -> lockedProfile;
-            case CTRL -> bypassProfile;
-            case ALT -> lockableProfile;
-            case UNLOCKABLE -> unlockableProfile;
-        };
+        List<OverlayProfileConfig> layers = activeLayers();
+        return layers.get(Math.clamp(layerIndex, 0, layers.size() - 1));
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
         NfiUiRenderer.setTheme(theme);
         renderBlurredBackground(delta);
+        boolean stateRequiresRebuild = rebuildRequested;
         if (observedServerAccessRevision != ServerConfigAccess.revision()) {
             observedServerAccessRevision = ServerConfigAccess.revision();
             if (ServerConfigAccess.snapshot() != null) {
@@ -816,15 +1109,14 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             if (configPage == ConfigPage.SERVER_RULES && !ServerConfigAccess.canEdit()) {
                 configPage = ConfigPage.RENDERING;
             }
-            clearWidgets();
-            init();
+            stateRequiresRebuild = true;
         }
         var config = ConfigManager.getInstance().getConfig();
         if (!ConfigManager.getInstance().isDraftDirty() && draftDiffersFrom(config)) {
             loadDraft();
-            clearWidgets();
-            init();
+            stateRequiresRebuild = true;
         }
+        if (stateRequiresRebuild) rebuildWidgetsNow();
         graphics.fill(0, 0, width, height, 0x30101010);
         NfiUiRenderer.panel(graphics, contentLeft, 8, contentWidth, height - 16, theme.background);
         NfiUiRenderer.centeredText(graphics, font, title, width / 2, 17, theme.text);
@@ -840,6 +1132,9 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             NfiUiRenderer.text(graphics, font,
                 Component.translatable("screen.neo_favorite_items.external_change"),
                 contentLeft + 12, height - 44, 0xFFFFC857);
+        }
+        if (keepDraftButton != null) {
+            keepDraftButton.visible = ConfigManager.getInstance().isExternalChangeDetected();
         }
         NfiUiRenderer.divider(graphics, contentLeft + 10, configTop - 5, contentWidth - 20);
         configPanel.renderLabels(graphics, font, theme.text);
@@ -903,10 +1198,7 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
 
     private boolean draftDiffersFrom(NeoFavoriteItemsConfig config) {
         var overlay = config.overlay;
-        return !lockedProfile.sameValues(overlay.locked)
-            || !bypassProfile.sameValues(overlay.bypass)
-            || !lockableProfile.sameValues(overlay.lockable)
-            || !unlockableProfile.sameValues(overlay.unlockable)
+        return !activeLayersEqual(overlay)
             || showVisualFeedbackDraft != config.feedback.showVisualFeedback
             || playSoundFeedbackDraft != config.feedback.playSoundFeedback
             || !java.util.Objects.equals(feedbackSoundDraft, config.feedback.feedbackSound)
@@ -915,16 +1207,23 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
             || !java.util.Objects.equals(theme.name(), config.feedback.uiTheme);
     }
 
+    private boolean activeLayersEqual(NeoFavoriteItemsConfig.Overlay overlay) {
+        return layersEqual(layerDrafts.get(PreviewMode.NORMAL), overlay.lockedLayers)
+            && layersEqual(layerDrafts.get(PreviewMode.CTRL), overlay.bypassLayers)
+            && layersEqual(layerDrafts.get(PreviewMode.ALT), overlay.lockableLayers)
+            && layersEqual(layerDrafts.get(PreviewMode.UNLOCKABLE), overlay.unlockableLayers);
+    }
+
+    private static boolean layersEqual(List<OverlayProfileConfig> left, List<OverlayProfileConfig> right) {
+        if (left == null || right == null || left.size() != right.size()) return false;
+        for (int i = 0; i < left.size(); i++) if (!left.get(i).sameValues(right.get(i))) return false;
+        return true;
+    }
+
     private void renderPreview(GuiGraphics graphics, int x, int y) {
         PreviewMode activeMode = Screen.hasControlDown()
             ? PreviewMode.CTRL
             : Screen.hasAltDown() ? PreviewMode.ALT : previewMode;
-        OverlayProfileConfig profileConfig = switch (activeMode) {
-            case CTRL -> bypassProfile;
-            case ALT -> lockableProfile;
-            case UNLOCKABLE -> unlockableProfile;
-            case NORMAL -> lockedProfile;
-        };
         OverlayMode mode = switch (activeMode) {
             case CTRL -> OverlayMode.BYPASS_LOCKED;
             case ALT -> OverlayMode.LOCKABLE;
@@ -944,12 +1243,25 @@ public final class NeoFavoriteItemsConfigScreen extends Screen {
                     drawEngine.beginFrame();
                     drawEngine.submit(
                         SlotRenderTarget.standard(LogicalSlotIndex.of(0), true, slotX + 1, slotY + 1),
-                        OverlayProfile.fromConfig(mode, profileConfig, lockedProfile.opacity)
+                        draftRenderProfile(mode, activeMode)
                     );
                     drawEngine.render(graphics);
                 }
             }
         }
+    }
+
+    private OverlayProfile draftRenderProfile(OverlayMode mode, PreviewMode preview) {
+        List<OverlayLayer> compiled = new java.util.ArrayList<>();
+        for (OverlayProfileConfig config : activeLayersFor(preview)) {
+            compiled.addAll(OverlayProfile.fromConfig(mode, config, lockedProfile.opacity).layers());
+        }
+        compiled.sort(java.util.Comparator.comparingInt(OverlayLayer::zIndex));
+        return new OverlayProfile(mode, compiled);
+    }
+
+    private List<OverlayProfileConfig> activeLayersFor(PreviewMode mode) {
+        return layerDrafts.getOrDefault(mode, List.of());
     }
 
     private enum ConfigPage { RENDERING, CLIENT_LOGIC, SERVER_RULES }

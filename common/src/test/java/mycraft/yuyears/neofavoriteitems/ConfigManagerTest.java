@@ -39,6 +39,9 @@ class ConfigManagerTest {
         Thread.sleep(550L);
         assertFalse(manager.reloadIfChanged());
         assertTrue(manager.isExternalChangeDetected());
+        manager.keepDraftAfterExternalChange();
+        assertFalse(manager.isExternalChangeDetected());
+        assertTrue(manager.isDraftDirty());
         manager.setDraftDirty(false);
     }
 
@@ -80,6 +83,9 @@ class ConfigManagerTest {
         assertTrue(Files.exists(clientConfigFile));
         assertTrue(Files.exists(clientLogicConfigFile));
         assertFalse(Files.exists(legacyConfigFile));
+        try (var files = Files.list(clientConfigFile.getParent())) {
+            assertFalse(files.anyMatch(path -> path.getFileName().toString().endsWith(".tmp")));
+        }
         assertTrue(Files.readString(commonConfigFile, StandardCharsets.UTF_8).contains("通用配置"));
         assertTrue(Files.readString(clientConfigFile, StandardCharsets.UTF_8).contains("客户端配置"));
         assertTrue(manager.getConfig().general.lockEmptySlots);

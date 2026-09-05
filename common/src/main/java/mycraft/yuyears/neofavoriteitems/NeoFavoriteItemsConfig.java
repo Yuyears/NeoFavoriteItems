@@ -1,6 +1,10 @@
 
 package mycraft.yuyears.neofavoriteitems;
 
+import java.util.List;
+import mycraft.yuyears.neofavoriteitems.render.OverlayLayerList;
+import mycraft.yuyears.neofavoriteitems.render.OverlayMode;
+
 public class NeoFavoriteItemsConfig {
     public static class General {
         public boolean lockEmptySlots = true;
@@ -63,6 +67,24 @@ public class NeoFavoriteItemsConfig {
         public OverlayProfileConfig bypass = OverlayProfileConfig.defaultBypass();
         public OverlayProfileConfig lockable = OverlayProfileConfig.defaultLockable();
         public OverlayProfileConfig unlockable = OverlayProfileConfig.defaultUnlockable();
+        /** New bounded model; legacy fields remain until codec/render migration. */
+        public List<OverlayProfileConfig> lockedLayers = standardLayers(OverlayProfileConfig::defaultLocked);
+        public List<OverlayProfileConfig> bypassLayers = standardLayers(OverlayProfileConfig::defaultBypass);
+        public List<OverlayProfileConfig> lockableLayers = standardLayers(OverlayProfileConfig::defaultLockable);
+        public List<OverlayProfileConfig> unlockableLayers = standardLayers(OverlayProfileConfig::defaultUnlockable);
+
+        private static List<OverlayProfileConfig> standardLayers(java.util.function.Supplier<OverlayProfileConfig> factory) {
+            return List.of(factory.get());
+        }
+
+        public List<OverlayProfileConfig> layers(OverlayMode mode) {
+            return switch (mode) {
+                case LOCKED -> OverlayLayerList.normalize(lockedLayers, OverlayProfileConfig::defaultLocked);
+                case BYPASS_LOCKED -> OverlayLayerList.normalize(bypassLayers, OverlayProfileConfig::defaultBypass);
+                case LOCKABLE -> OverlayLayerList.normalize(lockableLayers, OverlayProfileConfig::defaultLockable);
+                case UNLOCKABLE -> OverlayLayerList.normalize(unlockableLayers, OverlayProfileConfig::defaultUnlockable);
+            };
+        }
 
         public void syncProfilesFromLegacy() {
             locked.style = lockedStyle;

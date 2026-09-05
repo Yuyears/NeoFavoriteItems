@@ -371,6 +371,46 @@ public final class ServerFavoriteService {
         return true;
     }
 
+    public static boolean executeHotbarRowSwap(ServerPlayer player, int rowIndex, int columnMask) {
+        HotbarRowSwapCompatService.RowSwapPlan plan = HotbarRowSwapCompatService
+            .createPlan(rowIndex, columnMask)
+            .orElse(null);
+        if (player == null
+            || !player.isAlive()
+            || player.isSpectator()
+            || plan == null
+            || player.containerMenu != player.inventoryMenu
+            || !player.inventoryMenu.getCarried().isEmpty()) {
+            return false;
+        }
+
+        int[] slotPairs = plan.slotPairs();
+        FavoritesManager.getStateService().setPlayer(player.getUUID());
+        Set<Integer> currentFavorites = FavoritesManager.getStateService().getFavoriteSlots();
+        Set<Integer> movedFavorites = FavoriteSlotTransferHelper.movePairs(currentFavorites, slotPairs);
+
+        runWithInventoryGuardsBypassed(player, () -> {
+            for (int i = 0; i < slotPairs.length; i += 2) {
+                int first = slotPairs[i];
+                int second = slotPairs[i + 1];
+                ItemStack firstStack = player.getInventory().getItem(first).copy();
+                ItemStack secondStack = player.getInventory().getItem(second).copy();
+                player.getInventory().setItem(first, secondStack);
+                player.getInventory().setItem(second, firstStack);
+            }
+        });
+
+        if (!currentFavorites.equals(movedFavorites)) {
+            FavoritesManager favoritesManager = FavoritesManager.getInstance();
+            for (int inventoryIndex : slotPairs) {
+                favoritesManager.setSlotFavorite(inventoryIndex, movedFavorites.contains(inventoryIndex));
+            }
+            markFavoriteStateChanged(player, "hotbar_swapper_row_swap");
+        }
+        player.inventoryMenu.broadcastChanges();
+        return true;
+    }
+
     public static void beginRespawnInventoryRestoreBypass(Player newPlayer, boolean keepEverything) {
         if (shouldBypassRespawnInventoryRestore(newPlayer, keepEverything)) {
             beginInventoryGuardBypass(newPlayer.getUUID());

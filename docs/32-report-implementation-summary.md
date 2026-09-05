@@ -2,13 +2,22 @@
 
 # 实现摘要
 
-Last updated: 2026-08-16
+Last updated: 2026-09-06
 
-最后更新：2026-08-16
+最后更新：2026-09-06
 
 ## Purpose
 
 ## 用途
+
+## 0.0.2 Feature Update
+
+- In-game configuration UI, bindable key, themes, tabs, recursive collapsible sections, scrolling, live client updates, reload, and external-change detection.
+- Up to four independently configured rendering layers per profile, shared by preview and runtime rendering.
+- Custom `NFI Assets` PNG/JPG materials, bounded arbitrary dimensions, transforms, clipping, overflow, z-order, and expanded color modes.
+- Searchable lazy-paged sound IDs, subtitle tooltips, and cooldown-limited preview playback.
+
+本版本新增局内配置、可绑定按键、主题分页、递归折叠分组、滚动、即时生效、Reload 与外部修改检测；每个 Profile 支持最多四个独立渲染层，预览与实际渲染共用；支持 NFI Assets 自定义材质、任意受限尺寸、变换、裁剪、溢出、z 层和扩展着色模式；音效 ID 支持懒加载搜索、subtitle 和冷却预览。
 
 - This document records completed implementation scope. It is historical project status, not the active backlog.
 - 本文档记录已完成的实现范围。它属于历史项目状态，不作为当前待办列表。
