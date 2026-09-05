@@ -50,3 +50,4 @@ docs/*
 .claude/
 .tmp/
 .gradle-test-tmp/
+.gradle-tmp/
